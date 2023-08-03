@@ -130,13 +130,16 @@ async def get_maersk_p2p(client, url: str, location_url: str, cutoff_url: str, p
                                                         'reference': vessel_imo
                                                                         }
                                                                 }
-                                                voyage_num = legs['transport'].get('carrierDepartureVoyageNumber')
+                                                voyage_num:str = legs['transport'].get('carrierDepartureVoyageNumber')
                                                 if voyage_num:
                                                     voyage_body: dict = {'internalVoyage': voyage_num}
                                                     leg_body.update({'voyages': voyage_body})
 
-                                                if legs['transport'].get('carrierServiceCode'):
-                                                    service_body: dict = {'serviceCode': legs['transport'].get('carrierServiceCode'),'serviceName': legs['transport'].get('carrierServiceName')}
+                                                service_code:str = legs['transport'].get('carrierServiceCode')
+                                                service_name:str = legs['transport'].get('carrierServiceName')
+
+                                                if service_code or service_name:
+                                                    service_body: dict = {'serviceCode': service_code,'serviceName': service_name}
                                                     leg_body.update({'services': service_body})
 
                                                 # BU only need the cut off date for 1st leg
