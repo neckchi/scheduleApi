@@ -1,11 +1,12 @@
 import asyncio
 from datetime import datetime
 from typing import Generator
-from app.carrierp2p.helpers import deepget,call_client
+from app.carrierp2p.helpers import deepget
+from app.routers.router_config import HTTPXClientWrapper
 
 async def get_maersk_cutoff(client, url: str, headers: dict, country: str, pol: str, imo: str, voyage: str):
     params: dict = {'ISOCountryCode': country, 'portOfLoad': pol, 'vesselIMONumber': imo, 'voyage': voyage}
-    async for response_json in call_client(client=client,url=url,method ='GET',stream=True,headers=headers, params=params):
+    async for response_json in HTTPXClientWrapper.call_client(client=client,url=url,method ='GET',stream=True,headers=headers, params=params):
         cut_off_body: dict = {}
         for cutoff in response_json[0]['shipmentDeadlines']['deadlines']:
             if cutoff.get('deadlineName') == 'Commercial Cargo Cutoff':
@@ -20,7 +21,7 @@ async def get_maersk_p2p(client, url: str, location_url: str, cutoff_url: str, p
                          search_range: str, direct_only: bool|None, tsp: str | None = None, scac: str | None = None,
                          start_date: str | None = None,
                          date_type: str | None = None, service: str | None = None, vessel_flag: str | None = None):
-    location_tasks:Generator = (asyncio.create_task(anext(call_client(client=client,method='GET',stream=True, url=location_url, headers={'Consumer-Key': pw}, params= {'UNLocationCode': port}))) for port in [pol, pod])
+    location_tasks:Generator = (asyncio.create_task(anext(HTTPXClientWrapper.call_client(client=client,method='GET',stream=True, url=location_url, headers={'Consumer-Key': pw}, params= {'UNLocationCode': port}))) for port in [pol, pod])
     [origingeolocation, destinationgeolocation] = await asyncio.gather(*location_tasks)
     async def schedules():
         if origingeolocation and destinationgeolocation:
@@ -33,7 +34,7 @@ async def get_maersk_p2p(client, url: str, location_url: str, cutoff_url: str, p
                             'dateRange': f'P{search_range}W', 'startDateType': date_type, 'startDate': start_date}
             params.update({'vesselFlagCode': vessel_flag}) if vessel_flag else ...
             maersk_list: set = {'MAEU', 'SEAU', 'SEJJ', 'MCPU', 'MAEI'} if scac is None else {scac}
-            p2p_resp_tasks:list = [asyncio.create_task(anext(call_client(client=client, method='GET', url=url,params=dict(params, **{'vesselOperatorCarrierCode': mseries}),headers={'Consumer-Key': pw2}))) for mseries in maersk_list]
+            p2p_resp_tasks:list = [asyncio.create_task(anext(HTTPXClientWrapper.call_client(client=client, method='GET', url=url,params=dict(params, **{'vesselOperatorCarrierCode': mseries}),headers={'Consumer-Key': pw2}))) for mseries in maersk_list]
             # p2p_resp_gather = await asyncio.gather(*p2p_resp_tasks)
             for response in asyncio.as_completed(p2p_resp_tasks):
                 response = await response
