@@ -1,6 +1,5 @@
 import jwt
 import base64
-import orjson #Orjson is built in RUST, its performing way better than python in built json
 from datetime import datetime, timedelta, timezone
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
@@ -22,10 +21,9 @@ async def get_msc_token(client, oauth: str, aud: str, rsa: str, msc_client: str,
                     'client_assertion_type': 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
                     'grant_type': 'client_credentials', 'client_assertion': encoded}
     headers: dict = {'Content-Type': 'application/x-www-form-urlencoded'}
-    response = await anext(call_client(client=client,method='POST',url=oauth, headers=orjson.dumps(headers), data=orjson.dumps(params)))
-    if response.status_code == 200:
-        response_token = response.json()
-        yield response_token['access_token']
+    response = await anext(call_client(client=client,method='POST',url=oauth, headers=headers, data=params))
+    response_token = response.json()
+    yield response_token['access_token']
 
 
 async def get_msc_p2p(client, url: str, oauth: str, aud: str, pw: str, msc_client: str, msc_scope: str,
@@ -39,7 +37,7 @@ async def get_msc_p2p(client, url: str, oauth: str, aud: str, pw: str, msc_clien
     token = await anext( get_msc_token(client=client, oauth=oauth, aud=aud, rsa=pw, msc_client=msc_client, msc_scope=msc_scope,msc_thumbprint=msc_thumbprint))
     headers: dict = {'Authorization': f'Bearer {token}'}
     response = await anext(
-        call_client(client=client, method='GET', url=url, params=orjson.dumps(params), headers=orjson.dumps(headers)))
+        call_client(client=client, method='GET', url=url, params=params, headers=headers))
 
     ## Performance Enhancement - No meomory is used:async generator object - schedules
     async def schedules():
