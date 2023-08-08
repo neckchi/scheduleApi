@@ -1,12 +1,11 @@
-from app.carrierp2p.helpers import call_client
-
+from app.routers.router_config import HTTPXClientWrapper
 
 async def get_one_access_token(client, url: str, auth: str, api_key: str):
     headers: dict = {'apikey': api_key,
                      'Authorization': auth,
                      'Accept': 'application/json'
                      }
-    response = await anext(call_client(method='POST',client=client,url=url, headers=headers))
+    response = await anext(HTTPXClientWrapper.call_client(method='POST',client=client,url=url, headers=headers))
     response_token = response.json()
     access_token = response_token['access_token']
     yield access_token
@@ -21,7 +20,7 @@ async def get_one_p2p(client, url: str, turl: str, pw: str, auth: str, pol: str,
     # weekout:1 ≤ value ≤ 14
     token = await anext(get_one_access_token(client=client, url=turl, auth=auth, api_key=pw))
     headers: dict = {'apikey': pw, 'Authorization': f'Bearer {token}', 'Accept': 'application/json'}
-    response = await anext(call_client(client=client, method='GET', url=url, params=params,
+    response = await anext(HTTPXClientWrapper.call_client(client=client, method='GET', url=url, params=params,
                                        headers=headers))
     # Performance Enhancement - No meomory is used:async generator object - schedules
     async def schedules():
