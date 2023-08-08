@@ -10,7 +10,7 @@ from app.carrierp2p import cma, hamburgsud, one, hmm, zim, maersk, msc, iqax
 from app.schemas import schema_response, schema_request
 from app.background_tasks import db
 from app.config import Settings
-from app.routers.router_config import get_settings,get_client
+from app.routers.router_config import HTTPXClientWrapper,get_settings
 
 router = APIRouter(prefix='/schedules', tags=["API Point To Point Schedules"])
 @router.get("/p2p", summary="Search Point To Point schedules from carriers", response_model=schema_response.Product,
@@ -31,7 +31,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
                         vessel_flag_code: str | None = Query(alias='vesselFlagCode', default=None, max_length=2,regex=r"[A-Z]{2}"),
                         service: str | None = Query(default=None,description='Search by either service code or service name'),
                         settings: Settings = Depends(get_settings),
-                        client: httpx.AsyncClient = Depends(get_client)):
+                        client: httpx.AsyncClient = Depends(HTTPXClientWrapper.get_client)):
 
 
     """
