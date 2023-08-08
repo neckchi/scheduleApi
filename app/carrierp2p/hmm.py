@@ -1,6 +1,5 @@
 from datetime import datetime
 from app.carrierp2p.helpers import call_client
-import orjson #Orjson is built in RUST, its performing way better than python in built json
 import httpx
 
 
@@ -15,7 +14,7 @@ async def get_hmm_p2p(client, url: str, pw: str, pol: str, pod: str, search_rang
     headers: dict = {'x-Gateway-APIKey': pw}
     while (retries := 10) > 0:
         try:
-            response = await anext(call_client(client=client, method='POST', url=url, headers=orjson.dumps(headers),json=orjson.dumps(params)))
+            response = await anext(call_client(client=client, method='POST', url=url, headers=headers,json=params))
             response_json:dict = response.json()
             async def schedules():
                 if response.status_code == 200 and response_json.get('resultMessage') == 'Success':
