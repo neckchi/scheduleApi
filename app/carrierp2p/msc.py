@@ -4,10 +4,9 @@ import orjson #Orjson is built in RUST, its performing way better than python in
 from datetime import datetime, timedelta, timezone
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
-from functools import lru_cache
+from app.carrierp2p.helpers import call_client
 
 
-@lru_cache
 async def get_msc_token(client, oauth: str, aud: str, rsa: str, msc_client: str, msc_scope: str, msc_thumbprint: str):
     x5t: bytes = base64.b64encode(bytearray.fromhex(msc_thumbprint))
     payload_header: dict = {'x5t': x5t.decode(), 'typ': 'JWT'}
@@ -16,18 +15,16 @@ async def get_msc_token(client, oauth: str, aud: str, rsa: str, msc_client: str,
                           'sub': msc_client,
                           'exp': datetime.now(tz=timezone.utc) + timedelta(hours=2),
                           'nbf': datetime.now(tz=timezone.utc)}
-    private_rsakey = serialization.load_pem_private_key(rsa.encode('utf8'), password=None,
-                                                     backend=default_backend())
+    private_rsakey = serialization.load_pem_private_key(rsa.encode('utf8'), password=None,backend=default_backend())
     encoded: str = jwt.encode(headers=payload_header, payload=payload_data, key=private_rsakey, algorithm='RS256')
     params: dict = {'scope': msc_scope,
                     'client_id': msc_client,
                     'client_assertion_type': 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
                     'grant_type': 'client_credentials', 'client_assertion': encoded}
-
     headers: dict = {'Content-Type': 'application/x-www-form-urlencoded'}
-    response = await client.post(url=oauth, headers=headers, data=params)
+    response = await anext(call_client(client=client,method='POST',url=oauth, headers=orjson.dumps(headers), data=orjson.dumps(params)))
     if response.status_code == 200:
-        response_token = orjson.loads(response.text)
+        response_token = response.json()
         yield response_token['access_token']
 
 
@@ -41,17 +38,16 @@ async def get_msc_p2p(client, url: str, oauth: str, aud: str, pw: str, msc_clien
 
     token = await anext( get_msc_token(client=client, oauth=oauth, aud=aud, rsa=pw, msc_client=msc_client, msc_scope=msc_scope,msc_thumbprint=msc_thumbprint))
     headers: dict = {'Authorization': f'Bearer {token}'}
-    response = await client.get(url=url, params=params, headers=headers)
+    response = await anext(
+        call_client(client=client, method='GET', url=url, params=orjson.dumps(params), headers=orjson.dumps(headers)))
 
     ## Performance Enhancement - No meomory is used:async generator object - schedules
     async def schedules():
         if response.status_code == 200:
-            response_json = orjson.loads(response.text)
+            response_json:dict = response.json()
             for task in response_json['MSCSchedule']['Transactions']:
                 # Additional check on service code/name in order to fullfill business requirment(query the result by service code)
-                check_service_code: bool = next((True for services in task['Schedules'] if
-                                                 services.get('Service') and services['Service'][
-                                                     'Description'] == service), False) if service else True
+                check_service_code: bool = next((True for services in task['Schedules'] if services.get('Service') and services['Service']['Description'] == service), False) if service else True
                 check_transshipment: bool = True if len(task['Schedules']) > 1 else False
                 transshipment_port: bool = next((True for tsport in task['Schedules'][1:] if tsport['Calls'][0]['Code'] == tsp),False) if check_transshipment and tsp else False
                 if transshipment_port or not tsp:
@@ -131,3 +127,4 @@ async def get_msc_p2p(client, url: str, oauth: str, aud: str, pw: str, msc_clien
                     pass
 
     yield [s async for s in schedules()]
+
