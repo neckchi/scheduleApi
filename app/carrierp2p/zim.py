@@ -1,6 +1,6 @@
+from app.routers.router_config import HTTPXClientWrapper
 import httpx
 import datetime
-from app.carrierp2p.helpers import call_client
 
 
 async def get_zim_access_token(client, url: str, api_key: str, client_id: str, secret: str):
@@ -8,7 +8,7 @@ async def get_zim_access_token(client, url: str, api_key: str, client_id: str, s
                      }
     params: dict = {'grant_type': 'client_credentials', 'client_id': client_id,
                     'client_secret': secret, 'scope': 'Vessel Schedule'}
-    response = await anext(call_client(client=client,method='POST',url=url, headers=headers, data=params))
+    response = await anext(HTTPXClientWrapper.call_client(client=client,method='POST',url=url, headers=headers, data=params))
     response_token:dict = response.json()
     access_token = response_token['access_token']
     yield access_token
@@ -22,7 +22,7 @@ async def get_zim_p2p(client, url: str, turl: str, pw: str, zim_client: str, zim
         try:
             token = await anext(get_zim_access_token(client=client, url=turl, api_key=pw, client_id=zim_client, secret=zim_secret))
             headers: dict = {'Ocp-Apim-Subscription-Key': pw, 'Authorization': f'Bearer {token}','Accept': 'application/json'}
-            response = await anext(call_client(client=client, method='GET', url=url, params=params,
+            response = await anext(HTTPXClientWrapper.call_client(client=client, method='GET', url=url, params=params,
                                                headers=headers))
 
             # # Performance Enhancement - No meomory is used:async generator object - schedules
