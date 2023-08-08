@@ -1,6 +1,5 @@
 from datetime import datetime
 from app.carrierp2p.helpers import call_client
-import orjson #Orjson is built in RUST, its performing way better than python in built json
 import httpx
 
 async def get_sudu_p2p(client, url: str, pw: str, pol: str, pod: str, direct_only: bool |None = None , tsp: str | None = None,
@@ -12,7 +11,7 @@ async def get_sudu_p2p(client, url: str, pw: str, pol: str, pod: str, direct_onl
     headers: dict = {'x-api-key': pw}
     while (retries := 10) > 0:
         try:
-            response = await anext(call_client(client=client, method='GET', url=url, params=orjson.dumps(params),headers=orjson.dumps(headers)))
+            response = await anext(call_client(client=client, method='GET', url=url, params=params,headers=headers))
             # Performance Enhancement - No meomory is used: async generator object - schedules
             async def schedules():
                 """
