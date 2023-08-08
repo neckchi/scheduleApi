@@ -3,7 +3,7 @@ import datetime
 import uuid
 import httpx
 from itertools import chain
-from fastapi import APIRouter, Query, status, Depends, BackgroundTasks,Request
+from fastapi import APIRouter, Query, status, Depends, BackgroundTasks
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from app.carrierp2p import cma, hamburgsud, one, hmm, zim, maersk, msc, iqax
@@ -19,9 +19,7 @@ router = APIRouter(prefix='/schedules', tags=["API Point To Point Schedules"])
             responses={status.HTTP_404_NOT_FOUND: {"model": schema_response.Error}})
 
 
-
-async def get_schedules(request:Request,
-                        background_tasks: BackgroundTasks,
+async def get_schedules(background_tasks: BackgroundTasks,
                         point_from: str = Query(alias='pointFrom', default=..., max_length=5,regex=r"[A-Z]{2}[A-Z0-9]{3}",example='HKHKG',description='Search by either port or point of origin'),
                         point_to: str = Query(alias='pointTo', default=..., max_length=5, regex=r"[A-Z]{2}[A-Z0-9]{3}",example='DEHAM',description="Search by either port or point of destination"),
                         start_date_type: schema_request.StartDateType = Query(alias='startDateType', default=...,description="Search by either ETD or ETA"),
@@ -34,6 +32,7 @@ async def get_schedules(request:Request,
                         service: str | None = Query(default=None,description='Search by either service code or service name'),
                         settings: Settings = Depends(get_settings),
                         client: httpx.AsyncClient = Depends(get_client)):
+
 
     """
     Search P2P Schedules with all the information:
@@ -71,7 +70,7 @@ async def get_schedules(request:Request,
 
                 if carriers == 'ONEY' or carriers is None:
                     yield asyncio.create_task(anext(
-                        one.get_one_p2p(client=client,request=request, url=settings.oney_url, turl=settings.oney_turl,
+                        one.get_one_p2p(client=client, url=settings.oney_url, turl=settings.oney_turl,
                                         pol=point_from, pod=point_to, start_date=start_date,
                                         direct_only=direct_only,
                                         search_range=int(search_range.value[0]), tsp=tsp,
@@ -158,3 +157,4 @@ async def get_schedules(request:Request,
         return data
     else:
         return ttl_schedule
+
