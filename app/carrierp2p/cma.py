@@ -1,5 +1,6 @@
 import asyncio
-from app.carrierp2p.helpers import deepget,call_client
+from app.carrierp2p.helpers import deepget
+from app.routers.router_config import HTTPXClientWrapper
 from datetime import datetime
 
 
@@ -25,10 +26,8 @@ async def get_cma_p2p(client, url: str, pw: str, pol: str, pod: str, search_rang
         If commercial routes are not defined for a shipping company, you will get solutions of the other shipping companies (except for APL)
         """
 
-        p2p_resp_tasks: list = [asyncio.create_task(anext(call_client(client=client, method='GET', url=url,
-                                                                      params=dict(params, **{
-                                                                          'shippingCompany': cma_code,
-                                                                          'specificRoutings': 'USGovernment' if cma_code == '0015' and extra_condition else 'Commercial'}),
+        p2p_resp_tasks: list = [asyncio.create_task(anext(HTTPXClientWrapper.call_client(client=client, method='GET', url=url,
+                                                                      params=dict(params, **{'shippingCompany': cma_code,'specificRoutings': 'USGovernment' if cma_code == '0015' and extra_condition else 'Commercial'}),
                                                                       headers=headers))) for cma_code in cma_list]
 
         for response in asyncio.as_completed(p2p_resp_tasks):
@@ -43,7 +42,7 @@ async def get_cma_p2p(client, url: str, pw: str, pol: str, pod: str, search_rang
                 extra_tasks: set = set()
                 for n in range(page, last_page, page):
                     r: str = f'{n}-{49 + n}'
-                    extra_tasks.add((asyncio.create_task(anext(call_client(client=client, method='GET', url=url,
+                    extra_tasks.add((asyncio.create_task(anext(HTTPXClientWrapper.call_client(client=client, method='GET', url=url,
                                                                            params=dict(params, **{
                                                                                'shippingCompany': cma_code,
                                                                                'specificRoutings': 'USGovernment' if cma_code == '0015' and extra_condition else 'Commercial'}),
