@@ -18,7 +18,9 @@ def deepget(dct: dict, *keys):
 async def call_client(client, method:str, url: str, params:dict = None,headers:dict = None,json:dict = None,data:dict = None,stream:bool = False):
     if not stream:
         response = await client.request(method=method,url=url, params=params,headers=headers , json = json ,data = data)
-        yield response
+        if response.status_code == 200:
+            yield response
+        else:yield None
     else:
         """
         At the moment Only Maersk('MAEU', 'SEAU', 'SEJJ', 'MCPU', 'MAEI') need consumer to stream the response
