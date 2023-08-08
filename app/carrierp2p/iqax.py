@@ -1,6 +1,7 @@
 import datetime
 import asyncio
-from app.carrierp2p.helpers import deepget,call_client
+from app.carrierp2p.helpers import deepget
+from app.routers.router_config import HTTPXClientWrapper
 
 #
 # async def get_iqax_location_id(client, api_key: str,loc_name:str):
@@ -20,7 +21,7 @@ async def get_iqax_p2p(client, url: str, pw: str, pol: str, pod: str, search_ran
     iqax_list: set = {'OOLU', 'COSU'} if scac is None else {scac}
 
     async def schedules():
-        p2p_resp_tasks: set = {asyncio.create_task(anext(call_client(client=client, method='GET', url=url.format(iqax),params=dict(params, **{'vesselOperatorCarrierCode': iqax})))) for iqax in iqax_list}
+        p2p_resp_tasks: set = {asyncio.create_task(anext(HTTPXClientWrapper.call_client(client=client, method='GET', url=url.format(iqax),params=dict(params, **{'vesselOperatorCarrierCode': iqax})))) for iqax in iqax_list}
         # p2p_resp_gather = await asyncio.gather(*p2p_resp_tasks)
         for response in asyncio.as_completed(p2p_resp_tasks):
             response = await response
