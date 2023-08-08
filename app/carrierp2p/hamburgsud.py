@@ -1,4 +1,5 @@
 from datetime import datetime
+from app.carrierp2p.helpers import call_client
 import orjson #Orjson is built in RUST, its performing way better than python in built json
 import httpx
 
@@ -11,11 +12,14 @@ async def get_sudu_p2p(client, url: str, pw: str, pol: str, pod: str, direct_onl
     headers: dict = {'x-api-key': pw}
     while (retries := 10) > 0:
         try:
-            response = await client.get(url=url, params=params, headers=headers)
+            response = await anext(call_client(client=client, method='GET', url=url, params=orjson.dumps(params),headers=orjson.dumps(headers)))
             # Performance Enhancement - No meomory is used: async generator object - schedules
             async def schedules():
+                """
+                At the moment HamburgSud doenst allow any request to search for the past schedule.Otherwise, it will return 400 Bad Request
+                """
                 if response.status_code == 200:
-                    response_json:dict = orjson.loads(response.text)
+                    response_json:dict = response.json()
                     for task in response_json:
                         check_transshipment: bool = True if len(task['leg']) > 1 else False
                         transshipment_port: bool = next((True for tsport in task['leg'][1:] if tsport['from']['unlocode'] == tsp),False) if check_transshipment and tsp else False
@@ -81,3 +85,4 @@ async def get_sudu_p2p(client, url: str, pw: str, pol: str, pod: str, direct_onl
         if retries == 0:
             raise PermissionError
         else:yield None
+
