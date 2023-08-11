@@ -1,15 +1,11 @@
-import orjson #Orjson is built in RUST, its performing way better than python in built json
 import asyncio
 from app.carrierp2p.helpers import deepget
+from app.routers.router_config import HTTPXClientWrapper
 from datetime import datetime
 
 
 # Check API status
 # https://cma-status-prod.checklyhq.com/
-
-async def get_cma_multi_p2p_schedule(client, url: str, params: dict, headers: dict):
-    response = await client.get(url=url, params=params, headers=headers)
-    yield response
 
 async def get_cma_p2p(client, url: str, pw: str, pol: str, pod: str, search_range: int, direct_only: bool | None,tsp: str | None = None,
                           departure_date: str | None = None,
@@ -30,13 +26,14 @@ async def get_cma_p2p(client, url: str, pw: str, pol: str, pod: str, search_rang
         If commercial routes are not defined for a shipping company, you will get solutions of the other shipping companies (except for APL)
         """
 
-        p2p_resp_tasks: list = [asyncio.create_task(anext(get_cma_multi_p2p_schedule(client=client, url=url,
-                                                                                     params=dict(params, **{'shippingCompany': cma_code,'specificRoutings': 'USGovernment' if cma_code == '0015' and extra_condition else 'Commercial'}),
-                                                                                     headers=headers))) for cma_code in cma_list]
+        p2p_resp_tasks: list = [asyncio.create_task(anext(HTTPXClientWrapper.call_client(client=client, method='GET', url=url,
+                                                                      params=dict(params, **{'shippingCompany': cma_code,'specificRoutings': 'USGovernment' if cma_code == '0015' and extra_condition else 'Commercial'}),
+                                                                      headers=headers))) for cma_code in cma_list]
 
         for response in asyncio.as_completed(p2p_resp_tasks):
             response = await response
-            response_json:list = orjson.loads(response.text)
+            # response_json:list = orjson.loads(response.text)
+            response_json: list = response.json()
             # Each json response might have more than 49 results.if true, CMA will return http:206 and ask us to loop over the pages in order to get all the results from them
             if response.status_code == 206:
                 page: int = 50
@@ -45,12 +42,14 @@ async def get_cma_p2p(client, url: str, pw: str, pol: str, pod: str, search_rang
                 extra_tasks: set = set()
                 for n in range(page, last_page, page):
                     r: str = f'{n}-{49 + n}'
-                    extra_tasks.add((asyncio.create_task(anext(get_cma_multi_p2p_schedule(client=client, url=url,
-                                                                                          params=dict(params, **{'shippingCompany': cma_code,'specificRoutings': 'USGovernment' if cma_code == '0015' and extra_condition else 'Commercial'}),
-                                                                                          headers=dict(headers, **{'range': r}))))))
+                    extra_tasks.add((asyncio.create_task(anext(HTTPXClientWrapper.call_client(client=client, method='GET', url=url,
+                                                                           params=dict(params, **{
+                                                                               'shippingCompany': cma_code,
+                                                                               'specificRoutings': 'USGovernment' if cma_code == '0015' and extra_condition else 'Commercial'}),
+                                                                           headers=dict(headers, **{'range': r}))))))
                 for extra_p2p in asyncio.as_completed(extra_tasks):
                     result = await extra_p2p
-                    response_json.extend(orjson.loads(result.text))
+                    response_json.extend(result.json())
             if response.status_code in (200, 206):
                 for task in response_json:
                     transit_time = task['transitTime']
@@ -130,3 +129,4 @@ async def get_cma_p2p(client, url: str, pw: str, pol: str, pod: str, search_rang
                 pass
 
     yield [s async for s in schedules()]
+

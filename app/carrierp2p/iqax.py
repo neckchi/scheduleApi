@@ -1,8 +1,7 @@
 import datetime
-import orjson #Orjson is built in RUST, its performing way better than python in built json
 import asyncio
 from app.carrierp2p.helpers import deepget
-
+from app.routers.router_config import HTTPXClientWrapper
 
 #
 # async def get_iqax_location_id(client, api_key: str,loc_name:str):
@@ -14,10 +13,6 @@ from app.carrierp2p.helpers import deepget
 #         loc_id = response_token[0]['locationID']
 #         yield loc_id
 
-async def get_multi_iqax_p2p_schedule(client, url: str, params: dict, carrier: str):
-    response = await client.get(url=url.format(carrier), params=params)
-    yield response
-
 async def get_iqax_p2p(client, url: str, pw: str, pol: str, pod: str, search_range: int, direct_only: bool |None ,
                        tsp: str | None = None, departure_date: str | None = None, arrival_date: str | None = None,
                        scac: str | None = None, service: str | None = None):
@@ -26,12 +21,12 @@ async def get_iqax_p2p(client, url: str, pw: str, pol: str, pod: str, search_ran
     iqax_list: set = {'OOLU', 'COSU'} if scac is None else {scac}
 
     async def schedules():
-        p2p_resp_tasks: set = {asyncio.create_task(anext(get_multi_iqax_p2p_schedule(client=client, url=url,params= params | {'vesselOperatorCarrierCode': iqax},carrier=iqax))) for iqax in iqax_list}
+        p2p_resp_tasks: set = {asyncio.create_task(anext(HTTPXClientWrapper.call_client(client=client, method='GET', url=url.format(iqax),params=dict(params, **{'vesselOperatorCarrierCode': iqax})))) for iqax in iqax_list}
         # p2p_resp_gather = await asyncio.gather(*p2p_resp_tasks)
         for response in asyncio.as_completed(p2p_resp_tasks):
             response = await response
             if response.status_code == 200:
-                response_json:dict = orjson.loads(response.text)
+                response_json:dict = response.json()
                 for schedule_list in response_json['routeGroupsList']:
                     for task in schedule_list['route']:
                         # Additional check on service code/name in order to fullfill business requirment(query the result by service code)
@@ -118,3 +113,4 @@ async def get_iqax_p2p(client, url: str, pw: str, pol: str, pod: str, search_ran
                     pass
 
     yield [s async for s in schedules()]
+

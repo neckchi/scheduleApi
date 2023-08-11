@@ -1,23 +1,16 @@
-import orjson #Orjson is built in RUST, its performing way better than python in built json
-from functools import lru_cache
+from app.routers.router_config import HTTPXClientWrapper
 
-
-@lru_cache
 async def get_one_access_token(client, url: str, auth: str, api_key: str):
     headers: dict = {'apikey': api_key,
                      'Authorization': auth,
                      'Accept': 'application/json'
                      }
-    response = await client.post(url=url, headers=headers)
-    if response.status_code == 200:
-        response_token = orjson.loads(response.text)
-        access_token = response_token['access_token']
-        yield access_token
-    else:
-        yield None
+    response = await anext(HTTPXClientWrapper.call_client(method='POST',client=client,url=url, headers=headers))
+    response_token = response.json()
+    access_token = response_token['access_token']
+    yield access_token
 
-
-async def get_one_p2p(client,request, url: str, turl: str, pw: str, auth: str, pol: str, pod: str, search_range: int,
+async def get_one_p2p(client, url: str, turl: str, pw: str, auth: str, pol: str, pod: str, search_range: int,
                       direct_only: bool|None,
                       start_date: str | None = None,
                       date_type: str | None = None, service: str | None = None, tsp: str | None = None):
@@ -27,11 +20,13 @@ async def get_one_p2p(client,request, url: str, turl: str, pw: str, auth: str, p
     # weekout:1 ≤ value ≤ 14
     token = await anext(get_one_access_token(client=client, url=turl, auth=auth, api_key=pw))
     headers: dict = {'apikey': pw, 'Authorization': f'Bearer {token}', 'Accept': 'application/json'}
-    response = await client.get(url=url, params=params, headers=headers)
+    response = await anext(HTTPXClientWrapper.call_client(client=client, method='GET', url=url, params=params,
+                                       headers=headers))
     # Performance Enhancement - No meomory is used:async generator object - schedules
     async def schedules():
         if response.status_code == 200:
-            response_json: dict = orjson.loads(response.text)
+            # response_json: dict = orjson.loads(response.text)
+            response_json: dict = response.json()
             if response_json.get('errorMessages') is None:
                 schedule_type = response_json['Direct'] if response_json.get('Direct', None) else response_json['Transshipment']
                 for task in schedule_type:
@@ -120,3 +115,4 @@ async def get_one_p2p(client,request, url: str, turl: str, pw: str, auth: str, p
                 pass
 
     yield [s async for s in schedules()]
+

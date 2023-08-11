@@ -1,71 +1,46 @@
 import asyncio
-import orjson #Orjson is built in RUST, its performing way better than python in built json
 from datetime import datetime
 from typing import Generator
 from app.carrierp2p.helpers import deepget
-
-
-async def get_maersk_location_code(client, url: str, headers: dict, unloc: str):
-    params: dict = {'UNLocationCode': unloc}
-    response = await client.get(url=url, headers=headers, params=params)
-    if response.status_code == 200:
-        response_json = orjson.loads(orjson.dumps(response.text.splitlines()))
-        data = next(
-            (orjson.loads(geoid)['countryCode'], orjson.loads(geoid)['cityName'], orjson.loads(geoid)['UNLocationCode']) for
-            geoid in response_json if geoid)
-        yield data
-    else:
-        yield None
-
+from app.routers.router_config import HTTPXClientWrapper
 
 async def get_maersk_cutoff(client, url: str, headers: dict, country: str, pol: str, imo: str, voyage: str):
     params: dict = {'ISOCountryCode': country, 'portOfLoad': pol, 'vesselIMONumber': imo, 'voyage': voyage}
-    response = await client.get(url=url, headers=headers, params=params)
-    if response.status_code == 200:
-        response_json = orjson.loads(response.text)
+    async for response_json in HTTPXClientWrapper.call_client(client=client,url=url,method ='GET',stream=True,headers=headers, params=params):
         cut_off_body: dict = {}
         for cutoff in response_json[0]['shipmentDeadlines']['deadlines']:
             if cutoff.get('deadlineName') == 'Commercial Cargo Cutoff':
                 cut_off_body.update({'cyCuttoff': cutoff.get('deadlineLocal')})
-            if cutoff.get('deadlineName') in ('Shipping Instructions Deadline','Shipping Instructions Deadline for Advance Manifest Cargo'):
+            if cutoff.get('deadlineName') in ('Shipping Instructions Deadline','Shipping Instructions Deadline for Advance Manifest Cargo','Special Cargo Documentation Deadline'):
                 cut_off_body.update({'siCuttoff': cutoff.get('deadlineLocal')})
             if cutoff.get('deadlineName') == 'Commercial Verified Gross Mass Deadline':
                 cut_off_body.update({'vgmCutoff': cutoff.get('deadlineLocal')})
         yield cut_off_body
-    else:
-        yield None
-
-
-async def get_maersk_multi_p2p_schedule(client, url: str, params: dict, headers: dict):
-    response = await client.get(url=url, params=params, headers=headers)
-    yield response
 
 async def get_maersk_p2p(client, url: str, location_url: str, cutoff_url: str, pw: str, pw2: str, pol: str, pod: str,
                          search_range: str, direct_only: bool|None, tsp: str | None = None, scac: str | None = None,
                          start_date: str | None = None,
                          date_type: str | None = None, service: str | None = None, vessel_flag: str | None = None):
-    location_tasks:Generator = (asyncio.create_task(anext(get_maersk_location_code(client=client, url=location_url, headers={'Consumer-Key': pw}, unloc=port))) for port in [pol, pod])
+    location_tasks:Generator = (asyncio.create_task(anext(HTTPXClientWrapper.call_client(client=client,method='GET',stream=True, url=location_url, headers={'Consumer-Key': pw}, params= {'UNLocationCode': port}))) for port in [pol, pod])
     [origingeolocation, destinationgeolocation] = await asyncio.gather(*location_tasks)
-
     async def schedules():
         if origingeolocation and destinationgeolocation:
-            params: dict = {'collectionOriginCountryCode': origingeolocation[0],
-                            'collectionOriginCityName': origingeolocation[1],
-                            'collectionOriginUNLocationCode': origingeolocation[2],
-                            'deliveryDestinationCountryCode': destinationgeolocation[0],
-                            'deliveryDestinationCityName': destinationgeolocation[1],
-                            'deliveryDestinationUNLocationCode': destinationgeolocation[2],
+            params: dict = {'collectionOriginCountryCode': origingeolocation['countryCode'],
+                            'collectionOriginCityName': origingeolocation['cityName'],
+                            'collectionOriginUNLocationCode': origingeolocation['UNLocationCode'],
+                            'deliveryDestinationCountryCode': destinationgeolocation['countryCode'],
+                            'deliveryDestinationCityName': destinationgeolocation['cityName'],
+                            'deliveryDestinationUNLocationCode': destinationgeolocation['UNLocationCode'],
                             'dateRange': f'P{search_range}W', 'startDateType': date_type, 'startDate': start_date}
             params.update({'vesselFlagCode': vessel_flag}) if vessel_flag else ...
             maersk_list: set = {'MAEU', 'SEAU', 'SEJJ', 'MCPU', 'MAEI'} if scac is None else {scac}
-            p2p_resp_tasks:list = [asyncio.create_task(anext(get_maersk_multi_p2p_schedule(client=client, url=url,params=dict(params, **{'vesselOperatorCarrierCode': mseries}),
-                                                                                            headers={'Consumer-Key': pw2}))) for mseries in maersk_list]
+            p2p_resp_tasks:list = [asyncio.create_task(anext(HTTPXClientWrapper.call_client(client=client, method='GET', url=url,params=dict(params, **{'vesselOperatorCarrierCode': mseries}),headers={'Consumer-Key': pw2}))) for mseries in maersk_list]
             # p2p_resp_gather = await asyncio.gather(*p2p_resp_tasks)
             for response in asyncio.as_completed(p2p_resp_tasks):
                 response = await response
                 # print(f'Using 2nd API key for p2p schedule- {response}')
                 if response.status_code == 200:
-                    response_json = orjson.loads(response.text)
+                    response_json:dict = response.json()
                     for resp in response_json['oceanProducts']:
                         carrier_code:str = resp['vesselOperatorCarrierCode']
                         for task in resp['transportSchedules']:
@@ -98,7 +73,7 @@ async def get_maersk_p2p(client, url: str, location_url: str, cutoff_url: str, p
                                         # Performance Enhancement - No meomory is used:async generator object - schedule leg
                                         async def schedule_leg():
                                             for index, legs in enumerate(task['transportLegs'], start=1):
-                                                vessel_imo = deepget(legs['transport'], 'vessel', 'vesselIMONumber')
+                                                vessel_imo:str = deepget(legs['transport'], 'vessel', 'vesselIMONumber')
                                                 transport_type: dict = {'BAR': 'Barge',
                                                                         'BCO': 'Barge',
                                                                         'FEF': 'Feeder',
@@ -130,13 +105,16 @@ async def get_maersk_p2p(client, url: str, location_url: str, cutoff_url: str, p
                                                         'reference': vessel_imo
                                                                         }
                                                                 }
-                                                voyage_num = legs['transport'].get('carrierDepartureVoyageNumber')
+                                                voyage_num:str = legs['transport'].get('carrierDepartureVoyageNumber')
                                                 if voyage_num:
                                                     voyage_body: dict = {'internalVoyage': voyage_num}
                                                     leg_body.update({'voyages': voyage_body})
 
-                                                if legs['transport'].get('carrierServiceCode'):
-                                                    service_body: dict = {'serviceCode': legs['transport'].get('carrierServiceCode'),'serviceName': legs['transport'].get('carrierServiceName')}
+                                                service_code:str = legs['transport'].get('carrierServiceCode')
+                                                service_name:str = legs['transport'].get('carrierServiceName')
+
+                                                if service_code or service_name:
+                                                    service_body: dict = {'serviceCode': service_code,'serviceName': service_name}
                                                     leg_body.update({'services': service_body})
 
                                                 # BU only need the cut off date for 1st leg
@@ -165,3 +143,4 @@ async def get_maersk_p2p(client, url: str, location_url: str, cutoff_url: str, p
         else:
             pass
     yield [s async for s in schedules()]
+

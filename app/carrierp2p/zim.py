@@ -1,20 +1,17 @@
-import orjson #Orjson is built in RUST, its performing way better than python in built json
+from app.routers.router_config import HTTPXClientWrapper
 import httpx
 import datetime
-from functools import cache
 
 
-@cache
 async def get_zim_access_token(client, url: str, api_key: str, client_id: str, secret: str):
     headers: dict = {'Ocp-Apim-Subscription-Key': api_key,
                      }
     params: dict = {'grant_type': 'client_credentials', 'client_id': client_id,
                     'client_secret': secret, 'scope': 'Vessel Schedule'}
-    response = await client.post(url=url, headers=headers, data=params)
-    if response.status_code == 200:
-        response_token:dict = orjson.loads(response.text)
-        access_token = response_token['access_token']
-        yield access_token
+    response = await anext(HTTPXClientWrapper.call_client(client=client,method='POST',url=url, headers=headers, data=params))
+    response_token:dict = response.json()
+    access_token = response_token['access_token']
+    yield access_token
 
 
 async def get_zim_p2p(client, url: str, turl: str, pw: str, zim_client: str, zim_secret: str, pol: str, pod: str,
@@ -25,12 +22,13 @@ async def get_zim_p2p(client, url: str, turl: str, pw: str, zim_client: str, zim
         try:
             token = await anext(get_zim_access_token(client=client, url=turl, api_key=pw, client_id=zim_client, secret=zim_secret))
             headers: dict = {'Ocp-Apim-Subscription-Key': pw, 'Authorization': f'Bearer {token}','Accept': 'application/json'}
-            response = await client.get(url=url, params=params, headers=headers)
+            response = await anext(HTTPXClientWrapper.call_client(client=client, method='GET', url=url, params=params,
+                                               headers=headers))
 
             # # Performance Enhancement - No meomory is used:async generator object - schedules
             async def schedules():
                 if response.status_code == 200:
-                    response_json = orjson.loads(response.text)
+                    response_json:dict = response.json()
                     for task in response_json['response']['routes']:
                         # Additional check on service code/name in order to fullfill business requirment(query the result by service code)
                         check_service_code: bool = next((True for services in task['routeLegs'] if services.get('voyage') and services['line'] == service),False) if service else False
@@ -98,4 +96,5 @@ async def get_zim_p2p(client, url: str, turl: str, pw: str, zim_client: str, zim
         if retries == 0:
             raise PermissionError
         else:yield None
+
 
