@@ -2,7 +2,6 @@ import asyncio
 import datetime
 import uuid
 import httpx
-from itertools import chain
 from fastapi import APIRouter, Query, status, Depends, BackgroundTasks
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
@@ -10,7 +9,7 @@ from app.carrierp2p import cma, hamburgsud, one, hmm, zim, maersk, msc, iqax
 from app.schemas import schema_response, schema_request
 from app.background_tasks import db
 from app.config import Settings
-from app.routers.router_config import HTTPXClientWrapper,get_settings
+from app.routers.router_config import HTTPXClientWrapper,get_settings,flatten_list
 
 router = APIRouter(prefix='/schedules', tags=["API Point To Point Schedules"])
 @router.get("/p2p", summary="Search Point To Point schedules from carriers", response_model=schema_response.Product,
@@ -137,7 +136,8 @@ async def get_schedules(background_tasks: BackgroundTasks,
         # 👇 Await ALL
         p2p_schedules: list = await asyncio.gather(*{ap2ps async for ap2ps in awaitable_p2p_schedules()})
         # 👇 Best built o(1) function to flatten_p2p the loops
-        flatten_p2p: iter = chain(*p2p_schedules)
+        flatten_p2p:list = flatten_list(p2p_schedules)
+        # flatten_p2p: iter = chain(*p2p_schedules)
         sorted_schedules = sorted(flatten_p2p, key=lambda tt: (tt['etd'][:10], tt['transitTime']))
         count_schedules = len(sorted_schedules)
 
