@@ -18,6 +18,13 @@ def get_settings():
     """
     return config.Settings()
 
+def flatten_list(matrix) -> list:
+    flat_list:list = []
+    for row in matrix:
+        flat_list.extend(row)
+    return flat_list
+
+
 class HTTPXClientWrapper:
     ##Creating new session for each request but this would probably incur performance overhead issue.
     ##even so it also has its own advantage like fault islation, increased flexibility to each request and avoid concurrency issues.
@@ -63,3 +70,4 @@ class HTTPXClientWrapper:
                     yield response
             else:
                 yield None
+
