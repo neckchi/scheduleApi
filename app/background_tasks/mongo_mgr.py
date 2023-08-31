@@ -11,7 +11,7 @@ class MongoDBsetting:
     async def initialize_database(self):
         setting = Settings()
         logging.info('Connecting To MongoDB')
-        self.client = AsyncIOMotorClient(setting.mongo_url.get_secret_value(),connect=False)
+        self.client = AsyncIOMotorClient(setting.mongo_url.get_secret_value(),connect=False,uuidRepresentation='standard')
         try:
             await self.client.server_info()
             self.db = self.client['test']
@@ -22,10 +22,10 @@ class MongoDBsetting:
 
     async def insert(self, result: dict):
         utc_timestamp = datetime.datetime.utcnow()
-        #self.collection.create_index("productid", unique = True)
-        #self.collection.create_index("expiry",expireAfterSeconds = 60 * 60 * 12)
-        logging.info('Background Task:Cached the schedules into P2P schedule collection ')
+        # self.collection.create_index("productid", unique = True)
+        # self.collection.create_index("expiry",expireAfterSeconds = 60 * 60 * 12)
         await self.collection.insert_one(dict(result, **{'expiry': utc_timestamp}))
+        logging.info('Background Task:Cached the schedules into P2P schedule collection ')
 
     async def retrieve(self, productid: str):
         logging.info('Background Task:Getting schedules from MongoDB P2P schedule collection')
@@ -33,3 +33,4 @@ class MongoDBsetting:
 
     # async def replace(self,id,result:dict):
     #     await self.collection.update_one({"_id": id}, {"$set": result})
+
