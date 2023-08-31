@@ -73,8 +73,8 @@ async def get_cma_p2p(client, url: str, pw: str, pol: str, pod: str, search_rang
                     # Performance Enhancement - No meomory is used:async generator object - schedule leg
                     async def schedule_leg():
                         for legs in task['routingDetails']:
-                            check_pol_terminal:dict|None =deepget(legs['pointFrom']['location']['facility'],'facilityCodifications')
-                            check_pod_terminal:dict|None = deepget(legs['pointTo']['location']['facility'],'facilityCodifications')
+                            check_pol_terminal:dict|None =deepget(legs['pointFrom']['location'],'facility','facilityCodifications')
+                            check_pod_terminal:dict|None = deepget(legs['pointTo']['location'],'facility','facilityCodifications')
                             vessel_imo = deepget(legs['transportation'],'vehicule','reference')
                             leg_body: dict = {'pointFrom': {'locationName': legs['pointFrom']['location']['name'],
                                                             'locationCode': legs['pointFrom']['location']['internalCode'],
