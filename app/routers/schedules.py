@@ -1,9 +1,8 @@
 import asyncio
 import datetime
-import uuid
 import httpx
+from uuid import uuid5,NAMESPACE_DNS
 from fastapi import APIRouter, Query, status, Depends, BackgroundTasks
-from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from app.carrierp2p import cma, hamburgsud, one, hmm, zim, maersk, msc, iqax
 from app.schemas import schema_response, schema_request
@@ -24,7 +23,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
                         start_date_type: schema_request.StartDateType = Query(alias='startDateType', default=...,description="Search by either ETD or ETA"),
                         start_date: datetime.date = Query(alias='startDate', default=...,example=datetime.datetime.now().strftime("%Y-%m-%d"),description='YYYY-MM-DD'),
                         search_range: schema_request.SearchRange = Query(alias='searchRange',description='Search range based on start date and type,max 4 weeks',default=..., example=3),
-                        scac: set[schema_request.CarrierCode | None] = Query(default={None},description='Prefer to search p2p schedule by scac'),
+                        scac: set[schema_request.CarrierCode | None] = Query(default={None},description='Prefer to search p2p schedule by scac.Empty means searching for all API schedules'),
                         direct_only: bool | None = Query(alias='directOnly', default=None,description='Direct means only show direct schedule Else show both(direct/transshipment)type of schedule'),
                         tsp: str | None = Query(default=None, alias='transhipmentPort', max_length=5,regex=r"[A-Z]{2}[A-Z0-9]{3}",description="Filter By Transshipment Port"),
                         vessel_flag_code: str | None = Query(alias='vesselFlagCode', default=None, max_length=2,regex=r"[A-Z]{2}"),
@@ -40,8 +39,8 @@ async def get_schedules(background_tasks: BackgroundTasks,
 
     """
 
-    product_id: uuid = (uuid.uuid5(uuid.NAMESPACE_DNS,f'{scac}-p2p-api-{point_from}{point_to}{start_date_type}{start_date}{search_range}{tsp}{direct_only}{service}'))
-    ttl_schedule = await anext(db.retrieve(productid=str(product_id)))
+    product_id = uuid5(NAMESPACE_DNS,f'{scac}-p2p-api-{point_from}{point_to}{start_date_type}{start_date}{search_range}{tsp}{direct_only}{service}')
+    ttl_schedule = await anext(db.retrieve(productid=product_id))
     start_date: str = start_date.strftime("%Y-%m-%d")
     if not ttl_schedule:
         # 👇 Create yield tasks with less memory, we start requesting all of them concurrently if no carrier code
@@ -137,24 +136,25 @@ async def get_schedules(background_tasks: BackgroundTasks,
         p2p_schedules: list = await asyncio.gather(*{ap2ps async for ap2ps in awaitable_p2p_schedules()})
         # 👇 Best built o(1) function to flatten_p2p the loops
         flatten_p2p:list = flatten_list(p2p_schedules)
-        # flatten_p2p: iter = chain(*p2p_schedules)
+        # flatten_p2p: iter = itertools.chain(*p2p_schedules)
         sorted_schedules = sorted(flatten_p2p, key=lambda tt: (tt['etd'][:10], tt['transitTime']))
         count_schedules = len(sorted_schedules)
 
         if count_schedules == 0:
-            failed_response = JSONResponse(status_code=status.HTTP_404_NOT_FOUND,content=jsonable_encoder(schema_response.Error(id=product_id,error=f"{point_from}-{point_to} schedule not found")))
+            failed_response = JSONResponse(status_code=status.HTTP_404_NOT_FOUND,content=schema_response.Error(id=product_id,error=f"{point_from}-{point_to} schedule not found").model_dump_json())
             failed_response.set_cookie(key='p2psession', value='fail-p2p-request')
             return failed_response
 
-
-        data = jsonable_encoder(schema_response.Product(
+        data = schema_response.Product(
             productid=product_id,
             origin=point_from,
             destination=point_to, noofSchedule=count_schedules,
-            schedules=sorted_schedules))
+            schedules=sorted_schedules).model_dump(exclude_none=True)
+
         background_tasks.add_task(db.insert, data)
 
         return data
+
     else:
         return ttl_schedule
 
