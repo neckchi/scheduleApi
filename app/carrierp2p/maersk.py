@@ -21,7 +21,7 @@ async def get_maersk_p2p(client, url: str, location_url: str, cutoff_url: str, p
                          search_range: str, direct_only: bool|None, tsp: str | None = None, scac: str | None = None,
                          start_date: str | None = None,
                          date_type: str | None = None, service: str | None = None, vessel_flag: str | None = None):
-    location_tasks:Generator = (asyncio.create_task(anext(HTTPXClientWrapper.call_client(client=client,method='GET',stream=True, url=location_url, headers={'Consumer-Key': pw}, params= {'UNLocationCode': port}))) for port in [pol, pod])
+    location_tasks:Generator = (asyncio.create_task(anext(HTTPXClientWrapper.call_client(client=client,method='GET',stream=True, url=location_url, headers={'Consumer-Key': pw}, params= {'locationType':'CITY','UNLocationCode': port}))) for port in [pol, pod])
     [origingeolocation, destinationgeolocation] = await asyncio.gather(*location_tasks)
     async def schedules():
         if origingeolocation and destinationgeolocation:
