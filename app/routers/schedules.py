@@ -4,6 +4,7 @@ import httpx
 from uuid import uuid5,NAMESPACE_DNS
 from fastapi import APIRouter, Query, status, Depends, BackgroundTasks
 from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 from app.carrierp2p import cma, hamburgsud, one, hmm, zim, maersk, msc, iqax
 from app.schemas import schema_response, schema_request
 from app.background_tasks import db
@@ -141,7 +142,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
         count_schedules = len(sorted_schedules)
 
         if count_schedules == 0:
-            failed_response = JSONResponse(status_code=status.HTTP_404_NOT_FOUND,content=schema_response.Error(id=product_id,error=f"{point_from}-{point_to} schedule not found").model_dump_json())
+            failed_response = JSONResponse(status_code=status.HTTP_404_NOT_FOUND,content=jsonable_encoder(schema_response.Error(id=product_id,error=f"{point_from}-{point_to} schedule not found")))
             failed_response.set_cookie(key='p2psession', value='fail-p2p-request')
             return failed_response
 
