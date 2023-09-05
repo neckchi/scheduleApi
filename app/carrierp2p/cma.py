@@ -50,6 +50,7 @@ async def get_cma_p2p(client, url: str, pw: str, pol: str, pod: str, search_rang
                 for extra_p2p in asyncio.as_completed(extra_tasks):
                     result = await extra_p2p
                     response_json.extend(result.json())
+
             if response.status_code in (200, 206):
                 for task in response_json:
                     transit_time = task['transitTime']
@@ -57,9 +58,9 @@ async def get_cma_p2p(client, url: str, pw: str, pol: str, pod: str, search_rang
                     last_point_to = task['routingDetails'][-1]['pointTo']['location']['internalCode']
                     first_etd = next((ed['pointFrom']['departureDateLocal'] for ed in task['routingDetails'] if ed['pointFrom']['departureDateLocal']), default_etd_eta)
                     last_eta = next((ea['pointTo']['arrivalDateLocal'] for ea in task['routingDetails'][::-1] if ea['pointTo']['arrivalDateLocal']), default_etd_eta)
-                    first_cy_cutoff = next((cyc['pointFrom']['portCutoffDate'] for cyc in task['routingDetails'] if cyc['pointFrom']['portCutoffDate']), None)
-                    first_vgm_cuttoff = next((vgmc['pointFrom']['vgmCutoffDate'] for vgmc in task['routingDetails'] if vgmc['pointFrom']['vgmCutoffDate']), None)
-                    first_doc_cutoff = next((doc['pointFrom']['cutOff']['shippingInstructionAcceptance']['local'] for doc in task['routingDetails'] if deepget(doc['pointFrom']['cutOff'], 'shippingInstructionAcceptance', 'local')), None)
+                    first_cy_cutoff = next((cyc['pointFrom']['portCutoffDate'] for cyc in task['routingDetails'] if deepget(cyc['pointFrom'],'portCutoffDate')), None)
+                    first_vgm_cuttoff = next((vgmc['pointFrom']['vgmCutoffDate'] for vgmc in task['routingDetails'] if deepget(vgmc['pointFrom'],'vgmCutoffDate')), None)
+                    first_doc_cutoff = next((doc['pointFrom']['cutOff']['shippingInstructionAcceptance']['local'] for doc in task['routingDetails'] if deepget(doc['pointFrom'],'cutOff', 'shippingInstructionAcceptance', 'local')), None)
                     check_transshipment = True if len(task['routingDetails']) > 1 else False
                     schedule_body: dict = {'scac': carrier_code.get(task['shippingCompany']),
                                            'pointFrom': first_point_from,
