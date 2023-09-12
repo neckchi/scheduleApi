@@ -1,4 +1,4 @@
-FROM python:3.11.1
+FROM harbor.emea.ocp.int.kn/dockerhub/library/python:3.11.1
 
 WORKDIR /usr/p2papi
 
