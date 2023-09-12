@@ -4,8 +4,8 @@ WORKDIR /usr/p2papi
 
 COPY requirements.txt ./
 
-RUN pip install --upgrade pip
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --proxy http://zscaler.proxy.int.kn:80 --upgrade pip
+RUN pip install --proxy http://zscaler.proxy.int.kn:80 --no-cache-dir -r requirements.txt
 
 COPY . .
 
