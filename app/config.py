@@ -1,5 +1,8 @@
 from pydantic import SecretStr
 from pydantic_settings import BaseSettings
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class Settings(BaseSettings):
     mongo_url: SecretStr
@@ -34,5 +37,5 @@ class Settings(BaseSettings):
     mscu_rsa_key: SecretStr
 
     class Config:
-        env_file = "app\.env"
+        env_file = "./app/.env"
 
