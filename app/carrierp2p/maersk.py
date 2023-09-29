@@ -143,4 +143,3 @@ async def get_maersk_p2p(client, url: str, location_url: str, cutoff_url: str, p
         else:
             pass
     yield [s async for s in schedules()]
-

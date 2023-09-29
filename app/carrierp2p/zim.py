@@ -97,4 +97,3 @@ async def get_zim_p2p(client, url: str, turl: str, pw: str, zim_client: str, zim
             raise PermissionError
         else:yield None
 
-

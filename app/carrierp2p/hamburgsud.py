@@ -84,4 +84,3 @@ async def get_sudu_p2p(client, url: str, pw: str, pol: str, pod: str, direct_onl
         if retries == 0:
             raise PermissionError
         else:yield None
-

@@ -1,8 +1,7 @@
-import datetime
 import asyncio
 from app.carrierp2p.helpers import deepget
 from app.routers.router_config import HTTPXClientWrapper
-
+from datetime import datetime,timedelta
 #
 # async def get_iqax_location_id(client, api_key: str,loc_name:str):
 #     url:str = 'https://www.bigschedules.com/openapi/locations/list'
@@ -34,14 +33,14 @@ async def get_iqax_p2p(client, url: str, pw: str, pol: str, pod: str, search_ran
                         check_transshipment: bool = False if task['direct'] else True
                         transshipment_port: bool = next((True for tsport in task['leg'][1:] if tsport['fromPoint']['location']['unlocode'] == tsp),False) if check_transshipment and tsp else False
                         if transshipment_port or not tsp:
-                            if direct_only is None or (not check_transshipment  and direct_only is True) or (check_transshipment and direct_only is False) :
+                            if direct_only is None or (not check_transshipment  and direct_only is True) or (check_transshipment and direct_only is False):
                                 if check_service_code:
-                                    carrier_code = task['carrierScac']
-                                    transit_time = task['transitTime']
-                                    first_point_from = task['por']['location']['unlocode']
-                                    last_point_to = task['fnd']['location']['unlocode']
-                                    first_etd = task['por']['etd']
-                                    last_eta = task['fnd']['eta']
+                                    carrier_code:str = task['carrierScac']
+                                    transit_time:int = task['transitTime']
+                                    first_point_from:str = task['por']['location']['unlocode']
+                                    last_point_to:str = task['fnd']['location']['unlocode']
+                                    first_etd:str = task['por']['etd']
+                                    last_eta:str = task['fnd']['eta']
                                     schedule_body: dict = {'scac': carrier_code,
                                                            'pointFrom': first_point_from,
                                                            'pointTo': last_point_to,
@@ -54,16 +53,19 @@ async def get_iqax_p2p(client, url: str, pw: str, pol: str, pod: str, search_ran
                                     # Performance Enhancement - No meomory is used:async generator object - schedule leg
                                     async def schedule_leg():
                                         for index, legs in enumerate(task['leg'], start=1):
-                                            vessel_imo: int | None = legs['vessel'].get('IMO') if legs.get('vessel') else None
+                                            vessel_imo: str | None = str(legs['vessel'].get('IMO')) if legs.get('vessel') else None
                                             vessel_name:str |None  = deepget(legs,'vessel','name')
+                                            leg_tt:int = legs.get('transitTime')
                                             if index == 1:
                                                 final_etd: str = legs['fromPoint'].get('etd', first_etd)
-                                                final_eta: str = legs['toPoint'].get('eta', next(ed['fromPoint']['etd'] for ed in task['leg'][1 if transshipment_port else 0::] if ed['fromPoint'].get('etd')))
+                                                # final_eta: str = legs['toPoint'].get('eta', next(ed['fromPoint']['etd'] for ed in task['leg'][1 if transshipment_port else 0::] if ed['fromPoint'].get('etd')))
+                                                final_eta: str = legs['toPoint'].get('eta',(datetime.strptime(final_etd, "%Y-%m-%dT%H:%M:%S.000Z") + timedelta(days=leg_tt)).strftime("%Y-%m-%dT%H:%M:%S.000Z"))
                                             else:
-                                                final_etd: str = legs['fromPoint'].get('etd', next(ea['toPoint']['eta'] for ea in task['leg'][-2::-1] if ea['toPoint'].get('eta')))
+                                                # final_etd: str = legs['fromPoint'].get('etd', next(ea['toPoint']['eta'] for ea in task['leg'][-2::-1] if ea['toPoint'].get('eta')))
                                                 final_eta: str = legs['toPoint'].get('eta', last_eta)
+                                                final_etd: str = legs['toPoint'].get('etd', (datetime.strptime(final_eta,"%Y-%m-%dT%H:%M:%S.000Z") + timedelta(days=-(leg_tt))).strftime("%Y-%m-%dT%H:%M:%S.000Z"))
 
-                                            leg_transit_time = int((datetime.datetime.fromisoformat(final_eta[:10]) - datetime.datetime.fromisoformat(final_etd[:10])).days)
+                                            leg_transit_time = int((datetime.fromisoformat(final_eta[:10]) - datetime.fromisoformat(final_etd[:10])).days)
 
                                             leg_body: dict = {
                                                 'pointFrom': {'locationName': legs['fromPoint']['location']['name'],
@@ -113,4 +115,3 @@ async def get_iqax_p2p(client, url: str, pw: str, pol: str, pod: str, search_ran
                     pass
 
     yield [s async for s in schedules()]
-

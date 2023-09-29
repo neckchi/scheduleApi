@@ -70,4 +70,3 @@ class HTTPXClientWrapper:
                     yield response
             else:
                 yield None
-

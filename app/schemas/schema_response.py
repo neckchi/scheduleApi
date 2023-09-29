@@ -132,4 +132,3 @@ class Product(BaseModel):
 class Error(BaseModel):
     id: UUID
     error: str
-

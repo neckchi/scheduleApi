@@ -3,7 +3,6 @@ from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
 
 load_dotenv()
-
 class Settings(BaseSettings):
     mongo_url: SecretStr
     cma_url: str
@@ -35,7 +34,14 @@ class Settings(BaseSettings):
     mscu_thumbprint: SecretStr
     mscu_scope: SecretStr
     mscu_rsa_key: SecretStr
+    hlcu_token_url:str
+    hlcu_url:str
+    hlcu_client_id : SecretStr
+    hlcu_client_secret : SecretStr
+    hlcu_user_id : SecretStr
+    hlcu_password:SecretStr
+
 
     class Config:
+        # env_file = "app\.env"
         env_file = "./app/.env"
-

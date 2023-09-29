@@ -25,6 +25,7 @@ class CarrierCode(str, Enum):
     MAEI = 'MAEI'
     OOLU = 'OOLU'
     COSU = 'COSU'
+    HLCU = 'HLCU'
 
     def __str__(self):
         return str(self.value)

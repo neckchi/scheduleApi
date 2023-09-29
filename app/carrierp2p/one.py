@@ -115,4 +115,3 @@ async def get_one_p2p(client, url: str, turl: str, pw: str, auth: str, pol: str,
                 pass
 
     yield [s async for s in schedules()]
-

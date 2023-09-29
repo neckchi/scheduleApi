@@ -130,4 +130,3 @@ async def get_cma_p2p(client, url: str, pw: str, pol: str, pod: str, search_rang
                 pass
 
     yield [s async for s in schedules()]
-

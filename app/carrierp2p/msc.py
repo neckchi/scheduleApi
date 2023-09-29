@@ -51,8 +51,8 @@ async def get_msc_p2p(client, url: str, oauth: str, aud: str, pw: str, msc_clien
                     if direct_only is None or (not check_transshipment  and direct_only is True) or (check_transshipment and direct_only is False) :
                         if check_service_code:
                             carrier_code:str = 'MSCU'
-                            first_point_from = task['Schedules'][0]['Calls'][0]['Code']
-                            last_point_to = task['Schedules'][-1]['Calls'][-1]['Code']
+                            first_point_from:str = task['Schedules'][0]['Calls'][0]['Code']
+                            last_point_to:str = task['Schedules'][-1]['Calls'][-1]['Code']
                             first_etd = next(ed['CallDateTime'] for ed in task['Schedules'][0]['Calls'][0]['CallDates'] if ed['Type'] == 'ETD')
                             last_eta = next(ed['CallDateTime'] for ed in task['Schedules'][-1]['Calls'][-1]['CallDates'] if ed['Type'] == 'ETA')
                             first_cy_cutoff = next((led['CallDateTime'] for led in task['Schedules'][0]['Calls'][0]['CallDates'] if led['Type'] == 'CYCUTOFF' and led.get('CallDateTime')), None)
@@ -124,4 +124,3 @@ async def get_msc_p2p(client, url: str, oauth: str, aud: str, pw: str, msc_clien
                     pass
 
     yield [s async for s in schedules()]
-

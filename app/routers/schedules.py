@@ -5,7 +5,7 @@ from uuid import uuid5,NAMESPACE_DNS
 from fastapi import APIRouter, Query, status, Depends, BackgroundTasks
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
-from app.carrierp2p import cma, hamburgsud, one, hmm, zim, maersk, msc, iqax
+from app.carrierp2p import cma, hamburgsud, one, hmm, zim, maersk, msc, iqax,hlag
 from app.schemas import schema_response, schema_request
 from app.background_tasks import db
 from app.config import Settings
@@ -133,6 +133,16 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                           scac=carriers, service=service,
                                           pw=settings.iqax_token.get_secret_value())))
 
+                if carriers == 'HLCU' or carriers is None:
+                    yield asyncio.create_task(anext(
+                        hlag.get_hlag_p2p(client= client, url = settings.hlcu_url,turl=settings.hlcu_token_url,
+                                          client_id= settings.hlcu_client_id.get_secret_value(),client_secret=settings.hlcu_client_secret.get_secret_value(),
+                                          user= settings.hlcu_user_id.get_secret_value(),pw= settings.hlcu_password.get_secret_value(),
+                                          pol=point_from,pod=point_to,search_range= search_range.duration,
+                                          etd= start_date if start_date_type is schema_request.StartDateType.departure else None ,
+                                          eta =start_date if start_date_type is schema_request.StartDateType.arrival else None,direct_only=direct_only,
+                                          vessel_flag = vessel_flag_code)))
+
         # 👇 Await ALL
         p2p_schedules: list = await asyncio.gather(*{ap2ps async for ap2ps in awaitable_p2p_schedules()})
         # 👇 Best built o(1) function to flatten_p2p the loops
@@ -158,4 +168,3 @@ async def get_schedules(background_tasks: BackgroundTasks,
 
     else:
         return ttl_schedule
-
