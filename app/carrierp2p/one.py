@@ -31,30 +31,30 @@ async def get_one_p2p(client, url: str, turl: str, pw: str, auth: str, pol: str,
                 schedule_type = response_json['Direct'] if response_json.get('Direct', None) else response_json['Transshipment']
                 for task in schedule_type:
                     task: dict
-                    service_code = task['serviceCode']
-                    service_name = task['serviceName']
+                    service_code:str = task['serviceCode']
+                    service_name:str = task['serviceName']
                     # Additional check on service code/name in order to fullfill business requirment(query the result by service code)
                     check_service: bool = service_code == service or service_name == service if service else True
                     check_transshipment: bool = True if len(task['legs']) > 1 else False
                     transshipment_port: bool = next((True for tsport in task['legs'][1:] if tsport['departureUnloc'] == tsp),False) if check_transshipment and tsp else False
                     if transshipment_port or not tsp:
                         if check_service:
-                            carrier_code = task['scac']
-                            transit_time = round(task['transitDurationHrsUtc'] / 24)
-                            first_point_from = task['originUnloc']
-                            first_origin_terminal = task['originTerminal']
-                            last_point_to = task['destinationUnloc']
-                            last_destination_terminal = task['destinationTerminal']
-                            first_voyage = task['voyageNumber']
-                            first_vessel_name = task['vesselName']
-                            first_imo = task['imoNumber']
-                            first_service_code = task['serviceCode']
-                            first_service_name = task['serviceName']
-                            first_etd = task['originDepartureDateEstimated']
-                            last_eta = task['destinationArrivalDateEstimated']
-                            first_cy_cutoff = task['terminalCutoff'] if task['terminalCutoff'] != '' else None
-                            first_doc_cutoff = task['docCutoff'] if task['docCutoff'] != '' else None
-                            first_vgm_cutoff = task['vgmCutoff'] if task['vgmCutoff'] != '' else None
+                            carrier_code:str = task['scac']
+                            transit_time:int = round(task['transitDurationHrsUtc'] / 24)
+                            first_point_from:str = task['originUnloc']
+                            first_origin_terminal:str = task['originTerminal']
+                            last_point_to:str = task['destinationUnloc']
+                            last_destination_terminal:str = task['destinationTerminal']
+                            first_voyage:str = task['voyageNumber']
+                            first_vessel_name:str = task['vesselName']
+                            first_imo:str = task['imoNumber']
+                            first_service_code:str = task['serviceCode']
+                            first_service_name:str = task['serviceName']
+                            first_etd:str = task['originDepartureDateEstimated']
+                            last_eta:str = task['destinationArrivalDateEstimated']
+                            first_cy_cutoff:str = task['terminalCutoff'] if task['terminalCutoff'] != '' else None
+                            first_doc_cutoff:str = task['docCutoff'] if task['docCutoff'] != '' else None
+                            first_vgm_cutoff:str = task['vgmCutoff'] if task['vgmCutoff'] != '' else None
                             schedule_body: dict = {'scac': carrier_code, 'pointFrom': first_point_from,
                                                    'pointTo': last_point_to, 'etd': first_etd, 'eta': last_eta,
                                                    'cyCutOffDate': first_cy_cutoff, 'docCutOffDate': first_doc_cutoff,
