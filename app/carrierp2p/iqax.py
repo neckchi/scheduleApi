@@ -65,7 +65,7 @@ async def get_iqax_p2p(client, url: str, pw: str, pol: str, pod: str, search_ran
                                                 final_eta: str = legs['toPoint'].get('eta', last_eta)
                                                 final_etd: str = legs['toPoint'].get('etd', (datetime.strptime(final_eta,"%Y-%m-%dT%H:%M:%S.000Z") + timedelta(days=-(leg_tt))).strftime("%Y-%m-%dT%H:%M:%S.000Z"))
 
-                                            leg_transit_time = int((datetime.fromisoformat(final_eta[:10]) - datetime.fromisoformat(final_etd[:10])).days)
+                                            leg_transit_time:int = leg_tt if leg_tt else ((datetime.fromisoformat(final_eta[:10]) - datetime.fromisoformat(final_etd[:10])).days)
 
                                             leg_body: dict = {
                                                 'pointFrom': {'locationName': legs['fromPoint']['location']['name'],
