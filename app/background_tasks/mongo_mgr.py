@@ -14,7 +14,7 @@ class MongoDBsetting:
         self.client = AsyncIOMotorClient(setting.mongo_url.get_secret_value(),connect=False,uuidRepresentation='standard')
         try:
             await self.client.server_info()
-            self.db = self.client['test']
+            self.db = self.client['schedule']
             self.collection = self.db['p2p']
             logging.info('Connected To MongoDB - P2P schedule collection')
         except Exception:
