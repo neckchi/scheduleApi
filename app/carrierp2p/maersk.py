@@ -58,9 +58,9 @@ async def get_maersk_p2p(client, url: str, location_url: str, cutoff_url: str, p
                             if transshipment_port or not tsp:
                                 if direct_only is None or (not check_transshipment and direct_only is True) or (check_transshipment and direct_only is False):
                                     if check_service_code or check_service_name:
-                                        transit_time = round(int(task['transitTime']) / 1400)
-                                        first_point_from = task['facilities']['collectionOrigin']['UNLocationCode']
-                                        last_point_to = task['facilities']['deliveryDestination']['UNLocationCode']
+                                        transit_time:int = round(int(task['transitTime']) / 1400)
+                                        first_point_from:str = task['facilities']['collectionOrigin']['UNLocationCode']
+                                        last_point_to:str = task['facilities']['deliveryDestination']['UNLocationCode']
                                         first_etd = task['departureDateTime']
                                         last_eta = task['arrivalDateTime']
                                         schedule_body: dict = {'scac': carrier_code,

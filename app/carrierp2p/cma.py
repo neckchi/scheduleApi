@@ -53,11 +53,11 @@ async def get_cma_p2p(client, url: str, pw: str, pol: str, pod: str, search_rang
 
             if response.status_code in (200, 206):
                 for task in response_json:
-                    transit_time = task['transitTime']
-                    first_point_from = task['routingDetails'][0]['pointFrom']['location']['internalCode']
-                    last_point_to = task['routingDetails'][-1]['pointTo']['location']['internalCode']
-                    first_etd = next((ed['pointFrom']['departureDateLocal'] for ed in task['routingDetails'] if ed['pointFrom']['departureDateLocal']), default_etd_eta)
-                    last_eta = next((ea['pointTo']['arrivalDateLocal'] for ea in task['routingDetails'][::-1] if ea['pointTo']['arrivalDateLocal']), default_etd_eta)
+                    transit_time:int = task['transitTime']
+                    first_point_from:str = task['routingDetails'][0]['pointFrom']['location']['internalCode']
+                    last_point_to:str = task['routingDetails'][-1]['pointTo']['location']['internalCode']
+                    first_etd = next((ed['pointFrom']['departureDateLocal'] for ed in task['routingDetails'] if ed['pointFrom'].get('departureDateLocal')), default_etd_eta)
+                    last_eta = next((ea['pointTo']['arrivalDateLocal'] for ea in task['routingDetails'][::-1] if ea['pointTo'].get('arrivalDateLocal')), default_etd_eta)
                     first_cy_cutoff = next((cyc['pointFrom']['portCutoffDate'] for cyc in task['routingDetails'] if deepget(cyc['pointFrom'],'portCutoffDate')), None)
                     first_vgm_cuttoff = next((vgmc['pointFrom']['vgmCutoffDate'] for vgmc in task['routingDetails'] if deepget(vgmc['pointFrom'],'vgmCutoffDate')), None)
                     first_doc_cutoff = next((doc['pointFrom']['cutOff']['shippingInstructionAcceptance']['local'] for doc in task['routingDetails'] if deepget(doc['pointFrom'],'cutOff', 'shippingInstructionAcceptance', 'local')), None)
@@ -88,11 +88,10 @@ async def get_cma_p2p(client, url: str, pw: str, pol: str, pod: str, search_rang
                                                           'terminalName': deepget(legs['pointTo']['location'],'facility','name'),
                                                           'terminalCode': check_pod_terminal[0].get('codification') if check_pod_terminal else None
                                                           },
-                                              'etd': default_etd_eta if legs['pointFrom']['departureDateLocal'] is None else legs['pointFrom']['departureDateLocal'],
+                                              'etd': legs['pointFrom'].get('departureDateLocal',default_etd_eta) ,
+                                              'eta': legs['pointTo'].get('arrivalDateLocal',default_etd_eta) ,
 
-                                              'eta': default_etd_eta if legs['pointTo']['arrivalDateLocal'] is None else legs['pointTo']['arrivalDateLocal'],
-
-                                              'transitTime': legs['legTransitTime'] if legs['legTransitTime'] else 0,
+                                              'transitTime':legs.get('legTransitTime',0) ,
 
                                               'transportations': {
                                                   'transportType': str(legs['transportation']['meanOfTransport']).title(),

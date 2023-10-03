@@ -80,7 +80,7 @@ async def get_iqax_p2p(client, url: str, pw: str, pol: str, pod: str, search_ran
                                                             },
                                                 'etd': final_etd,
                                                 'eta': final_eta,
-                                                'transitTime': legs['transitTime'] if legs.get('transitTime') else leg_transit_time,
+                                                'transitTime': legs.get('transitTime',leg_transit_time)  ,
                                                 'transportations': {
                                                     'transportType': str(legs['transportMode']).title(),
                                                     'transportName': legs['vessel']['name'] if vessel_imo and vessel_name != '---' else None,
