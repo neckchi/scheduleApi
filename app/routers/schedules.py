@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import orjson
 import httpx
 from uuid import uuid5,NAMESPACE_DNS
 from fastapi import APIRouter, Query, status, Depends, BackgroundTasks
@@ -40,7 +41,8 @@ async def get_schedules(background_tasks: BackgroundTasks,
 
     """
     product_id = uuid5(NAMESPACE_DNS,f'{scac}-p2p-api-{point_from}{point_to}{start_date_type}{start_date}{search_range}{tsp}{direct_only}{service}')
-    ttl_schedule = await anext(db.retrieve(productid=product_id))
+    # ttl_schedule = await anext(db.retrieve(productid=product_id)) #for MongoDB
+    ttl_schedule = await anext(db.get(key=product_id)) #for Redis
     start_date: str = start_date.strftime("%Y-%m-%d")
     if not ttl_schedule:
         # 👇 Create yield tasks with less memory, we start requesting all of them concurrently if no carrier code
@@ -161,9 +163,11 @@ async def get_schedules(background_tasks: BackgroundTasks,
             destination=point_to, noofSchedule=count_schedules,
             schedules=sorted_schedules).model_dump(exclude_none=True)
 
-        background_tasks.add_task(db.insert, data)
+        # background_tasks.add_task(db.insert, data) # for MongoDB
+        background_tasks.add_task(db.set,product_id,data) # for Redis
 
         return data
 
     else:
-        return ttl_schedule
+        # return ttl_schedule #for MongoDB
+       return orjson.loads(ttl_schedule) #for Redis
