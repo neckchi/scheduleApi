@@ -1,5 +1,6 @@
 from app.routers.router_config import HTTPXClientWrapper
 
+
 async def get_one_access_token(client, url: str, auth: str, api_key: str):
     headers: dict = {'apikey': api_key,
                      'Authorization': auth,
@@ -9,6 +10,8 @@ async def get_one_access_token(client, url: str, auth: str, api_key: str):
     response_token = response.json()
     access_token = response_token['access_token']
     yield access_token
+
+
 
 async def get_one_p2p(client, url: str, turl: str, pw: str, auth: str, pol: str, pod: str, search_range: int,
                       direct_only: bool|None,

@@ -17,8 +17,8 @@ class MongoDBsetting:
             self.db = self.client['schedule']
             self.collection = self.db['p2p']
             logging.info('Connected To MongoDB - P2P schedule collection')
-        except Exception:
-            logging.error('Unable to connect to the MongoDB')
+        except Exception as disconnect:
+            logging.error(f'Unable to connect to the MongoDB - {disconnect}')
 
     async def insert(self, result: dict):
         utc_timestamp = datetime.datetime.utcnow()

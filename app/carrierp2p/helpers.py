@@ -1,5 +1,6 @@
 from functools import lru_cache
 import csv
+import time
 
 def deepget(dct: dict, *keys):
     """
@@ -11,6 +12,7 @@ def deepget(dct: dict, *keys):
         except (TypeError, KeyError):
             return None
     return dct
+
 
 @lru_cache(maxsize=None)
 def check_loop(file_path,scac:str,loop_code:str = None,loop_name:str = None):

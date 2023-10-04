@@ -1,9 +1,11 @@
 from pydantic import SecretStr
-from pydantic_settings import BaseSettings
-from dotenv import load_dotenv
+from pydantic_settings import BaseSettings,SettingsConfigDict
+# from dotenv import load_dotenv
 
-load_dotenv()
+# load_dotenv()
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file='./app/.env', env_file_encoding='utf-8')
+    # model_config = SettingsConfigDict(secrets_dir='/run/secrets')
     mongo_url: SecretStr
     cma_url: str
     cma_token: SecretStr
@@ -41,7 +43,7 @@ class Settings(BaseSettings):
     hlcu_user_id : SecretStr
     hlcu_password:SecretStr
 
-
-    class Config:
-        # env_file = "app\.env"
-        env_file = "./app/.env"
+    #
+    # class Config:
+    #     # env_file = "app\.env"
+    #     env_file = "./app/.env"
