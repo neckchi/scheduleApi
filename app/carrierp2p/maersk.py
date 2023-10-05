@@ -25,12 +25,12 @@ async def get_maersk_p2p(client, url: str, location_url: str, cutoff_url: str, p
     [origingeolocation, destinationgeolocation] = await asyncio.gather(*location_tasks)
     async def schedules():
         if origingeolocation and destinationgeolocation:
-            params: dict = {'collectionOriginCountryCode': origingeolocation['countryCode'],
-                            'collectionOriginCityName': origingeolocation['cityName'],
-                            'collectionOriginUNLocationCode': origingeolocation['UNLocationCode'],
-                            'deliveryDestinationCountryCode': destinationgeolocation['countryCode'],
-                            'deliveryDestinationCityName': destinationgeolocation['cityName'],
-                            'deliveryDestinationUNLocationCode': destinationgeolocation['UNLocationCode'],
+            params: dict = {'collectionOriginCountryCode': origingeolocation[0]['countryCode'],
+                            'collectionOriginCityName': origingeolocation[0]['cityName'],
+                            'collectionOriginUNLocationCode': origingeolocation[0]['UNLocationCode'],
+                            'deliveryDestinationCountryCode': destinationgeolocation[0]['countryCode'],
+                            'deliveryDestinationCityName': destinationgeolocation[0]['cityName'],
+                            'deliveryDestinationUNLocationCode': destinationgeolocation[0]['UNLocationCode'],
                             'dateRange': f'P{search_range}W', 'startDateType': date_type, 'startDate': start_date}
             params.update({'vesselFlagCode': vessel_flag}) if vessel_flag else ...
             maersk_list: set = {'MAEU', 'SEAU', 'SEJJ', 'MCPU', 'MAEI'} if scac is None else {scac}
