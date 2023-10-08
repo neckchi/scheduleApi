@@ -1,8 +1,7 @@
 import asyncio
 import datetime
-import orjson
 import httpx
-from uuid import uuid5,NAMESPACE_DNS
+from uuid import uuid5,NAMESPACE_DNS,UUID
 from fastapi import APIRouter, Query, status, Depends, BackgroundTasks
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
@@ -40,10 +39,11 @@ async def get_schedules(background_tasks: BackgroundTasks,
     - **pointFrom/pointTo** : Provide either Point or Port in UNECE format
 
     """
-    product_id = uuid5(NAMESPACE_DNS,f'{scac}-p2p-api-{point_from}{point_to}{start_date_type}{start_date}{search_range}{tsp}{direct_only}{service}')
+    product_id:UUID = uuid5(NAMESPACE_DNS,f'{scac}-p2p-api-{point_from}{point_to}{start_date_type}{start_date}{search_range}{tsp}{direct_only}{service}')
     # ttl_schedule = await anext(db.retrieve(productid=product_id)) #for MongoDB
-    ttl_schedule = await anext(db.get(key=product_id)) #for Redis
+    ttl_schedule = await db.get(key=product_id) #for Redis
     start_date: str = start_date.strftime("%Y-%m-%d")
+
     if not ttl_schedule:
         # 👇 Create yield tasks with less memory, we start requesting all of them concurrently if no carrier code
         # given or mutiple carrier codes given
@@ -70,7 +70,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
 
                 if carriers == 'ONEY' or carriers is None:
                     yield asyncio.create_task(anext(
-                        one.get_one_p2p(client=client, url=settings.oney_url, turl=settings.oney_turl,
+                        one.get_one_p2p(client=client,background_task = background_tasks, url=settings.oney_url, turl=settings.oney_turl,
                                         pol=point_from, pod=point_to, start_date=start_date,
                                         direct_only=direct_only,
                                         search_range=int(search_range.value[0]), tsp=tsp,
@@ -89,7 +89,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
                 # Missing IMO code and Cut off date from ZIM response
                 if carriers == 'ZIMU' or carriers is None:
                     yield asyncio.create_task(anext(
-                        zim.get_zim_p2p(client=client, url=settings.zim_url, turl=settings.zim_turl,
+                        zim.get_zim_p2p(client=client,background_task = background_tasks, url=settings.zim_url, turl=settings.zim_turl,
                                         pol=point_from, pod=point_to, start_date=start_date,
                                         direct_only=direct_only, tsp=tsp,
                                         search_range=search_range.duration, service=service,
@@ -99,7 +99,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
 
                 if carriers in {'MAEU', 'SEAU', 'SEJJ', 'MCPU', 'MAEI'} or carriers is None:
                     yield asyncio.create_task(anext(
-                        maersk.get_maersk_p2p(client=client, url=settings.maeu_p2p,
+                        maersk.get_maersk_p2p(client=client,background_task = background_tasks,url=settings.maeu_p2p,
                                               location_url=settings.maeu_location,
                                               cutoff_url=settings.maeu_cutoff,
                                               pol=point_from, pod=point_to, start_date=start_date,
@@ -112,7 +112,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
 
                 if carriers == 'MSCU' or carriers is None:
                     yield asyncio.create_task(anext(
-                        msc.get_msc_p2p(client=client, url=settings.mscu_url, oauth=settings.mscu_oauth,
+                        msc.get_msc_p2p(client=client,background_task = background_tasks, url=settings.mscu_url, oauth=settings.mscu_oauth,
                                         aud=settings.mscu_aud, pol=point_from, pod=point_to,
                                         start_date=start_date, search_range=search_range.duration,
                                         direct_only=direct_only,
@@ -136,7 +136,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
 
                 if carriers == 'HLCU' or carriers is None:
                     yield asyncio.create_task(anext(
-                        hlag.get_hlag_p2p(client= client, url = settings.hlcu_url,turl=settings.hlcu_token_url,
+                        hlag.get_hlag_p2p(client= client,background_task = background_tasks, url = settings.hlcu_url,turl=settings.hlcu_token_url,
                                           client_id= settings.hlcu_client_id.get_secret_value(),client_secret=settings.hlcu_client_secret.get_secret_value(),
                                           user= settings.hlcu_user_id.get_secret_value(),pw= settings.hlcu_password.get_secret_value(),
                                           pol=point_from,pod=point_to,search_range= search_range.duration,
@@ -157,17 +157,18 @@ async def get_schedules(background_tasks: BackgroundTasks,
             failed_response.set_cookie(key='p2psession', value='fail-p2p-request')
             return failed_response
 
+
         data = schema_response.Product(
             productid=product_id,
             origin=point_from,
             destination=point_to, noofSchedule=count_schedules,
             schedules=sorted_schedules).model_dump(exclude_none=True)
 
+
         # background_tasks.add_task(db.insert, data) # for MongoDB
-        background_tasks.add_task(db.set,product_id,data) # for Redis
+        background_tasks.add_task(db.set,key=product_id,value=data) #for Redis
 
         return data
 
     else:
-        # return ttl_schedule #for MongoDB
-       return orjson.loads(ttl_schedule) #for Redis
+        return ttl_schedule

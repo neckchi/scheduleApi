@@ -1,8 +1,10 @@
 import asyncio
 from datetime import datetime
-from typing import Generator
 from app.carrierp2p.helpers import deepget
 from app.routers.router_config import HTTPXClientWrapper
+from app.background_tasks import db
+from uuid import uuid5,NAMESPACE_DNS
+from datetime import timedelta
 
 async def get_maersk_cutoff(client, url: str, headers: dict, country: str, pol: str, imo: str, voyage: str):
     params: dict = {'ISOCountryCode': country, 'portOfLoad': pol, 'vesselIMONumber': imo, 'voyage': voyage}
@@ -17,12 +19,26 @@ async def get_maersk_cutoff(client, url: str, headers: dict, country: str, pol: 
                 cut_off_body.update({'vgmCutoff': cutoff.get('deadlineLocal')})
         yield cut_off_body
 
-async def get_maersk_p2p(client, url: str, location_url: str, cutoff_url: str, pw: str, pw2: str, pol: str, pod: str,
+async def get_maersk_p2p(client,background_task,url: str, location_url: str, cutoff_url: str, pw: str, pw2: str, pol: str, pod: str,
                          search_range: str, direct_only: bool|None, tsp: str | None = None, scac: str | None = None,
                          start_date: str | None = None,
                          date_type: str | None = None, service: str | None = None, vessel_flag: str | None = None):
-    location_tasks:Generator = (asyncio.create_task(anext(HTTPXClientWrapper.call_client(client=client,method='GET',stream=True, url=location_url, headers={'Consumer-Key': pw}, params= {'locationType':'CITY','UNLocationCode': port}))) for port in [pol, pod])
-    [origingeolocation, destinationgeolocation] = await asyncio.gather(*location_tasks)
+    maersk_uuid = lambda port:uuid5(NAMESPACE_DNS, f'maersk-loc-uuid-kuehne-nagel-{port}')
+    port_uuid:list = [maersk_uuid(port=port) for port in [pol,pod]]
+    [origingeolocation,destinationgeolocation] = await asyncio.gather(*(db.get(key=port_id) for port_id in port_uuid))
+
+    if not origingeolocation or not destinationgeolocation:
+        port_loading,port_discharge  = pol if not origingeolocation else None, pod if not destinationgeolocation else None
+        location_tasks = (asyncio.create_task(anext(HTTPXClientWrapper.call_client(client=client,background_tasks=background_task,method='GET',
+                                                                                             stream=True, url=location_url, headers={'Consumer-Key': pw},
+                                                                                             params= {'locationType':'CITY','UNLocationCode': port},
+                                                                                             token_key=maersk_uuid(port=port),expire=timedelta(days=60)))) for port in [port_loading, port_discharge] if port)
+        location = await asyncio.gather(*location_tasks)
+        if origingeolocation is None and destinationgeolocation is None:
+            origingeolocation, destinationgeolocation = location
+        else: origingeolocation,destinationgeolocation = location[0] if  origingeolocation is None and destinationgeolocation is not None else origingeolocation,\
+            location[0] if destinationgeolocation is None and origingeolocation is not None else destinationgeolocation
+
     async def schedules():
         if origingeolocation and destinationgeolocation:
             params: dict = {'collectionOriginCountryCode': origingeolocation[0]['countryCode'],
@@ -35,10 +51,8 @@ async def get_maersk_p2p(client, url: str, location_url: str, cutoff_url: str, p
             params.update({'vesselFlagCode': vessel_flag}) if vessel_flag else ...
             maersk_list: set = {'MAEU', 'SEAU', 'SEJJ', 'MCPU', 'MAEI'} if scac is None else {scac}
             p2p_resp_tasks:list = [asyncio.create_task(anext(HTTPXClientWrapper.call_client(client=client, method='GET', url=url,params=dict(params, **{'vesselOperatorCarrierCode': mseries}),headers={'Consumer-Key': pw2}))) for mseries in maersk_list]
-            # p2p_resp_gather = await asyncio.gather(*p2p_resp_tasks)
             for response in asyncio.as_completed(p2p_resp_tasks):
                 response = await response
-                # print(f'Using 2nd API key for p2p schedule- {response}')
                 if response.status_code == 200:
                     response_json:dict = response.json()
                     for resp in response_json['oceanProducts']:

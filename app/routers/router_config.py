@@ -1,6 +1,8 @@
 from functools import cache
 from app import config
+from app.background_tasks import db
 from fastapi import HTTPException
+from fastapi import BackgroundTasks
 from starlette.background import BackgroundTask
 from starlette.responses import StreamingResponse
 from typing import Literal
@@ -18,8 +20,9 @@ def get_settings():
     """
     return config.Settings()
 
+
 def flatten_list(matrix) -> list:
-    flat_list:list = []
+    flat_list: list = []
     for row in matrix:
         flat_list.extend(row)
     return flat_list
@@ -49,13 +52,18 @@ class HTTPXClientWrapper:
                 # close the client when the request is done
         except Exception as e:
             logging.error(f'An error occured while making the request {e}')
-            raise HTTPException(status_code=500, detail='An error occured while creating the client')
+            raise HTTPException(status_code=500, detail=f'An error occured while creating the client - {e}')
 
     @staticmethod
-    async def call_client(client:httpx.AsyncClient, url: str,method: str = Literal['GET','POST'], params: dict = None, headers: dict = None, json: dict = None,
-                          data: dict = None, stream: bool = False):
+    async def call_client(client: httpx.AsyncClient, url: str, method: str = Literal['GET', 'POST'],
+                          params: dict = None, headers: dict = None, json: dict = None, token_key=None,
+                          data: dict = None, background_tasks: BackgroundTasks = None, expire=None,
+                          stream: bool = False):
         if not stream:
-            response = await client.request(method=method, url=url, params=params, headers=headers, json=json,data=data)
+            response = await client.request(method=method, url=url, params=params, headers=headers, json=json,
+                                            data=data)
+            if token_key:
+                background_tasks.add_task(db.set, key=token_key, value=response.json(), expire=expire)
             yield response
         else:
             """
@@ -67,6 +75,8 @@ class HTTPXClientWrapper:
             if result.status_code == 200:
                 async for data in result.body_iterator:
                     response = orjson.loads(data)
+                    if token_key:
+                        background_tasks.add_task(db.set, key=token_key, value=response, expire=expire)
                     yield response
             else:
                 yield None

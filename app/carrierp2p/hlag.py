@@ -1,21 +1,25 @@
 from app.routers.router_config import HTTPXClientWrapper
 from datetime import datetime,timedelta
-async def get_hlag_access_token(client, url: str,pw:str,user:str, client_id: str,client_secret:str):
-    headers: dict = {'X-IBM-Client-Id': client_id,
-                     'X-IBM-Client-Secret': client_secret,
-                     'Accept': 'application/json'}
-    body:dict = {
-    'mode': "raw",
-    'userId': user,
-    'password': pw,
-    'orgUnit': "HLAG"}
+from app.background_tasks import db
+from uuid import uuid5,NAMESPACE_DNS
+async def get_hlag_access_token(client,background_task, url: str,pw:str,user:str, client_id: str,client_secret:str):
+    hlcu_token_key = uuid5(NAMESPACE_DNS, 'hlcu-token-uuid-kuehne-nagel')
+    response_token = await db.get(key=hlcu_token_key)
+    if not response_token:
+        headers: dict = {'X-IBM-Client-Id': client_id,
+                         'X-IBM-Client-Secret': client_secret,
+                         'Accept': 'application/json'}
+        body:dict = {
+        'mode': "raw",
+        'userId': user,
+        'password': pw,
+        'orgUnit': "HLAG"}
 
-    response = await anext(HTTPXClientWrapper.call_client(method='POST',client=client,url=url, headers=headers,json=body))
-    response_token = response.json()
-    access_token = response_token['token']
-    yield access_token
+        response = await anext(HTTPXClientWrapper.call_client(method='POST',background_tasks =background_task,client=client,url=url, headers=headers,json=body,token_key=hlcu_token_key,expire=timedelta(minutes=10)))
+        response_token = response.json()
+    yield response_token['token']
 
-async def get_hlag_p2p(client, url: str, turl: str,user:str, pw: str, client_id: str,client_secret:str,pol: str, pod: str,search_range: int,
+async def get_hlag_p2p(client,background_task, url: str, turl: str,user:str, pw: str, client_id: str,client_secret:str,pol: str, pod: str,search_range: int,
                        etd: str | None, eta: str | None, direct_only: bool|None = None,vessel_flag:str|None = None,service: str | None = None, tsp: str | None = None):
     start_day:str = datetime.strptime(etd, "%Y-%m-%d").strftime("%Y-%m-%dT%H:%M:%S.%SZ") if etd else datetime.strptime(eta, "%Y-%m-%d").strftime("%Y-%m-%dT%H:%M:%S.%SZ")
     end_day:str = (datetime.strptime(etd, "%Y-%m-%d") + timedelta(days=search_range)).strftime("%Y-%m-%dT%H:%M:%S.%SZ") if etd else (datetime.strptime(eta, "%Y-%m-%d") + timedelta(days=search_range)).strftime("%Y-%m-%dT%H:%M:%S.%SZ")
@@ -23,7 +27,7 @@ async def get_hlag_p2p(client, url: str, turl: str,user:str, pw: str, client_id:
     params.update({'earliestDepartureDateTime': start_day,'latestDepartureDateTime':end_day}) if etd else params.update({'earliestArrivalDateTime': start_day,'arrivalEndDateTime':end_day})
     params.update({'routingTypeCode': direct_only}) if direct_only is not None else...
     params.update({'vesselFlag': vessel_flag}) if vessel_flag is not None else ...
-    token = await anext(get_hlag_access_token(client=client, url=turl,user=user, pw=pw, client_id= client_id,client_secret = client_secret))
+    token = await anext(get_hlag_access_token(client=client,background_task=background_task, url=turl,user=user, pw=pw, client_id= client_id,client_secret = client_secret))
     headers: dict = {'X-IBM-Client-Id': client_id,'X-IBM-Client-Secret': client_secret, 'Authorization': f'Bearer {token}', 'Accept': 'application/json'}
     response = await anext(HTTPXClientWrapper.call_client(client=client, method='GET', url=url, params=params,headers=headers))
     async def schedules():

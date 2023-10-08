@@ -4,39 +4,44 @@ from datetime import datetime, timedelta, timezone
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 from app.routers.router_config import HTTPXClientWrapper
+from app.background_tasks import db
+from uuid import uuid5,NAMESPACE_DNS
 
 
-async def get_msc_token(client, oauth: str, aud: str, rsa: str, msc_client: str, msc_scope: str, msc_thumbprint: str):
-    x5t: bytes = base64.b64encode(bytearray.fromhex(msc_thumbprint))
-    payload_header: dict = {'x5t': x5t.decode(), 'typ': 'JWT'}
-    payload_data: dict = {'aud': aud,
-                          'iss': msc_client,
-                          'sub': msc_client,
-                          'exp': datetime.now(tz=timezone.utc) + timedelta(hours=2),
-                          'nbf': datetime.now(tz=timezone.utc)}
-    private_rsakey = serialization.load_pem_private_key(rsa.encode('utf8'), password=None,backend=default_backend())
-    encoded: str = jwt.encode(headers=payload_header, payload=payload_data, key=private_rsakey, algorithm='RS256')
-    params: dict = {'scope': msc_scope,
-                    'client_id': msc_client,
-                    'client_assertion_type': 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
-                    'grant_type': 'client_credentials', 'client_assertion': encoded}
-    headers: dict = {'Content-Type': 'application/x-www-form-urlencoded'}
-    response = await anext(HTTPXClientWrapper.call_client(client=client,method='POST',url=oauth, headers=headers, data=params))
-    response_token = response.json()
+async def get_msc_token(client,background_task, oauth: str, aud: str, rsa: str, msc_client: str, msc_scope: str, msc_thumbprint: str):
+    msc_token_key = uuid5(NAMESPACE_DNS, 'msc-token-uuid-kuehne-nagel')
+    response_token = await db.get(key=msc_token_key)
+    if not response_token:
+        x5t: bytes = base64.b64encode(bytearray.fromhex(msc_thumbprint))
+        payload_header: dict = {'x5t': x5t.decode(), 'typ': 'JWT'}
+        payload_data: dict = {'aud': aud,
+                              'iss': msc_client,
+                              'sub': msc_client,
+                              'exp': datetime.now(tz=timezone.utc) + timedelta(hours=2),
+                              'nbf': datetime.now(tz=timezone.utc)}
+        private_rsakey = serialization.load_pem_private_key(rsa.encode('utf8'), password=None,backend=default_backend())
+        encoded: str = jwt.encode(headers=payload_header, payload=payload_data, key=private_rsakey, algorithm='RS256')
+        params: dict = {'scope': msc_scope,
+                        'client_id': msc_client,
+                        'client_assertion_type': 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+                        'grant_type': 'client_credentials', 'client_assertion': encoded}
+        headers: dict = {'Content-Type': 'application/x-www-form-urlencoded'}
+        response = await anext(HTTPXClientWrapper.call_client(client=client,background_tasks =background_task,method='POST',url=oauth, headers=headers, data=params,token_key=msc_token_key,expire = timedelta(hours=1)))
+        response_token = response.json()
     yield response_token['access_token']
 
 
-async def get_msc_p2p(client, url: str, oauth: str, aud: str, pw: str, msc_client: str, msc_scope: str,
+
+async def get_msc_p2p(client, background_task,url: str, oauth: str, aud: str, pw: str, msc_client: str, msc_scope: str,
                       msc_thumbprint: str, pol: str, pod: str,
                       search_range: int, start_date_type: str,
                       start_date: str, direct_only: bool |None, service: str | None = None, tsp: str | None = None):
     params: dict = {'fromPortUNCode': pol, 'toPortUNCode': pod, 'fromDate': start_date,
                     'toDate': (datetime.strptime(start_date, "%Y-%m-%d") + timedelta(days=search_range)).strftime(
                         "%Y-%m-%d"), 'datesRelated': start_date_type}
-
-    token = await anext( get_msc_token(client=client, oauth=oauth, aud=aud, rsa=pw, msc_client=msc_client, msc_scope=msc_scope,msc_thumbprint=msc_thumbprint))
+    token = await anext(get_msc_token(client=client,background_task=background_task,oauth=oauth, aud=aud, rsa=pw, msc_client=msc_client, msc_scope=msc_scope,msc_thumbprint=msc_thumbprint))
     headers: dict = {'Authorization': f'Bearer {token}'}
-    response = await anext(HTTPXClientWrapper.call_client(client=client, method='GET', url=url, params=params, headers=headers))
+    response = await anext(HTTPXClientWrapper.call_client(client=client,method='GET', url=url, params=params, headers=headers))
 
     ## Performance Enhancement - No meomory is used:async generator object - schedules
     async def schedules():

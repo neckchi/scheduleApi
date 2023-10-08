@@ -1,19 +1,23 @@
 from app.routers.router_config import HTTPXClientWrapper
+from app.background_tasks import db
+from uuid import uuid5,NAMESPACE_DNS
+from datetime import timedelta
+
+async def get_one_access_token(client,background_task, url: str, auth: str, api_key: str):
+    one_token_key = uuid5(NAMESPACE_DNS, 'one-token-uuid-kuehne-nagel')
+    response_token = await db.get(key=one_token_key)
+    if not response_token:
+        headers: dict = {'apikey': api_key,
+                         'Authorization': auth,
+                         'Accept': 'application/json'
+                         }
+        response = await anext(HTTPXClientWrapper.call_client(method='POST',background_tasks=background_task,client=client,url=url, headers=headers,token_key=one_token_key,expire=timedelta(minutes=40)))
+        response_token = response.json()
+    yield response_token['access_token']
 
 
-async def get_one_access_token(client, url: str, auth: str, api_key: str):
-    headers: dict = {'apikey': api_key,
-                     'Authorization': auth,
-                     'Accept': 'application/json'
-                     }
-    response = await anext(HTTPXClientWrapper.call_client(method='POST',client=client,url=url, headers=headers))
-    response_token = response.json()
-    access_token = response_token['access_token']
-    yield access_token
 
-
-
-async def get_one_p2p(client, url: str, turl: str, pw: str, auth: str, pol: str, pod: str, search_range: int,
+async def get_one_p2p(client, background_task,url: str, turl: str, pw: str, auth: str, pol: str, pod: str, search_range: int,
                       direct_only: bool|None,
                       start_date: str | None = None,
                       date_type: str | None = None, service: str | None = None, tsp: str | None = None):
@@ -21,14 +25,12 @@ async def get_one_p2p(client, url: str, turl: str, pw: str, auth: str, pol: str,
                     'searchDateType': date_type, 'weeksOut': search_range,
                     'directOnly': 'TRUE' if direct_only is True else 'FALSE'}
     # weekout:1 ≤ value ≤ 14
-    token = await anext(get_one_access_token(client=client, url=turl, auth=auth, api_key=pw))
+    token = await anext(get_one_access_token(client=client,background_task=background_task, url=turl, auth=auth, api_key=pw))
     headers: dict = {'apikey': pw, 'Authorization': f'Bearer {token}', 'Accept': 'application/json'}
-    response = await anext(HTTPXClientWrapper.call_client(client=client, method='GET', url=url, params=params,
-                                       headers=headers))
+    response = await anext(HTTPXClientWrapper.call_client(client=client, method='GET', url=url, params=params,headers=headers))
     # Performance Enhancement - No meomory is used:async generator object - schedules
     async def schedules():
         if response.status_code == 200:
-            # response_json: dict = orjson.loads(response.text)
             response_json: dict = response.json()
             if response_json.get('errorMessages') is None:
                 schedule_type = response_json['Direct'] if response_json.get('Direct', None) else response_json['Transshipment']

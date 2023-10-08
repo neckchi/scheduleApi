@@ -21,6 +21,7 @@ docs.zip
 archive.zip
 build
 .env
+.csv
 
 # vim temporary files
 *~

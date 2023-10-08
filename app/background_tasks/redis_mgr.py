@@ -5,6 +5,7 @@ import uuid
 import logging
 import orjson
 import asyncio
+import json
 
 class ClientSideCache:
     def __init__(self):
@@ -23,18 +24,19 @@ class ClientSideCache:
         except Exception as disconnect:
             logging.error(f'Unable to connect to the Redis - {disconnect}')
 
-    async def set(self, key:uuid, value):
+    async def set(self, key:uuid.UUID, value,expire:int = timedelta(hours = 4)):
         try:
-            await asyncio.gather(self._pool.set(key.urn, orjson.dumps(value)),self._pool.expire(key.urn,timedelta(hours = 4)))
-            logging.info('Background Task:Cached the schedules into P2P schedule collection ')
+            await asyncio.gather(self._pool.set(key.urn, orjson.dumps(value)),self._pool.expire(key.urn, expire))
+            logging.info(f'Background Task:Cached data into schedule collection - {key}')
         except Exception as insert_db:
             logging.error(insert_db)
 
-    async def get(self, key:uuid):
+    async def get(self, key:uuid.UUID):
         try:
-            logging.info(f'Background Task:Getting P2P schedules from Redis - {key}')
-            yield await self._pool.get(key.urn)
+            logging.info(f'Background Task:Getting data from Redis - {key}')
+            get_result = await self._pool.get(key.urn)
+            if get_result:
+                return orjson.loads(get_result)
+            return None
         except Exception as find_error:
             logging.error(find_error)
-
-
