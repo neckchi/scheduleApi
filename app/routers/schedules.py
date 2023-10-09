@@ -39,8 +39,8 @@ async def get_schedules(background_tasks: BackgroundTasks,
     - **pointFrom/pointTo** : Provide either Point or Port in UNECE format
 
     """
-    product_id = uuid5(NAMESPACE_DNS,f'{scac}-p2p-api-{point_from}{point_to}{start_date_type}{start_date}{search_range}{tsp}{direct_only}{service}')
-    ttl_schedule = await anext(db.retrieve(productid=product_id))
+    product_id:UUID = uuid5(NAMESPACE_DNS,f'{scac}-p2p-api-{point_from}{point_to}{start_date_type}{start_date}{search_range}{tsp}{direct_only}{service}')
+    ttl_schedule = await db.get(key=product_id)
     start_date: str = start_date.strftime("%Y-%m-%d")
 
     if not ttl_schedule:
@@ -163,7 +163,9 @@ async def get_schedules(background_tasks: BackgroundTasks,
             destination=point_to, noofSchedule=count_schedules,
             schedules=sorted_schedules).model_dump(exclude_none=True)
 
-        background_tasks.add_task(db.insert, data)
+
+        background_tasks.add_task(db.set, value=data) # for MongoDB
+        # background_tasks.add_task(db.set,key=product_id,value=data) #for Redis
 
         return data
 

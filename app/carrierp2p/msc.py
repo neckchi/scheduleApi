@@ -26,7 +26,7 @@ async def get_msc_token(client,background_task, oauth: str, aud: str, rsa: str, 
                         'client_assertion_type': 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
                         'grant_type': 'client_credentials', 'client_assertion': encoded}
         headers: dict = {'Content-Type': 'application/x-www-form-urlencoded'}
-        response = await anext(HTTPXClientWrapper.call_client(client=client,background_tasks =background_task,method='POST',url=oauth, headers=headers, data=params,token_key=msc_token_key,expire = timedelta(hours=1)))
+        response = await anext(HTTPXClientWrapper.call_client(client=client,background_tasks =background_task,method='POST',url=oauth, headers=headers, data=params,token_key=msc_token_key,expire = timedelta(minutes=40)))
         response_token = response.json()
     yield response_token['access_token']
 

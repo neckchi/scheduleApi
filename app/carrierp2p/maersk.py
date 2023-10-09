@@ -50,12 +50,12 @@ async def get_maersk_p2p(client,background_task,url: str, location_url: str, cut
                             'dateRange': f'P{search_range}W', 'startDateType': date_type, 'startDate': start_date}
             params.update({'vesselFlagCode': vessel_flag}) if vessel_flag else ...
             maersk_list: set = {'MAEU', 'SEAU', 'SEJJ', 'MCPU', 'MAEI'} if scac is None else {scac}
-            p2p_resp_tasks:list = [asyncio.create_task(anext(HTTPXClientWrapper.call_client(client=client, method='GET', url=url,params=dict(params, **{'vesselOperatorCarrierCode': mseries}),headers={'Consumer-Key': pw2}))) for mseries in maersk_list]
+            p2p_resp_tasks:list = [asyncio.create_task(anext(HTTPXClientWrapper.call_client(client=client,stream = True, method='GET', url=url,params=dict(params, **{'vesselOperatorCarrierCode': mseries}),headers={'Consumer-Key': pw2}))) for mseries in maersk_list]
             for response in asyncio.as_completed(p2p_resp_tasks):
-                response = await response
-                if response.status_code == 200:
-                    response_json:dict = response.json()
-                    for resp in response_json['oceanProducts']:
+                response_json = await response
+                check_oceanProducts = response_json.get('oceanProducts')
+                if check_oceanProducts:
+                    for resp in check_oceanProducts:
                         carrier_code:str = resp['vesselOperatorCarrierCode']
                         for task in resp['transportSchedules']:
                             # Additional check on service code/name in order to fullfill business requirment(query the result by service code)
@@ -115,8 +115,8 @@ async def get_maersk_p2p(client,background_task,url: str, location_url: str, cut
                                                     'transportations': {
                                                         'transportType': transport_type.get(legs['transport']['transportMode']),
                                                         'transportName': deepget(legs['transport'], 'vessel','vesselName'),
-                                                        'referenceType': 'IMO' if transport_type.get(legs['transport']['transportMode'], 'UNKNOWN') in ('Vessel', 'Feeder','Barge') and vessel_imo else None,
-                                                        'reference': vessel_imo
+                                                        'referenceType': 'IMO' if transport_type.get(legs['transport']['transportMode'], 'UNKNOWN') in ('Vessel', 'Feeder','Barge') and vessel_imo and vessel_imo != '9999999'else None,
+                                                        'reference': vessel_imo if vessel_imo != '9999999' else None
                                                                         }
                                                                 }
                                                 voyage_num:str = legs['transport'].get('carrierDepartureVoyageNumber')
@@ -132,7 +132,7 @@ async def get_maersk_p2p(client,background_task,url: str, location_url: str, cut
                                                     leg_body.update({'services': service_body})
 
                                                 # BU only need the cut off date for 1st leg
-                                                if index == 1 and vessel_imo and voyage_num:
+                                                if index == 1 and vessel_imo and vessel_imo != '9999999' and voyage_num:
                                                     cutoffseries = await anext(get_maersk_cutoff(client=client, url=cutoff_url,
                                                                           headers={'Consumer-Key': pw},
                                                                           country=legs['facilities']['startLocation']['countryCode'],
@@ -154,6 +154,8 @@ async def get_maersk_p2p(client,background_task,url: str, location_url: str, cut
                                     pass
                             else:
                                 pass
+                else:
+                    pass
         else:
             pass
     yield [s async for s in schedules()]

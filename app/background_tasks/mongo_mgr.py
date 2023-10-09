@@ -1,7 +1,8 @@
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase, AsyncIOMotorCollection
 from app.config import Settings
-import datetime
+from datetime import datetime,timedelta
 import logging
+import uuid
 
 class MongoDBsetting:
     client: AsyncIOMotorClient = None
@@ -17,26 +18,31 @@ class MongoDBsetting:
             self.db = self.client['schedule']
             self.collection = self.db['p2p']
             logging.info('Connected To MongoDB - P2P schedule collection')
-            self.collection.create_index("productid", unique = True)
-            self.collection.create_index("expiry",expireAfterSeconds = 60 * 60 * 12)
-            logging.info('Created indexes')
         except Exception as disconnect:
             logging.error(f'Unable to connect to the MongoDB - {disconnect}')
 
-    async def insert(self, result: dict):
-        utc_timestamp = datetime.datetime.utcnow()
+    async def set(self, value: dict| list,expire = timedelta(hours = 4),key:uuid.UUID|None = None):
+        now_utc_timestamp = datetime.utcnow()
         try:
-            await self.collection.insert_one(dict(result, **{'expiry': utc_timestamp}))
-            logging.info('Background Task:Cached the schedules into P2P schedule collection ')
+            # self.collection.create_index("productid", unique = True)
+            # self.collection.create_index("expiry",expireAfterSeconds = 60 * 60 * 12)
+            if key:
+                non_p2p_cache :dict = {'productid':key,'cache':value}
+                await self.collection.insert_one(dict(non_p2p_cache,**{'expiry': now_utc_timestamp + expire}))
+            else:
+                await self.collection.insert_one(dict(value, **{'expiry': now_utc_timestamp + expire}))
+            logging.info('Background Task:Cached data to P2P schedule collection')
         except Exception as insert_db:
             logging.error(insert_db)
 
-    async def retrieve(self, productid: str):
+    async def get(self, key: uuid.UUID):
         try:
-            logging.info('Background Task:Getting schedules from MongoDB P2P schedule collection')
-            yield await self.collection.find_one({"productid":productid})
+            logging.info(f'Background Task:Getting data from MongoDB P2P schedule collection - {key}')
+            get_result = await self.collection.find_one({"productid":key})
+            if get_result:
+                final_result = get_result.get('cache',get_result)
+                return final_result
+            return None
         except Exception as find_error:
             logging.error(find_error)
 
-    # async def replace(self,id,result:dict):
-    #     await self.collection.update_one({"_id": id}, {"$set": result})

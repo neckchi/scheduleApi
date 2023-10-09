@@ -62,7 +62,7 @@ class HTTPXClientWrapper:
         if not stream:
             response = await client.request(method=method, url=url, params=params, headers=headers, json=json,
                                             data=data)
-            if token_key:
+            if background_tasks:
                 background_tasks.add_task(db.set, key=token_key, value=response.json(), expire=expire)
             yield response
         else:
@@ -75,7 +75,7 @@ class HTTPXClientWrapper:
             if result.status_code == 200:
                 async for data in result.body_iterator:
                     response = orjson.loads(data)
-                    if token_key:
+                    if background_tasks:
                         background_tasks.add_task(db.set, key=token_key, value=response, expire=expire)
                     yield response
             else:
