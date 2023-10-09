@@ -25,7 +25,7 @@ class MongoDBsetting:
         now_utc_timestamp = datetime.utcnow()
         try:
             # self.collection.create_index("productid", unique = True)
-            # self.collection.create_index("expiry",expireAfterSeconds = 60 * 60 * 12)
+            # self.collection.create_index("expiry",expireAfterSeconds = 0)
             if key:
                 non_p2p_cache :dict = {'productid':key,'cache':value}
                 await self.collection.insert_one(dict(non_p2p_cache,**{'expiry': now_utc_timestamp + expire}))
