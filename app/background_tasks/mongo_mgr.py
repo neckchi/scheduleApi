@@ -17,14 +17,15 @@ class MongoDBsetting:
             self.db = self.client['schedule']
             self.collection = self.db['p2p']
             logging.info('Connected To MongoDB - P2P schedule collection')
+            self.collection.create_index("productid", unique = True)
+            self.collection.create_index("expiry",expireAfterSeconds = 60 * 60 * 12)
+            logging.info('Created indexes')
         except Exception as disconnect:
             logging.error(f'Unable to connect to the MongoDB - {disconnect}')
 
     async def insert(self, result: dict):
         utc_timestamp = datetime.datetime.utcnow()
         try:
-            self.collection.create_index("productid", unique = True)
-            self.collection.create_index("expiry",expireAfterSeconds = 60 * 60 * 12)
             await self.collection.insert_one(dict(result, **{'expiry': utc_timestamp}))
             logging.info('Background Task:Cached the schedules into P2P schedule collection ')
         except Exception as insert_db:
