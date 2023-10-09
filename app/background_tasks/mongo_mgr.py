@@ -32,7 +32,7 @@ class MongoDBsetting:
 
     async def retrieve(self, productid: str):
         try:
-            logging.info(f'Background Task:Getting schedules from MongoDB P2P schedule collection - {productid}')
+            logging.info('Background Task:Getting schedules from MongoDB P2P schedule collection')
             yield await self.collection.find_one({"productid":productid})
         except Exception as find_error:
             logging.error(find_error)

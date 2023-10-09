@@ -1,7 +1,6 @@
 import logging
 from uuid import UUID
 from datetime import datetime
-from uuid import uuid5
 from typing_extensions import Annotated
 from pydantic import BaseModel, Field, PositiveInt,field_validator,model_validator
 from pydantic.functional_serializers import PlainSerializer
@@ -131,5 +130,5 @@ class Product(BaseModel):
 
 
 class Error(BaseModel):
-    id: UUID = Field(default_factory=uuid5)
+    id: UUID
     error: str
