@@ -7,11 +7,11 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file='./app/.env', env_file_encoding='utf-8')
     # model_config = SettingsConfigDict(secrets_dir='/run/secrets')
     mongo_url: SecretStr
-    redis_host:SecretStr
-    redis_port:SecretStr
-    redis_db:SecretStr
-    redis_user:SecretStr
-    redis_pw:SecretStr
+    #redis_host:SecretStr
+    #redis_port:SecretStr
+    #redis_db:SecretStr
+    #redis_user:SecretStr
+    #redis_pw:SecretStr
     cma_url: str
     cma_token: SecretStr
     sudu_url: str
@@ -41,12 +41,6 @@ class Settings(BaseSettings):
     mscu_thumbprint: SecretStr
     mscu_scope: SecretStr
     mscu_rsa_key: SecretStr
-    hlcu_token_url:str
-    hlcu_url:str
-    hlcu_client_id : SecretStr
-    hlcu_client_secret : SecretStr
-    hlcu_user_id : SecretStr
-    hlcu_password:SecretStr
 
     #
     # class Config:
