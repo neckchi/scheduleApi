@@ -34,11 +34,11 @@ async def get_hlag_p2p(client,background_task, url: str, turl: str,user:str, pw:
         if response.status_code == 200:
             response_json: dict = response.json()
             for task in response_json:
-                transit_time:int = task['transitTime']
                 first_point_from:str = task['placeOfReceipt']
                 last_point_to:str = task['placeOfDelivery']
                 first_etd:datetime = task['placeOfReceiptDateTime']
                 last_eta:datetime = task['placeOfDeliveryDateTime']
+                transit_time: int = task.get('transitTime',(datetime.fromisoformat(last_eta[:10]) - datetime.fromisoformat(first_etd[:10])).days)
                 first_cy_cutoff:datetime  = next((cutoff['cutOffDateTime'] for cutoff in task['gateInCutOffDateTimes'] if cutoff['cutOffDateTimeCode'] == 'FCO'), None)
                 first_vgm_cuttoff:datetime  = next((cutoff['cutOffDateTime'] for cutoff in task['gateInCutOffDateTimes'] if cutoff['cutOffDateTimeCode'] == 'VCO'), None)
                 first_doc_cutoff:datetime  = next((cutoff['cutOffDateTime'] for cutoff in task['gateInCutOffDateTimes'] if cutoff['cutOffDateTimeCode'] == 'LCO'), None)
