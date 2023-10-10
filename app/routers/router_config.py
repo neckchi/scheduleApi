@@ -51,8 +51,7 @@ class HTTPXClientWrapper:
                 logging.info(f'Client Session Closed')
                 # close the client when the request is done
         except Exception as e:
-
-            logging.error(f'An error occured while making the request {e}')
+            logging.error(f'An error occured while making the request - {e}')
             raise HTTPException(status_code=500, detail=f'An error occured while creating the client - {e}')
 
     @staticmethod
@@ -61,9 +60,7 @@ class HTTPXClientWrapper:
                           data: dict = None, background_tasks: BackgroundTasks = None, expire=None,
                           stream: bool = False):
         if not stream:
-            response = await client.request(method=method, url=url, params=params, headers=headers, json=json,
-                                            data=data)
-
+            response = await client.request(method=method, url=url, params=params, headers=headers, json=json,data=data)
             if background_tasks:
                 background_tasks.add_task(db.set, key=token_key, value=response.json(), expire=expire)
             yield response

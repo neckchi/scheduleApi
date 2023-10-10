@@ -1,3 +1,4 @@
+import pymongo.errors
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase, AsyncIOMotorCollection
 from app.config import Settings
 from datetime import datetime,timedelta
@@ -23,15 +24,15 @@ class MongoDBsetting:
 
     async def set(self, value: dict| list,expire = timedelta(hours = 4),key:uuid.UUID|None = None):
         now_utc_timestamp = datetime.utcnow()
+        insert_cache = dict({'productid': key, 'cache': value} if key else value, **{'expiry': now_utc_timestamp + expire})
         try:
             # self.collection.create_index("productid", unique = True)
             # self.collection.create_index("expiry",expireAfterSeconds = 0)
-            if key:
-                non_p2p_cache :dict = {'productid':key,'cache':value}
-                await self.collection.insert_one(dict(non_p2p_cache,**{'expiry': now_utc_timestamp + expire}))
-            else:
-                await self.collection.insert_one(dict(value, **{'expiry': now_utc_timestamp + expire}))
+            await self.collection.insert_one(insert_cache)
             logging.info('Background Task:Cached data to P2P schedule collection')
+        except pymongo.errors.DuplicateKeyError:
+            logging.info('Background Task:duplicated Key is skipped')
+            pass
         except Exception as insert_db:
             logging.error(insert_db)
 
