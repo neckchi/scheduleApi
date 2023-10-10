@@ -44,16 +44,16 @@ class HTTPXClientWrapper:
         FastAPI dependancy injection allows us to use generator functions as dependenacy
         """
         try:
-            async with httpx.AsyncClient(verify=False, timeout=timeout, limits=limits) as client:
+            async with httpx.AsyncClient(proxies="http://zscaler.proxy.int.kn:80",verify=False, timeout=timeout, limits=limits) as client:
                 # yield the client to the endpoint function
                 logging.info(f'Client Session Started')
                 yield client
                 logging.info(f'Client Session Closed')
                 # close the client when the request is done
         except Exception as e:
-            logging.critical('An error occurred while making the request')
-            logging.critical(e, exc_info=True)
-            raise HTTPException(status_code=500, detail=f'An error occurred while creating the client - {e}')
+
+            logging.error(f'An error occured while making the request {e}')
+            raise HTTPException(status_code=500, detail=f'An error occured while creating the client - {e}')
 
     @staticmethod
     async def call_client(client: httpx.AsyncClient, url: str, method: str = Literal['GET', 'POST'],
@@ -63,6 +63,7 @@ class HTTPXClientWrapper:
         if not stream:
             response = await client.request(method=method, url=url, params=params, headers=headers, json=json,
                                             data=data)
+
             if background_tasks:
                 background_tasks.add_task(db.set, key=token_key, value=response.json(), expire=expire)
             yield response
