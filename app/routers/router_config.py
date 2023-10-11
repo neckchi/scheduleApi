@@ -51,7 +51,8 @@ class HTTPXClientWrapper:
                 logging.info(f'Client Session Closed')
                 # close the client when the request is done
         except Exception as e:
-            logging.error(f'An error occured while making the request - {e}')
+            logging.error('An error occured while making the request')
+            logging.exception(e)
             raise HTTPException(status_code=500, detail=f'An error occured while creating the client - {e}')
 
     @staticmethod
