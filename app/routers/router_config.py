@@ -62,6 +62,7 @@ class HTTPXClientWrapper:
                           stream: bool = False):
         if not stream:
             response = await client.request(method=method, url=url, params=params, headers=headers, json=json,data=data)
+            logging.info(f'method {method} \n url {url} \n params {params} \n headers {headers} \n json {json} \n data {data}')
             if background_tasks:
                 background_tasks.add_task(db.set, key=token_key, value=response.json(), expire=expire)
             yield response
