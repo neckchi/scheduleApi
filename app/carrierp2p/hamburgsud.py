@@ -3,7 +3,7 @@ from app.routers.router_config import HTTPXClientWrapper
 import httpx
 
 async def get_sudu_p2p(client, url: str, pw: str, pol: str, pod: str, direct_only: bool |None = None , tsp: str | None = None,
-                       start_date: str | None = None,
+                       start_date:datetime.date = None,
                        date_type: str | None = None, scac: str | None = None):
     params: dict = {'from': pol, 'to': pod, 'searchDate': start_date,'dateQualifier': date_type}
     params.update({'directOnly': direct_only}) if direct_only is not None else...
@@ -23,13 +23,13 @@ async def get_sudu_p2p(client, url: str, pw: str, pol: str, pod: str, direct_onl
                         check_transshipment: bool = True if len(task['leg']) > 1 else False
                         transshipment_port: bool = next((True for tsport in task['leg'][1:] if tsport['from']['unlocode'] == tsp),False) if check_transshipment and tsp else False
                         if transshipment_port or not tsp:
-                            carrier_code = task['products']['scac'][0]
-                            transit_time = task['routing']['totalTransitTime']
-                            first_point_from = task['leg'][0]['from']['unlocode']
-                            last_point_to = task['leg'][-1]['to']['unlocode']
-                            first_etd = task['leg'][0]['expectedDepartureLT']
-                            last_eta = task['leg'][-1]['expectedArrivalLT']
-                            first_cy_cutoff = next((cyc['cargoCutOffLT'] for cyc in task['leg'] if cyc['cargoCutOffLT'] is not None), None)
+                            carrier_code:str = task['products']['scac'][0]
+                            transit_time:int = task['routing']['totalTransitTime']
+                            first_point_from:str = task['leg'][0]['from']['unlocode']
+                            last_point_to:str = task['leg'][-1]['to']['unlocode']
+                            first_etd:str = task['leg'][0]['expectedDepartureLT']
+                            last_eta:str = task['leg'][-1]['expectedArrivalLT']
+                            first_cy_cutoff:str = next((cyc['cargoCutOffLT'] for cyc in task['leg'] if cyc['cargoCutOffLT'] is not None), None)
                             schedule_body: dict = {'scac': carrier_code, 'pointFrom': first_point_from,
                                                    'pointTo': last_point_to, 'etd': first_etd, 'eta': last_eta,
                                                    'cyCutOffDate': first_cy_cutoff,
@@ -40,11 +40,11 @@ async def get_sudu_p2p(client, url: str, pw: str, pol: str, pod: str, direct_onl
                             async def schedule_leg():
                                 for legs in task['leg']:
                                     vessel_imo  = legs['vessel'].get('imo')
-                                    vessel_name = legs['vessel'].get('name')
-                                    from_terminal_name = legs['from'].get('facilityName')
-                                    from_terminal_code = legs['from'].get('facilityCode')
-                                    to_terminal_name = legs['to'].get('facilityName')
-                                    to_terminal_code = legs['to'].get('facilityCode')
+                                    vessel_name:str = legs['vessel'].get('name')
+                                    from_terminal_name:str = legs['from'].get('facilityName')
+                                    from_terminal_code:str = legs['from'].get('facilityCode')
+                                    to_terminal_name:str = legs['to'].get('facilityName')
+                                    to_terminal_code:str = legs['to'].get('facilityCode')
                                     leg_body: dict = {'pointFrom': {'locationCode': legs['from']['unlocode'],
                                                                     'terminalName': from_terminal_name if from_terminal_name !='' else None,
                                                                     'terminalCode': from_terminal_code if from_terminal_code !='' else None

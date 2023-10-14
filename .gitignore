@@ -20,8 +20,11 @@ venv
 docs.zip
 archive.zip
 build
+logs
+verified network
 .env
 .csv
+.log
 
 # vim temporary files
 *~

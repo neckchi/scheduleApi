@@ -8,8 +8,8 @@ from datetime import datetime
 # https://cma-status-prod.checklyhq.com/
 
 async def get_cma_p2p(client, url: str, pw: str, pol: str, pod: str, search_range: int, direct_only: bool | None,tsp: str | None = None,
-                          departure_date: str | None = None,
-                          arrival_date: str | None = None, scac: str | None = None, service: str | None = None):
+                          departure_date: datetime.date = None,
+                          arrival_date: datetime.date = None, scac: str | None = None, service: str | None = None):
     default_etd_eta = datetime.now().astimezone().replace(microsecond=0).isoformat()
     carrier_code: dict = {'0001': 'CMDU', '0002': 'ANNU','0011': 'CHNL', '0014': 'CSFU', '0015': 'APLU'}
     api_carrier_code: str = next(k for k, v in carrier_code.items() if v == scac.upper()) if scac else None

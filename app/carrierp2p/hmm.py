@@ -1,13 +1,13 @@
-from datetime import datetime
+import datetime
 from app.routers.router_config import HTTPXClientWrapper
 
 
 async def get_hmm_p2p(client, url: str, pw: str, pol: str, pod: str, search_range: str, direct_only: bool|None,
-                      start_date: str,
+                      start_date: datetime,
                       tsp: str | None = None, service: str | None = None):
 
     params: dict = {'fromLocationCode': pol, 'receiveTermCode': 'CY', 'toLocationCode': pod, 'deliveryTermCode': 'CY',
-                    'periodDate': start_date.replace('-', ''),
+                    'periodDate': start_date.strftime("%Y%m%d"),
                     'weekTerm': search_range, 'webSort': 'D',
                     'webPriority':'D' if direct_only is True else 'T' if direct_only is False else 'A'}
     headers: dict = {'x-Gateway-APIKey': pw}
@@ -58,8 +58,8 @@ async def get_hmm_p2p(client, url: str, pw: str, pol: str, pod: str, search_rang
                                     'pointTo': {'locationName': task['outboundInland']['toLocationName'],'locationCode': 'DEBRE'},
                                     'etd': task['outboundInland']['fromLocationDepatureDate'],
                                     'eta': task['outboundInland']['toLocationArrivalDate'],
-                                    'transitTime': int((datetime.fromisoformat(
-                                        task['outboundInland']['toLocationArrivalDate']) - datetime.fromisoformat(
+                                    'transitTime': int((datetime.datetime.fromisoformat(
+                                        task['outboundInland']['toLocationArrivalDate']) - datetime.datetime.fromisoformat(
                                         task['outboundInland']['fromLocationDepatureDate'])).days),
                                     'transportations': {'transportType': task['outboundInland']['transMode']}}
                                 yield leg_body
@@ -80,8 +80,8 @@ async def get_hmm_p2p(client, url: str, pw: str, pol: str, pod: str, search_rang
                                                             'terminalCode': first_pot_terminal_code if check_transshipment and legs['vesselSequence'] == 1 else last_pod_terminal_code},
                                                 'etd': legs['vesselDepartureDate'],
                                                 'eta': legs['vesselArrivalDate'],
-                                                'transitTime': int((datetime.fromisoformat(
-                                                    legs['vesselArrivalDate']) - datetime.fromisoformat(
+                                                'transitTime': int((datetime.datetime.fromisoformat(
+                                                    legs['vesselArrivalDate']) - datetime.datetime.fromisoformat(
                                                     legs['vesselDepartureDate'])).days),
                                                 'transportations': {
                                                     'transportType': 'Vessel' if vessel_name else 'Barge',
@@ -106,8 +106,8 @@ async def get_hmm_p2p(client, url: str, pw: str, pol: str, pod: str, search_rang
                                                 'terminalCode': task['deliveryFaciltyCode']},
                                     'etd': task['inboundInland']['fromLocationDepatureDate'],
                                     'eta': task['inboundInland']['toLocationArrivalDate'],
-                                    'transitTime': int((datetime.fromisoformat(
-                                        task['inboundInland']['toLocationArrivalDate']) - datetime.fromisoformat(
+                                    'transitTime': int((datetime.datetime.fromisoformat(
+                                        task['inboundInland']['toLocationArrivalDate']) - datetime.datetime.fromisoformat(
                                         task['inboundInland']['fromLocationDepatureDate'])).days),
                                     'transportations': {'transportType': task['inboundInland']['transMode']}}
                                 yield leg_body

@@ -41,7 +41,6 @@ async def get_schedules(background_tasks: BackgroundTasks,
     """
     product_id:UUID = uuid5(NAMESPACE_DNS,f'{scac}-p2p-api-{point_from}{point_to}{start_date_type}{start_date}{search_range}{tsp}{direct_only}{service}')
     ttl_schedule = await db.get(key=product_id)
-    start_date: str = start_date.strftime("%Y-%m-%d")
 
     if not ttl_schedule:
         # 👇 Create yield tasks with less memory, we start requesting all of them concurrently if no carrier code
@@ -140,7 +139,8 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                           user= settings.hlcu_user_id.get_secret_value(),pw= settings.hlcu_password.get_secret_value(),
                                           pol=point_from,pod=point_to,search_range= search_range.duration,
                                           etd= start_date if start_date_type is schema_request.StartDateType.departure else None ,
-                                          eta =start_date if start_date_type is schema_request.StartDateType.arrival else None,direct_only=direct_only,
+                                          eta =start_date if start_date_type is schema_request.StartDateType.arrival else None,
+                                          direct_only=direct_only,
                                           vessel_flag = vessel_flag_code)))
 
         # 👇 Await ALL

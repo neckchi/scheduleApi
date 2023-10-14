@@ -19,9 +19,9 @@ async def get_hlag_access_token(client,background_task, url: str,pw:str,user:str
     yield response_token['token']
 
 async def get_hlag_p2p(client,background_task, url: str, turl: str,user:str, pw: str, client_id: str,client_secret:str,pol: str, pod: str,search_range: int,
-                       etd: str | None, eta: str | None, direct_only: bool|None = None,vessel_flag:str|None = None,service: str | None = None, tsp: str | None = None):
-    start_day:str = datetime.strptime(etd, "%Y-%m-%d").strftime("%Y-%m-%dT%H:%M:%S.%SZ") if etd else datetime.strptime(eta, "%Y-%m-%d").strftime("%Y-%m-%dT%H:%M:%S.%SZ")
-    end_day:str = (datetime.strptime(etd, "%Y-%m-%d") + timedelta(days=search_range)).strftime("%Y-%m-%dT%H:%M:%S.%SZ") if etd else (datetime.strptime(eta, "%Y-%m-%d") + timedelta(days=search_range)).strftime("%Y-%m-%dT%H:%M:%S.%SZ")
+                       etd: datetime.date = None, eta: datetime.date = None, direct_only: bool|None = None,vessel_flag:str|None = None,service: str | None = None, tsp: str | None = None):
+    start_day:str = etd.strftime("%Y-%m-%dT%H:%M:%S.%SZ") if etd else eta.strftime("%Y-%m-%dT%H:%M:%S.%SZ")
+    end_day:str = (etd+ timedelta(days=search_range)).strftime("%Y-%m-%dT%H:%M:%S.%SZ") if etd else (eta + timedelta(days=search_range)).strftime("%Y-%m-%dT%H:%M:%S.%SZ")
     params: dict = {'placeOfReceipt': pol, 'placeOfDelivery': pod}
     params.update({'earliestDepartureDateTime': start_day,'latestDepartureDateTime':end_day}) if etd else params.update({'earliestArrivalDateTime': start_day,'arrivalEndDateTime':end_day})
     params.update({'routingTypeCode': direct_only}) if direct_only is not None else...

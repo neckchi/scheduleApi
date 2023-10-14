@@ -35,10 +35,9 @@ async def get_msc_token(client,background_task, oauth: str, aud: str, rsa: str, 
 async def get_msc_p2p(client, background_task,url: str, oauth: str, aud: str, pw: str, msc_client: str, msc_scope: str,
                       msc_thumbprint: str, pol: str, pod: str,
                       search_range: int, start_date_type: str,
-                      start_date: str, direct_only: bool |None, service: str | None = None, tsp: str | None = None):
+                      start_date: datetime.date, direct_only: bool |None, service: str | None = None, tsp: str | None = None):
     params: dict = {'fromPortUNCode': pol, 'toPortUNCode': pod, 'fromDate': start_date,
-                    'toDate': (datetime.strptime(start_date, "%Y-%m-%d") + timedelta(days=search_range)).strftime(
-                        "%Y-%m-%d"), 'datesRelated': start_date_type}
+                    'toDate': (start_date + timedelta(days=search_range)).strftime("%Y-%m-%d"), 'datesRelated': start_date_type}
     token = await anext(get_msc_token(client=client,background_task=background_task,oauth=oauth, aud=aud, rsa=pw, msc_client=msc_client, msc_scope=msc_scope,msc_thumbprint=msc_thumbprint))
     headers: dict = {'Authorization': f'Bearer {token}'}
     response = await anext(HTTPXClientWrapper.call_client(client=client,method='GET', url=url, params=params, headers=headers))

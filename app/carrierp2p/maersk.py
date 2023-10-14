@@ -1,10 +1,9 @@
 import asyncio
-from datetime import datetime
 from app.carrierp2p.helpers import deepget
 from app.routers.router_config import HTTPXClientWrapper
 from app.background_tasks import db
 from uuid import uuid5,NAMESPACE_DNS
-from datetime import timedelta
+from datetime import timedelta,datetime
 
 async def get_maersk_cutoff(client, url: str, headers: dict, country: str, pol: str, imo: str, voyage: str):
     params: dict = {'ISOCountryCode': country, 'portOfLoad': pol, 'vesselIMONumber': imo, 'voyage': voyage}
@@ -21,7 +20,7 @@ async def get_maersk_cutoff(client, url: str, headers: dict, country: str, pol: 
 
 async def get_maersk_p2p(client,background_task,url: str, location_url: str, cutoff_url: str, pw: str, pw2: str, pol: str, pod: str,
                          search_range: str, direct_only: bool|None, tsp: str | None = None, scac: str | None = None,
-                         start_date: str | None = None,
+                         start_date: datetime.date = None,
                          date_type: str | None = None, service: str | None = None, vessel_flag: str | None = None):
     maersk_uuid = lambda port:uuid5(NAMESPACE_DNS, f'maersk-loc-uuid-kuehne-nagel-{port}')
     port_uuid:list = [maersk_uuid(port=port) for port in [pol,pod]]

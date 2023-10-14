@@ -13,7 +13,7 @@ from datetime import datetime,timedelta
 #         yield loc_id
 
 async def get_iqax_p2p(client, url: str, pw: str, pol: str, pod: str, search_range: int, direct_only: bool |None ,
-                       tsp: str | None = None, departure_date: str | None = None, arrival_date: str | None = None,
+                       tsp: str | None = None, departure_date:datetime.date = None, arrival_date: datetime.date = None,
                        scac: str | None = None, service: str | None = None):
     params: dict = {'appKey': pw, 'porID': pol, 'fndID': pod, 'departureFrom': departure_date,
                     'arrivalFrom': arrival_date, 'searchDuration': search_range}
