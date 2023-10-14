@@ -14,7 +14,6 @@ async def get_hlag_access_token(client,background_task, url: str,pw:str,user:str
         'userId': user,
         'password': pw,
         'orgUnit': "HLAG"}
-
         response = await anext(HTTPXClientWrapper.call_client(method='POST',background_tasks =background_task,client=client,url=url, headers=headers,json=body,token_key=hlcu_token_key,expire=timedelta(minutes=10)))
         response_token = response.json()
     yield response_token['token']

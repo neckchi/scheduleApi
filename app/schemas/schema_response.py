@@ -13,18 +13,19 @@ datetime = Annotated[
     datetime, PlainSerializer(convert_datetime_to_iso_8601, return_type=str, when_used='json')
 ]
 
-class PointFrom(BaseModel):
+
+class PointBase(BaseModel):
     locationName: str | None = Field(max_length=100, default=None, example='Hong Kong')
     locationCode: str = Field(max_length=5, title="Port Of Discharge", example='HKHKG', pattern =r"[A-Z]{2}[A-Z0-9]{3}")
     terminalName: str | None = Field(max_length=100, default=None, example='HONG KONG INTL TERMINAL (HIT4)')
     terminalCode: str | None = Field(default=None, example='HIT4')
 
+class PointFrom(PointBase):
+    pass
 
-class PointTo(BaseModel):
-    locationName: str | None = Field(max_length=100, default=None, example='Hamburg')
-    locationCode: str = Field(max_length=5, title="Port Of Discharge", example='DEHAM', pattern =r"[A-Z]{2}[A-Z0-9]{3}")
-    terminalName: str | None = Field(max_length=100, default=None, example='HHLA CTT')
-    terminalCode: str | None = Field(default=None, example='DEHAMCTT')
+
+class PointTo(PointBase):
+    pass
 
 
 class Cutoff(BaseModel):
