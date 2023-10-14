@@ -20,13 +20,6 @@ class PointBase(BaseModel):
     terminalName: str | None = Field(max_length=100, default=None, example='HONG KONG INTL TERMINAL (HIT4)')
     terminalCode: str | None = Field(default=None, example='HIT4')
 
-class PointFrom(PointBase):
-    pass
-
-
-class PointTo(PointBase):
-    pass
-
 
 class Cutoff(BaseModel):
     bookingCutoff: datetime | None = Field(default=None)
@@ -71,8 +64,8 @@ class Service(BaseModel):
 
 
 class Leg(BaseModel):
-    pointFrom: PointFrom = Field(description="This could be point/port")
-    pointTo: PointTo = Field(description="This could be point/port")
+    pointFrom: PointBase = Field(description="This could be point/port")
+    pointTo: PointBase = Field(description="This could be point/port")
     etd: datetime
     eta: datetime
     cutoffs: Cutoff | None = Field(default=None, title="A Series Of Cut Off date")
