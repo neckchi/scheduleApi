@@ -13,7 +13,7 @@ from datetime import datetime,timedelta
 #         yield loc_id
 
 async def get_iqax_p2p(client, url: str, pw: str, pol: str, pod: str, search_range: int, direct_only: bool |None ,
-                       tsp: str | None = None, departure_date: str | None = None, arrival_date: str | None = None,
+                       tsp: str | None = None, departure_date:datetime.date = None, arrival_date: datetime.date = None,
                        scac: str | None = None, service: str | None = None):
     params: dict = {'appKey': pw, 'porID': pol, 'fndID': pod, 'departureFrom': departure_date,
                     'arrivalFrom': arrival_date, 'searchDuration': search_range}
@@ -84,8 +84,8 @@ async def get_iqax_p2p(client, url: str, pw: str, pol: str, pod: str, search_ran
                                                 'transportations': {
                                                     'transportType': str(legs['transportMode']).title(),
                                                     'transportName': legs['vessel']['name'] if vessel_imo and vessel_name != '---' else None,
-                                                    'referenceType': 'IMO' if vessel_imo and vessel_imo != 9999999 else None,
-                                                    'reference': None if vessel_imo == 9999999 else vessel_imo
+                                                    'referenceType': 'IMO' if vessel_imo and vessel_imo not in (9999999,'None') else None,
+                                                    'reference': None if vessel_imo in (9999999,'None') else vessel_imo
                                                                     }
                                                             }
                                             if legs.get('service'):

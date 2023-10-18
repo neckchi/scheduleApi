@@ -1,10 +1,9 @@
 import asyncio
-from datetime import datetime
 from app.carrierp2p.helpers import deepget
 from app.routers.router_config import HTTPXClientWrapper
 from app.background_tasks import db
 from uuid import uuid5,NAMESPACE_DNS
-from datetime import timedelta
+from datetime import timedelta,datetime
 
 async def get_maersk_cutoff(client, url: str, headers: dict, country: str, pol: str, imo: str, voyage: str):
     params: dict = {'ISOCountryCode': country, 'portOfLoad': pol, 'vesselIMONumber': imo, 'voyage': voyage}
@@ -21,7 +20,7 @@ async def get_maersk_cutoff(client, url: str, headers: dict, country: str, pol: 
 
 async def get_maersk_p2p(client,background_task,url: str, location_url: str, cutoff_url: str, pw: str, pw2: str, pol: str, pod: str,
                          search_range: str, direct_only: bool|None, tsp: str | None = None, scac: str | None = None,
-                         start_date: str | None = None,
+                         start_date: datetime.date = None,
                          date_type: str | None = None, service: str | None = None, vessel_flag: str | None = None):
     maersk_uuid = lambda port:uuid5(NAMESPACE_DNS, f'maersk-loc-uuid-kuehne-nagel-{port}')
     port_uuid:list = [maersk_uuid(port=port) for port in [pol,pod]]
@@ -32,7 +31,7 @@ async def get_maersk_p2p(client,background_task,url: str, location_url: str, cut
         location_tasks = (asyncio.create_task(anext(HTTPXClientWrapper.call_client(client=client,background_tasks=background_task,method='GET',
                                                                                              stream=True, url=location_url, headers={'Consumer-Key': pw},
                                                                                              params= {'locationType':'CITY','UNLocationCode': port},
-                                                                                             token_key=maersk_uuid(port=port),expire=timedelta(days=60)))) for port in [port_loading, port_discharge] if port)
+                                                                                             token_key=maersk_uuid(port=port),expire=timedelta(days=90)))) for port in [port_loading, port_discharge] if port)
         location = await asyncio.gather(*location_tasks)
         if origingeolocation is None and destinationgeolocation is None:
             origingeolocation, destinationgeolocation = location

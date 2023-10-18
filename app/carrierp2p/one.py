@@ -1,7 +1,7 @@
 from app.routers.router_config import HTTPXClientWrapper
 from app.background_tasks import db
 from uuid import uuid5,NAMESPACE_DNS
-from datetime import timedelta
+from datetime import timedelta,datetime
 
 async def get_one_access_token(client,background_task, url: str, auth: str, api_key: str):
     one_token_key = uuid5(NAMESPACE_DNS, 'one-token-uuid-kuehne-nagel')
@@ -19,7 +19,7 @@ async def get_one_access_token(client,background_task, url: str, auth: str, api_
 
 async def get_one_p2p(client, background_task,url: str, turl: str, pw: str, auth: str, pol: str, pod: str, search_range: int,
                       direct_only: bool|None,
-                      start_date: str | None = None,
+                      start_date: datetime.date,
                       date_type: str | None = None, service: str | None = None, tsp: str | None = None):
     params: dict = {'originPort': pol, 'destinationPort': pod, 'searchDate': start_date,
                     'searchDateType': date_type, 'weeksOut': search_range,
