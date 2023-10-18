@@ -42,6 +42,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
     product_id:UUID = uuid5(NAMESPACE_DNS,f'{scac}-p2p-api-{point_from}{point_to}{start_date_type}{start_date}{search_range}{tsp}{direct_only}{service}')
     ttl_schedule = await db.get(key=product_id)
 
+
     if not ttl_schedule:
         # 👇 Create yield tasks with less memory, we start requesting all of them concurrently if no carrier code
         # given or mutiple carrier codes given

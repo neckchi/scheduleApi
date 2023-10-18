@@ -31,7 +31,7 @@ async def get_maersk_p2p(client,background_task,url: str, location_url: str, cut
         location_tasks = (asyncio.create_task(anext(HTTPXClientWrapper.call_client(client=client,background_tasks=background_task,method='GET',
                                                                                              stream=True, url=location_url, headers={'Consumer-Key': pw},
                                                                                              params= {'locationType':'CITY','UNLocationCode': port},
-                                                                                             token_key=maersk_uuid(port=port),expire=timedelta(days=60)))) for port in [port_loading, port_discharge] if port)
+                                                                                             token_key=maersk_uuid(port=port),expire=timedelta(days=90)))) for port in [port_loading, port_discharge] if port)
         location = await asyncio.gather(*location_tasks)
         if origingeolocation is None and destinationgeolocation is None:
             origingeolocation, destinationgeolocation = location

@@ -2,7 +2,7 @@
 
 Facade which aggregates the P2P Schedules APIs of the following Carriers:
 
-ANNU, ANRM, APLU, CHNL, CMDU, COSU, CSFU, HDMU, MAEI, MAEU, MCPU, MSCU, ONEY, OOLU, SEAU, SEJJ, SUDU, ZIMU
+ANNU, ANRM, APLU, CHNL, CMDU, COSU, CSFU, HDMU, MAEI, MAEU, MCPU, MSCU, ONEY, OOLU, SEAU, SEJJ, SUDU, ZIMU,HLCU
 
 Other Carriers currently do not offer such an API.
 
@@ -12,7 +12,7 @@ Tested under Python 3.11 (see Dockerfile).
 
 For a list of dependencies refer to requirements.txt.
 
-Results are cached in a remote MongoDB. The URL is stored in .env. Results are cached for 12h.
+Results are cached in a remote MongoDB based on carrierp2p setting
 
 **TODO:** Currently the .env file contains several secrets, these should be removed from there. Locally the need to be stored in a gitignored file, in OCP they can be provided via Secret.
 
