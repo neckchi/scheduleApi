@@ -18,6 +18,11 @@ class MongoDBsetting:
             await self.client.server_info()
             self.db = self.client['schedule']
             self.collection = self.db['p2p']
+
+            self.collection.create_index("productid", unique = True)
+            self.collection.create_index("expiry",expireAfterSeconds = 0)
+            logging.info()
+
             logging.info('Connected To MongoDB - P2P schedule collection')
         except Exception as disconnect:
             logging.error(f'Unable to connect to the MongoDB - {disconnect}')
@@ -26,8 +31,6 @@ class MongoDBsetting:
         now_utc_timestamp = datetime.utcnow()
         insert_cache = dict({'productid': key, 'cache': value} if key else value, **{'expiry': now_utc_timestamp + expire})
         try:
-            # self.collection.create_index("productid", unique = True)
-            # self.collection.create_index("expiry",expireAfterSeconds = 0)
             await self.collection.insert_one(insert_cache)
             logging.info('Background Task:Cached data to P2P schedule collection')
         except pymongo.errors.DuplicateKeyError:
