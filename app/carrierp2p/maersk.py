@@ -55,7 +55,7 @@ async def get_maersk_p2p(client,background_task,url: str, location_url: str, cut
             p2p_resp_tasks:list = [asyncio.create_task(anext(HTTPXClientWrapper.call_client(client=client,stream = True, method='GET', url=url,params=dict(params, **{'vesselOperatorCarrierCode': mseries}),headers={'Consumer-Key': pw2}))) for mseries in maersk_list]
             for response in asyncio.as_completed(p2p_resp_tasks):
                 response_json = await response
-                check_oceanProducts = response_json.get('oceanProducts')
+                check_oceanProducts = response_json.get('oceanProducts') if response_json else None
                 if check_oceanProducts:
                     for resp in check_oceanProducts:
                         carrier_code:str = resp['vesselOperatorCarrierCode']
