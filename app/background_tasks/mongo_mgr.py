@@ -18,11 +18,8 @@ class MongoDBsetting:
             await self.client.server_info()
             self.db = self.client['schedule']
             self.collection = self.db['p2p']
-
-            self.collection.create_index("productid", unique = True)
-            self.collection.create_index("expiry",expireAfterSeconds = 0)
-            logging.info()
-
+            # self.collection.create_index("productid", unique = True)
+            # self.collection.create_index("expiry",expireAfterSeconds = 0)
             logging.info('Connected To MongoDB - P2P schedule collection')
         except Exception as disconnect:
             logging.error(f'Unable to connect to the MongoDB - {disconnect}')
