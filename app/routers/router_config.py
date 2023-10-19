@@ -71,10 +71,12 @@ class HTTPXClientWrapper:
             """
             client_request = client.build_request(method=method, url=url, params=params, headers=headers, data=data)
             stream_request = await client.send(client_request, stream=True)
-            result = StreamingResponse(stream_request.aiter_lines(),status_code=200, background=BackgroundTask(stream_request.aclose))
-            async for data in result.body_iterator:
-                response = orjson.loads(data)
-                if background_tasks:
-                    background_tasks.add_task(db.set, key=token_key, value=response, expire=expire)
-                yield response
+            if stream_request.status_code == 200:
+                result = StreamingResponse(stream_request.aiter_lines(),status_code=200, background=BackgroundTask(stream_request.aclose))
+                async for data in result.body_iterator:
+                    response = orjson.loads(data)
+                    if background_tasks:
+                        background_tasks.add_task(db.set, key=token_key, value=response, expire=expire)
+                    yield response
+            else:yield None
 
