@@ -22,12 +22,12 @@ class PointBase(BaseModel):
 
 
 class Cutoff(BaseModel):
-    bookingCutoff: datetime | None = Field(default=None)
-    cyCuttoff: datetime | None = Field(default=None)
-    siCuttoff: datetime | None = Field(default=None)
-    vgmCutoff: datetime | None = Field(default=None)
-    customsCutoff: datetime | None = Field(default=None)
-    securityFilingCutoff: datetime | None = Field(default=None)
+    bookingCutoff: datetime | None = Field(default=None,example='2023-11-09T22:00:00')
+    cyCuttoff: datetime | None = Field(default=None,example='2023-11-11T22:00:00')
+    siCuttoff: datetime | None = Field(default=None,example='2023-11-11T22:00:00')
+    vgmCutoff: datetime | None = Field(default=None,example='2023-11-11T22:00:00')
+    customsCutoff: datetime | None = Field(default=None,example='2023-11-11T22:00:00')
+    securityFilingCutoff: datetime | None = Field(default=None,example='2023-11-11T22:00:00')
 
 
 class Transportation(BaseModel):
@@ -66,11 +66,11 @@ class Service(BaseModel):
 class Leg(BaseModel):
     pointFrom: PointBase = Field(description="This could be point/port")
     pointTo: PointBase = Field(description="This could be point/port")
-    etd: datetime
-    eta: datetime
+    etd: datetime = Field(example='2023-11-13T18:00:00')
+    eta: datetime = Field(example='2023-12-15T07:00:00')
     cutoffs: Cutoff | None = Field(default=None, title="A Series Of Cut Off date")
     transitTime: int = Field(ge=0, title="Leg Transit Time",
-                             description="Transit Time on Leg Level")
+                             description="Transit Time on Leg Level",example='31')
     transportations: Transportation | None
     voyages: Voyage | None = Field(default=None, title="Voyage Number.Keep in mind that voyage number is not mandatory")
     services: Service | None = Field(default=None, title="Service Loop")
@@ -90,14 +90,14 @@ class Schedule(BaseModel):
                               example="MAEU")
     pointFrom: str = Field(max_length=5, title="First Port Of Loading", example='HKHKG', pattern =r"[A-Z]{2}[A-Z0-9]{3}")
     pointTo: str = Field(max_length=5, title="Last Port Of Discharge", example='DEHAM', pattern =r"[A-Z]{2}[A-Z0-9]{3}")
-    etd: datetime
-    eta: datetime
-    cyCutOffDate: datetime | None = Field(default= None)
-    docCutOffDate: datetime | None = Field(default= None)
-    vgmCutOffDate: datetime | None = Field(default= None)
+    etd: datetime = Field(example='2023-11-13T18:00:00')
+    eta: datetime = Field(example='2023-12-15T07:00:00')
+    cyCutOffDate: datetime | None = Field(default= None, example='2023-11-11T22:00:00')
+    docCutOffDate: datetime | None = Field(default= None,example = '2023-11-10T11:00:00')
+    vgmCutOffDate: datetime | None = Field(default= None,example='2023-11-11T22:00:00')
     transitTime: int = Field(ge=0, alias='transitTime', title="Schedule Transit Time",
                              description="Transit Time on Schedule Level")
-    transshipment: bool = Field(title="Is transshipment?")
+    transshipment: bool = Field(title="Is transshipment?",example=False)
     legs: list[Leg] = Field(default_factory=list)
     @model_validator(mode='after')
     def check_reference_type_or_reference(self) -> 'Schedule':

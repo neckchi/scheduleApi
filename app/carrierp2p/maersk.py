@@ -8,15 +8,17 @@ from datetime import timedelta,datetime
 async def get_maersk_cutoff(client, url: str, headers: dict, country: str, pol: str, imo: str, voyage: str):
     params: dict = {'ISOCountryCode': country, 'portOfLoad': pol, 'vesselIMONumber': imo, 'voyage': voyage}
     async for response_json in HTTPXClientWrapper.call_client(client=client,url=url,method ='GET',stream=True,headers=headers, params=params):
-        cut_off_body: dict = {}
-        for cutoff in response_json[0]['shipmentDeadlines']['deadlines']:
-            if cutoff.get('deadlineName') == 'Commercial Cargo Cutoff':
-                cut_off_body.update({'cyCuttoff': cutoff.get('deadlineLocal')})
-            if cutoff.get('deadlineName') in ('Shipping Instructions Deadline','Shipping Instructions Deadline for Advance Manifest Cargo','Special Cargo Documentation Deadline'):
-                cut_off_body.update({'siCuttoff': cutoff.get('deadlineLocal')})
-            if cutoff.get('deadlineName') == 'Commercial Verified Gross Mass Deadline':
-                cut_off_body.update({'vgmCutoff': cutoff.get('deadlineLocal')})
-        yield cut_off_body
+        if response_json.status_code == 200:
+            cut_off_body: dict = {}
+            for cutoff in response_json[0]['shipmentDeadlines']['deadlines']:
+                if cutoff.get('deadlineName') == 'Commercial Cargo Cutoff':
+                    cut_off_body.update({'cyCuttoff': cutoff.get('deadlineLocal')})
+                if cutoff.get('deadlineName') in ('Shipping Instructions Deadline','Shipping Instructions Deadline for Advance Manifest Cargo','Special Cargo Documentation Deadline'):
+                    cut_off_body.update({'siCuttoff': cutoff.get('deadlineLocal')})
+                if cutoff.get('deadlineName') == 'Commercial Verified Gross Mass Deadline':
+                    cut_off_body.update({'vgmCutoff': cutoff.get('deadlineLocal')})
+            yield cut_off_body
+        else:yield None
 
 async def get_maersk_p2p(client,background_task,url: str, location_url: str, cutoff_url: str, pw: str, pw2: str, pol: str, pod: str,
                          search_range: str, direct_only: bool|None, tsp: str | None = None, scac: str | None = None,

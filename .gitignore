@@ -22,6 +22,7 @@ archive.zip
 build
 logs
 verified network
+
 .env
 .csv
 .log
