@@ -19,13 +19,13 @@ async def get_hmm_p2p(client, url: str, pw: str, pol: str, pod: str, search_rang
                 # Additional check on service code/name in order to fullfill business requirment(query the result by service code)
                 check_service_code: bool = next((True for services in task['vessel'] if dict(services).get('vesselDepartureDate') and services['vesselLoop'] == service), False) if service else True
                 check_transshipment: bool = True if task.get('transshipPortCode') else False
-                first_pot_code = task.get('transshipPortCode')
+                first_pot_code:str = task.get('transshipPortCode')
                 if (check_transshipment and tsp and first_pot_code) or not tsp:
                     if check_service_code:
                         carrier_code:str = 'HDMU'
                         transit_time:int = task['totalTransitDay']
-                        first_point_from = task['loadingPortCode']
-                        first_pot_code = task.get('transshipPortCode')
+                        first_point_from:str = task['loadingPortCode']
+                        first_pot_code:str = task.get('transshipPortCode')
                         first_pol_terminal_name:str = task['loadingTerminalName']
                         first_pol_terminal_code:str = task['loadingTerminalCode']
                         first_pot_terminal_name:str = task.get('transshipTerminalName')
@@ -36,7 +36,7 @@ async def get_hmm_p2p(client, url: str, pw: str, pol: str, pod: str, search_rang
                         first_etd:str = task['departureDate']
                         last_eta:str = task['arrivalDate']
                         first_cy_cutoff:str = task.get('cargoCutOffTime')
-                        first_doc_cutoff:str = task.get('docCutOffDate')
+                        first_doc_cutoff:str = task.get('docuCutOffTime')
                         schedule_body:dict = {'scac': carrier_code, 'pointFrom': first_point_from,
                                          'pointTo': last_point_to, 'etd': first_etd, 'eta': last_eta,
                                          'cyCutOffDate': first_cy_cutoff,
@@ -51,11 +51,15 @@ async def get_hmm_p2p(client, url: str, pw: str, pol: str, pod: str, search_rang
                             if task.get('outboundInland'):
                                 leg_body: dict = {
                                     'pointFrom': {'locationName': task['outboundInland']['fromLocationName'],
-                                                  'locationCode': 'DEHAM',
+                                                  'locationCode': task['outboundInland']['fromUnLocationCode'],
                                                   'terminalName': task['porFacilityName'],
                                                   'terminalCode': task['porFacilityCode']
                                                   },
-                                    'pointTo': {'locationName': task['outboundInland']['toLocationName'],'locationCode': 'DEBRE'},
+                                    'pointTo': {'locationName': task['outboundInland']['toLocationName'],
+                                                'locationCode': task['outboundInland']['toUnLocationCode'],
+                                                'terminalName': first_pol_terminal_name,
+                                                'terminalCode': first_pol_terminal_code
+                                                },
                                     'etd': task['outboundInland']['fromLocationDepatureDate'],
                                     'eta': task['outboundInland']['toLocationArrivalDate'],
                                     'transitTime': int((datetime.datetime.fromisoformat(
@@ -66,8 +70,7 @@ async def get_hmm_p2p(client, url: str, pw: str, pol: str, pod: str, search_rang
                             else:
                                 pass
                             for legs in task['vessel']:
-                                legs: dict
-                                vessel_imo = legs.get('lloydRegisterNo')
+                                vessel_imo:str = legs.get('lloydRegisterNo')
                                 vessel_name:str|None =  legs.get('vesselName')
                                 if legs.get('vesselDepartureDate'):
                                     leg_body = {'pointFrom': {'locationName': legs['loadPort'],
@@ -99,9 +102,12 @@ async def get_hmm_p2p(client, url: str, pw: str, pol: str, pod: str, search_rang
                             if task.get('inboundInland'):
                                 leg_body: dict = {
                                     'pointFrom': {'locationName': task['inboundInland']['fromLocationName'],
-                                                  'locationCode': 'DEHAM'},
+                                                  'locationCode': task['inboundInland']['fromUnLocationCode'],
+                                                  'terminalName': last_pod_terminal_name,
+                                                  'terminalCode': last_pod_terminal_code
+                                                  },
                                     'pointTo': {'locationName': task['inboundInland']['toLocationName'],
-                                                'locationCode': 'DEBRE',
+                                                'locationCode': task['inboundInland']['toUnLocationCode'],
                                                 'terminalName': task['deliveryFacilityName'],
                                                 'terminalCode': task['deliveryFaciltyCode']},
                                     'etd': task['inboundInland']['fromLocationDepatureDate'],

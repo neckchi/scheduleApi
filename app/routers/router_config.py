@@ -21,6 +21,7 @@ def get_settings():
     return config.Settings()
 
 
+
 def flatten_list(matrix) -> list:
     flat_list: list = []
     for row in matrix:

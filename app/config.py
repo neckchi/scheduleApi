@@ -47,6 +47,8 @@ class Settings(BaseSettings):
     hlcu_client_secret: SecretStr
     hlcu_user_id: SecretStr
     hlcu_password: SecretStr
+    basic_user : SecretStr
+    basic_pw : SecretStr
     #
     # class Config:
     #     # env_file = "app\.env"

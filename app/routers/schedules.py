@@ -1,5 +1,7 @@
 import asyncio
 import datetime
+import logging
+
 import httpx
 from uuid import uuid5,NAMESPACE_DNS,UUID
 from fastapi import APIRouter, Query, status, Depends, BackgroundTasks
@@ -10,6 +12,7 @@ from app.schemas import schema_response, schema_request
 from app.background_tasks import db
 from app.config import Settings
 from app.routers.router_config import HTTPXClientWrapper,get_settings,flatten_list
+from app.routers.security import basic_auth
 
 router = APIRouter(prefix='/schedules', tags=["API Point To Point Schedules"])
 @router.get("/p2p", summary="Search Point To Point schedules from carriers", response_model=schema_response.Product,
@@ -30,8 +33,8 @@ async def get_schedules(background_tasks: BackgroundTasks,
                         vessel_flag_code: str | None = Query(alias='vesselFlagCode', default=None, max_length=2,regex=r"[A-Z]{2}"),
                         service: str | None = Query(default=None,description='Search by either service code or service name'),
                         settings: Settings = Depends(get_settings),
+                        credentials = Depends(basic_auth),
                         client: httpx.AsyncClient = Depends(HTTPXClientWrapper.get_client)):
-
 
     """
     Search P2P Schedules with all the information:
