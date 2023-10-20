@@ -1,7 +1,5 @@
 import asyncio
 import datetime
-import logging
-
 import httpx
 from uuid import uuid5,NAMESPACE_DNS,UUID
 from fastapi import APIRouter, Query, status, Depends, BackgroundTasks
