@@ -34,7 +34,7 @@ async def get_maersk_p2p(client,background_task,url: str, location_url: str, cut
         location_tasks = (asyncio.create_task(anext(HTTPXClientWrapper.call_client(client=client,background_tasks=background_task,method='GET',
                                                                                              stream=True, url=location_url, headers={'Consumer-Key': pw},
                                                                                              params= {'locationType':'CITY','UNLocationCode': port},
-                                                                                             token_key=maersk_uuid(port=port),expire=timedelta(days=90)))) for port in [port_loading, port_discharge] if port)
+                                                                                             token_key=maersk_uuid(port=port),expire=timedelta(days=180)))) for port in [port_loading, port_discharge] if port)
         location = await asyncio.gather(*location_tasks)
         if origingeolocation is None and destinationgeolocation is None:
             origingeolocation, destinationgeolocation = location
@@ -86,8 +86,10 @@ async def get_maersk_p2p(client,background_task,url: str, location_url: str, cut
                                                                'transitTime': transit_time,
                                                                'transshipment': check_transshipment}
 
+
                                         # Performance Enhancement - No meomory is used:async generator object - schedule leg
                                         async def schedule_leg():
+
                                             for index, legs in enumerate(task['transportLegs'], start=1):
                                                 vessel_imo:str = deepget(legs['transport'], 'vessel', 'vesselIMONumber')
                                                 transport_type: dict = {'BAR': 'Barge',
@@ -130,7 +132,7 @@ async def get_maersk_p2p(client,background_task,url: str, location_url: str, cut
                                                 service_name:str = legs['transport'].get('carrierServiceName')
 
                                                 if service_code or service_name:
-                                                    service_body: dict = {'serviceCode': service_code,'serviceName': service_name}
+                                                    service_body: dict = {'serviceCode': service_name if service_name else service_code}
                                                     leg_body.update({'services': service_body})
 
                                                 # BU only need the cut off date for 1st leg
@@ -139,10 +141,12 @@ async def get_maersk_p2p(client,background_task,url: str, location_url: str, cut
                                                                           headers={'Consumer-Key': pw},
                                                                           country=legs['facilities']['startLocation']['countryCode'],
                                                                           pol=legs['facilities']['startLocation']['cityName'],
-                                                                          imo=legs['transport']['vessel']['vesselIMONumber'],
+                                                                          imo=vessel_imo,
                                                                           voyage=voyage_num))
+
                                                     if cutoffseries:
                                                         leg_body.update({'cutoffs': cutoffseries})
+
 
                                                 yield leg_body
 
