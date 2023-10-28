@@ -62,42 +62,40 @@ async def get_one_p2p(client, background_task,url: str, turl: str, pw: str, auth
                     vgm_cutoff=first_vgm_cutoff,
                     transit_time=transit_time,
                     check_transshipment=check_transshipment)
-                leg_list: list = []
                 if check_transshipment:
-                    for legs in task['legs']:
-                        transport_id = legs.get('transportID')
-                        leg_list.append(mapping_template.produce_leg_body(
-                            origin_un_code=legs['departureUnloc'],
-                            origin_term_name=legs['departureTerminal'],
-                            dest_un_code=legs['arrivalUnloc'],
-                            dest_term_name=legs['arrivalTerminal'],
-                            etd=legs['departureDateEstimated'],
-                            eta=legs['arrivalDateEstimated'],
-                            tt=round(legs['transitDurationHrsUtc'] / 24),
+                    leg_list:list = [mapping_template.produce_leg_body(
+                            origin_un_code=leg['departureUnloc'],
+                            origin_term_name=leg['departureTerminal'],
+                            dest_un_code=leg['arrivalUnloc'],
+                            dest_term_name=leg['arrivalTerminal'],
+                            etd=leg['departureDateEstimated'],
+                            eta=leg['arrivalDateEstimated'],
+                            tt=round(leg['transitDurationHrsUtc'] / 24),
                             transport_type='Vessel',
-                            transport_name=legs['transportName'],
-                            reference_type= None if transport_id == 'UNKNOWN' else 'IMO',
-                            reference=None if transport_id == 'UNKNOWN' else transport_id,
-                            service_code=legs['serviceCode'], service_name=legs['serviceName'],
-                            internal_voy=legs['conveyanceNumber']))
-
+                            transport_name=leg['transportName'],
+                            reference_type=None if (transport_type:=leg.get('transportID')) == 'UNKNOWN' else 'IMO',
+                            reference=None if transport_type  == 'UNKNOWN' else transport_type,
+                            service_code=leg['serviceCode'],
+                            service_name=leg['serviceName'],
+                            internal_voy=leg['conveyanceNumber'])for leg in task['legs']]
                 else:
-                    leg_list.append(mapping_template.produce_leg_body(
-                        origin_un_code=first_point_from,
-                        origin_term_name=first_origin_terminal,
-                        dest_un_code=last_point_to,
-                        dest_term_name=last_destination_terminal,
-                        etd=first_etd,
-                        eta=last_eta,
-                        tt=transit_time,
-                        cy_cutoff=first_cy_cutoff,
-                        si_cutoff=first_doc_cutoff,
-                        vgm_cutoff=first_vgm_cutoff,
-                        transport_type='Vessel',
-                        transport_name=first_vessel_name,
-                        reference_type=None if first_imo == 'UNKNOWN' else 'IMO',
-                        reference=None if first_imo == 'UNKNOWN' else first_imo,
-                        service_code=first_service_code,service_name=first_service_name,
-                        internal_voy=first_voyage))
+                    leg_list:list = [mapping_template.produce_leg_body(
+                            origin_un_code=first_point_from,
+                            origin_term_name=first_origin_terminal,
+                            dest_un_code=last_point_to,
+                            dest_term_name=last_destination_terminal,
+                            etd=first_etd,
+                            eta=last_eta,
+                            tt=transit_time,
+                            cy_cutoff=first_cy_cutoff,
+                            si_cutoff=first_doc_cutoff,
+                            vgm_cutoff=first_vgm_cutoff,
+                            transport_type='Vessel',
+                            transport_name=first_vessel_name,
+                            reference_type=None if first_imo == 'UNKNOWN' else 'IMO',
+                            reference=None if first_imo == 'UNKNOWN' else first_imo,
+                            service_code=first_service_code,
+                            service_name=first_service_name,
+                            internal_voy=first_voyage)]
                 total_schedule_list.append(mapping_template.produce_schedule(schedule=schedule_body, legs=leg_list))
         return total_schedule_list

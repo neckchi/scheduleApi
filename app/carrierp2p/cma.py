@@ -33,7 +33,6 @@ async def get_cma_p2p(client, url: str, pw: str, pol: str, pod: str, search_rang
         awaited_response = await response
         check_extension:bool = awaited_response is not None and  type(awaited_response) != list and awaited_response.status_code == 206
         response_json: list = awaited_response.json() if check_extension else awaited_response
-
         # Each json response might have more than 49 results.if true, CMA will return http:206 and ask us to loop over the pages in order to get all the results from them
         if check_extension:
             page: int = 50
@@ -69,34 +68,27 @@ async def get_cma_p2p(client, url: str, pw: str, pol: str, pod: str, search_rang
                     vgm_cutoff=first_vgm_cuttoff,
                     transit_time=transit_time,
                     check_transshipment=check_transshipment)
-
-                leg_list:list=[]
-                for legs in task['routingDetails']:
-                    check_pol_terminal:dict|None =deepget(legs['pointFrom']['location'],'facility','facilityCodifications')
-                    check_pod_terminal:dict|None = deepget(legs['pointTo']['location'],'facility','facilityCodifications')
-                    check_cut_offs = legs['pointFrom'].get('cutOff')
-                    vessel_imo = deepget(legs['transportation'],'vehicule','reference')
-                    leg_list.append(mapping_template.produce_leg_body(
-                        origin_un_name=legs['pointFrom']['location']['name'],
-                        origin_un_code=legs['pointFrom']['location']['internalCode'],
-                        origin_term_name=deepget(legs['pointFrom']['location'],'facility', 'name'),
-                        origin_term_code=check_pol_terminal[0].get('codification') if check_pol_terminal else None,
-                        dest_un_name=legs['pointTo']['location']['name'],
-                        dest_un_code=legs['pointTo']['location']['internalCode'],
-                        dest_term_name=deepget(legs['pointTo']['location'],'facility','name'),
-                        dest_term_code=check_pod_terminal[0].get('codification') if check_pod_terminal else None,
-                        etd=legs['pointFrom'].get('departureDateLocal',default_etd_eta),
-                        eta=legs['pointTo'].get('arrivalDateLocal',default_etd_eta),
-                        tt=legs.get('legTransitTime',0),
-                        cy_cutoff=deepget(legs['pointFrom']['cutOff'], 'portCutoff', 'local') if check_cut_offs else None,
-                        si_cutoff=deepget(legs['pointFrom']['cutOff'], 'shippingInstructionAcceptance','local')if check_cut_offs else None,
-                        vgm_cutoff=deepget(legs['pointFrom']['cutOff'], 'vgm', 'local')if check_cut_offs else None,
-                        transport_type=str(legs['transportation']['meanOfTransport']).title(),
-                        transport_name=deepget(legs['transportation'],'vehicule','vehiculeName'),
-                        reference_type='IMO' if vessel_imo else None,
+                leg_list:list = [mapping_template.produce_leg_body(
+                        origin_un_name=leg['pointFrom']['location']['name'],
+                        origin_un_code=leg['pointFrom']['location']['internalCode'],
+                        origin_term_name=deepget(leg['pointFrom']['location'], 'facility', 'name'),
+                        origin_term_code=check_pol_terminal[0].get('codification') if (check_pol_terminal := deepget(leg['pointFrom']['location'], 'facility','facilityCodifications')) else None,
+                        dest_un_name=leg['pointTo']['location']['name'],
+                        dest_un_code=leg['pointTo']['location']['internalCode'],
+                        dest_term_name=deepget(leg['pointTo']['location'], 'facility', 'name'),
+                        dest_term_code=check_pod_terminal[0].get('codification') if (check_pod_terminal := deepget(leg['pointTo']['location'], 'facility','facilityCodifications')) else None,
+                        etd=leg['pointFrom'].get('departureDateLocal', default_etd_eta),
+                        eta=leg['pointTo'].get('arrivalDateLocal', default_etd_eta),
+                        tt=leg.get('legTransitTime', 0),
+                        cy_cutoff=deepget(leg['pointFrom']['cutOff'], 'portCutoff', 'local') if (check_cut_offs := leg['pointFrom'].get('cutOff')) else None,
+                        si_cutoff=deepget(leg['pointFrom']['cutOff'], 'shippingInstructionAcceptance','local') if check_cut_offs else None,
+                        vgm_cutoff=deepget(leg['pointFrom']['cutOff'], 'vgm', 'local') if check_cut_offs else None,
+                        transport_type=str(leg['transportation']['meanOfTransport']).title(),
+                        transport_name=deepget(leg['transportation'], 'vehicule', 'vehiculeName'),
+                        reference_type='IMO' if (vessel_imo := deepget(leg['transportation'], 'vehicule', 'reference')) else None,
                         reference=vessel_imo,
-                        service_code=deepget(legs['transportation'], 'voyage', 'service', 'code') if legs['transportation'].get('voyage') and legs['transportation']['voyage'].get('service') else None,
-                        internal_voy=deepget(legs['transportation'], 'voyage', 'voyageReference')))
+                        service_code=deepget(leg['transportation'], 'voyage', 'service', 'code') if leg['transportation'].get('voyage') and leg['transportation']['voyage'].get('service') else None,
+                        internal_voy=deepget(leg['transportation'], 'voyage', 'voyageReference'))for leg in task['routingDetails']]
                 total_schedule_list.append(mapping_template.produce_schedule(schedule=schedule_body, legs=leg_list))
     return total_schedule_list
 

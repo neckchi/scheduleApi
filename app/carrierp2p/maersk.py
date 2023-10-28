@@ -68,6 +68,9 @@ async def get_maersk_p2p(client,background_task,url: str, location_url: str, cut
                         transshipment_port:bool = any(tsport['facilities']['startLocation']['UNLocationCode'] == tsp  for tsport in task['transportLegs'][1:]) if check_transshipment and tsp else False
                         if (transshipment_port or not tsp) and (direct_only is None or check_transshipment != direct_only) and (check_service_code or check_service_name):
                             transit_time:int = round(int(task['transitTime']) / 1400)
+                            transport_type: dict = {'BAR': 'Barge', 'BCO': 'Barge', 'FEF': 'Feeder', 'FEO': 'Feeder',
+                                                    'MVS': 'Vessel', 'RCO': 'Rail', 'RR': 'Rail', 'TRK': 'Truck',
+                                                    'VSF': 'Feeder', 'VSL': 'Feeder', 'VSM': 'Vessel'}
                             first_point_from:str = task['facilities']['collectionOrigin']['UNLocationCode']
                             last_point_to:str = task['facilities']['deliveryDestination']['UNLocationCode']
                             first_etd = task['departureDateTime']
@@ -80,35 +83,28 @@ async def get_maersk_p2p(client,background_task,url: str, location_url: str, cut
                                 last_eta=last_eta,
                                 transit_time=transit_time,
                                 check_transshipment=check_transshipment)
-                            leg_list:list=[]
-                            for index, legs in enumerate(task['transportLegs'], start=1):
-                                vessel_imo:str = deepget(legs['transport'], 'vessel', 'vesselIMONumber')
-                                transport_type: dict = {'BAR': 'Barge','BCO': 'Barge','FEF': 'Feeder','FEO': 'Feeder','MVS': 'Vessel','RCO': 'Rail', 'RR': 'Rail','TRK': 'Truck','VSF': 'Feeder','VSL': 'Feeder','VSM': 'Vessel'}
-                                service_code:str = legs['transport'].get('carrierServiceCode')
-                                service_name:str = legs['transport'].get('carrierServiceName')
-                                voyage_num=legs['transport'].get('carrierDepartureVoyageNumber')
-                                cutoffseries = await anext(get_maersk_cutoff(client=client, url=cutoff_url,headers={'Consumer-Key': pw},country=legs['facilities']['startLocation']['countryCode'],
-                                                          pol=legs['facilities']['startLocation']['cityName'],
-                                                          imo=vessel_imo,voyage=voyage_num)) if index == 1 and vessel_imo and vessel_imo != '9999999' and voyage_num else None
-                                leg_list.append(mapping_template.produce_leg_body(
-                                    origin_un_name=legs['facilities']['startLocation']['cityName'],
-                                    origin_un_code=legs['facilities']['startLocation']['UNLocationCode'],
-                                    origin_term_name=legs['facilities']['startLocation']['locationName'],
-                                    dest_un_name=legs['facilities']['endLocation']['cityName'],
-                                    dest_un_code=legs['facilities']['endLocation']['UNLocationCode'],
-                                    dest_term_name=legs['facilities']['endLocation']['locationName'],
-                                    etd=legs['departureDateTime'],
-                                    eta=legs['arrivalDateTime'],
-                                    tt=int((datetime.fromisoformat(legs['arrivalDateTime']) - datetime.fromisoformat(legs['departureDateTime'])).days),
-                                    cy_cutoff=cutoffseries.get('cyCuttoff') if cutoffseries else None,
-                                    si_cutoff=cutoffseries.get('siCuttoff') if cutoffseries else None,
-                                    vgm_cutoff=cutoffseries.get('vgmCutoff')if cutoffseries else None,
-                                    transport_type=transport_type.get(legs['transport']['transportMode']),
-                                    transport_name=deepget(legs['transport'], 'vessel','vesselName'),
-                                    reference_type='IMO' if transport_type.get(legs['transport']['transportMode'], 'UNKNOWN') in ('Vessel', 'Feeder','Barge') and vessel_imo and vessel_imo != '9999999'else None,
+                            leg_list:list = [mapping_template.produce_leg_body(
+                                    origin_un_name=(pol_name:=leg['facilities']['startLocation']['cityName']),
+                                    origin_un_code=leg['facilities']['startLocation']['UNLocationCode'],
+                                    origin_term_name=leg['facilities']['startLocation']['locationName'],
+                                    dest_un_name=leg['facilities']['endLocation']['cityName'],
+                                    dest_un_code=leg['facilities']['endLocation']['UNLocationCode'],
+                                    dest_term_name=leg['facilities']['endLocation']['locationName'],
+                                    etd=(etd:=leg['departureDateTime']),
+                                    eta=(eta:=leg['arrivalDateTime']),
+                                    tt=int((datetime.fromisoformat(eta) - datetime.fromisoformat(etd)).days),
+                                    transport_type=transport_type.get(leg['transport']['transportMode']),
+                                    transport_name=deepget(leg['transport'], 'vessel', 'vesselName'),
+                                    reference_type='IMO' if transport_type.get(leg['transport']['transportMode'],'UNKNOWN') in ('Vessel', 'Feeder','Barge')
+                                                            and (vessel_imo:=deepget(leg['transport'], 'vessel', 'vesselIMONumber'))
+                                                            and vessel_imo != '9999999' else None,
                                     reference=vessel_imo if vessel_imo != '9999999' else None,
-                                    service_code=service_name if service_name else service_code,
-                                    internal_voy=voyage_num))
+                                    service_code=service_name if (service_name:=leg['transport'].get('carrierServiceName')) else leg['transport'].get('carrierServiceCode'),
+                                    internal_voy=(voyage_num:=leg['transport'].get('carrierDepartureVoyageNumber')),
+                                    cy_cutoff=(cutoffseries:=await anext(get_maersk_cutoff(client=client, url=cutoff_url,headers={'Consumer-Key': pw},country=leg['facilities']['startLocation']['countryCode'],
+                                                      pol=pol_name,imo=vessel_imo,voyage=voyage_num))).get('cyCuttoff') if  (first_valid_leg:=index == 1 and vessel_imo and vessel_imo != '9999999' and voyage_num) else None,
+                                    si_cutoff=cutoffseries.get('siCuttoff') if  first_valid_leg else None,
+                                    vgm_cutoff=cutoffseries.get('vgmCutoff') if  first_valid_leg else None ) for index, leg in enumerate(task['transportLegs'], start=1)]
                             total_schedule_list.append(mapping_template.produce_schedule(schedule=schedule_body, legs=leg_list))
                 return total_schedule_list
 

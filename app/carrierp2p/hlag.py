@@ -10,11 +10,7 @@ async def get_hlag_access_token(client,background_task, url: str,pw:str,user:str
         headers: dict = {'X-IBM-Client-Id': client_id,
                          'X-IBM-Client-Secret': client_secret,
                          'Accept': 'application/json'}
-        body:dict = {
-        'mode': "raw",
-        'userId': user,
-        'password': pw,
-        'orgUnit': "HLAG"}
+        body:dict = {'mode': "raw",'userId': user,'password': pw,'orgUnit': "HLAG"}
         response_token = await anext(HTTPXClientWrapper.call_client(method='POST',background_tasks =background_task,client=client,url=url, headers=headers,json=body,token_key=hlcu_token_key,expire=timedelta(minutes=10)))
     yield response_token['token']
 
@@ -49,25 +45,20 @@ async def get_hlag_p2p(client,background_task, url: str, turl: str,user:str, pw:
                 last_eta=last_eta, cy_cutoff=first_cy_cutoff, doc_cutoff=first_doc_cutoff,vgm_cutoff=first_vgm_cuttoff,
                 transit_time=transit_time,
                 check_transshipment=check_transshipment)
-            leg_list:list =[]
-            for legs in task['legs']:
-                vessel_imo:str = legs.get('vesselImoNumber')
-                etd:str = legs['departureDateTime']
-                eta:str = legs['arrivalDateTime']
-                leg_list.append(mapping_template.produce_leg_body(
-                    origin_un_name=legs['departureLocation']['locationName'],
-                    origin_un_code=legs['departureLocation']['UNLocationCode'],
-                    dest_un_name=legs['arrivalLocation']['locationName'],
-                    dest_un_code=legs['arrivalLocation']['UNLocationCode'],
-                    etd=etd,
-                    eta=eta,
+            leg_list:list = [mapping_template.produce_leg_body(
+                    origin_un_name=leg['departureLocation']['locationName'],
+                    origin_un_code=leg['departureLocation']['UNLocationCode'],
+                    dest_un_name=leg['arrivalLocation']['locationName'],
+                    dest_un_code=leg['arrivalLocation']['UNLocationCode'],
+                    etd=(etd:=leg['departureDateTime']),
+                    eta=(eta:=leg['arrivalDateTime']),
                     tt=int((datetime.fromisoformat(eta) - datetime.fromisoformat(etd)).days),
-                    transport_type=str(legs['modeOfTransport']).title(),
-                    transport_name=legs['vesselName'] if vessel_imo else None,
-                    reference_type='IMO' if vessel_imo and vessel_imo != '0000000' else None ,
+                    transport_type=str(leg['modeOfTransport']).title(),
+                    transport_name=leg['vesselName'] if (vessel_imo := leg.get('vesselImoNumber')) else None,
+                    reference_type='IMO' if vessel_imo and vessel_imo != '0000000' else None,
                     reference=vessel_imo if vessel_imo != '0000000' else None,
-                    service_name=legs.get('serviceName'),
-                    internal_voy=legs.get('importVoyageNumber')))
+                    service_name=leg.get('serviceName'),
+                    internal_voy=leg.get('importVoyageNumber'))for leg in task['legs']]
             total_schedule_list.append(mapping_template.produce_schedule(schedule=schedule_body, legs=leg_list))
         return total_schedule_list
 

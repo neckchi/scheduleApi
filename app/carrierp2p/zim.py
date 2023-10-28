@@ -46,26 +46,21 @@ async def get_zim_p2p(client, background_task,url: str, turl: str, pw: str, zim_
                     last_eta=last_eta,
                     transit_time=transit_time,
                     check_transshipment=check_transshipment)
-                leg_list: list = []
-                for legs in task['routeLegs']:
-                    vessel_type:dict = {'Land Trans': 'Truck', 'Feeder': 'Feeder', 'TO BE NAMED': 'Vessel'}
-                    vessel_name: str | None = legs.get('vesselName')
-                    vessel_imo = legs.get('vesselCode')
-                    check_voyage = legs.get('voyage')
-                    leg_list.append(mapping_template.produce_leg_body(
-                        origin_un_name=legs['departurePortName'],
-                        origin_un_code=legs['departurePort'],
-                        dest_un_name=legs['arrivalPortName'],
-                        dest_un_code=legs['arrivalPort'],
-                        etd=legs['departureDate'],
-                        eta=legs['arrivalDate'],
-                        tt=int((datetime.datetime.fromisoformat(legs['arrivalDate']) - datetime.datetime.fromisoformat(legs['departureDate'])).days),
-                        transport_type=vessel_type.get(legs['vesselName'], 'Vessel'),
-                        transport_name=None if vessel_name == 'TO BE NAMED' else vessel_name,
-                        reference_type='Call Sign' if vessel_imo and vessel_name != 'TO BE NAMED' else None,
-                        reference=vessel_imo if vessel_name != 'TO BE NAMED' else None,
-                        service_code=legs['line'] if check_voyage else None,
-                        internal_voy=check_voyage + legs['leg'] if check_voyage else None))
+                leg_list:list = [mapping_template.produce_leg_body(
+                        origin_un_name=leg['departurePortName'],
+                        origin_un_code=leg['departurePort'],
+                        dest_un_name=leg['arrivalPortName'],
+                        dest_un_code=leg['arrivalPort'],
+                        etd=(etd:=leg['departureDate']),
+                        eta=(eta:=leg['arrivalDate']),
+                        tt=int((datetime.datetime.fromisoformat(eta) - datetime.datetime.fromisoformat(etd)).days),
+                        transport_type={'Land Trans': 'Truck', 'Feeder': 'Feeder', 'TO BE NAMED': 'Vessel'}.get(leg['vesselName'], 'Vessel'),
+                        transport_name=None if (vessel_name:=leg['vesselName']) == 'TO BE NAMED' else vessel_name,
+                        reference_type='Call Sign' if (vessel_code:=leg.get('vesselCode')) and vessel_name != 'TO BE NAMED' else None,
+                        reference=vessel_code if vessel_name != 'TO BE NAMED' else None,
+                        service_code=leg['line'] if (voyage_num:=leg.get('voyage')) else None,
+                        internal_voy=voyage_num + leg['leg'] if voyage_num else None) for leg in task['routeLegs']]
+
                 total_schedule_list.append(mapping_template.produce_schedule(schedule=schedule_body, legs=leg_list))
         return total_schedule_list
 

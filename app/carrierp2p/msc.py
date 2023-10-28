@@ -65,31 +65,27 @@ async def get_msc_p2p(client, background_task,url: str, oauth: str, aud: str, pw
                                                                          last_eta=last_eta,cy_cutoff=first_cy_cutoff,doc_cutoff=first_doc_cutoff,vgm_cutoff=first_vgm_cutoff,
                                                                          transit_time=transit_time,
                                                                          check_transshipment=check_transshipment)
-                leg_list: list = []
-                for legs in task['Schedules']:
-                    etd = next(led['CallDateTime'] for led in legs['Calls'][0]['CallDates'] if led['Type'] == 'ETD')
-                    eta = next(lea['CallDateTime'] for lea in legs['Calls'][-1]['CallDates'] if lea['Type'] == 'ETA')
-                    vessel_imo = legs.get('IMONumber')
-                    leg_list.append(mapping_template.produce_leg_body(
-                        origin_un_name=legs['Calls'][0]['Name'],
-                        origin_un_code=legs['Calls'][0]['Code'],
-                        origin_term_name=legs['Calls'][0]['EHF']['Description'],
-                        origin_term_code=legs['Calls'][0]['DepartureEHFSMDGCode'] if legs['Calls'][0]['DepartureEHFSMDGCode'] != '' else None,
-                        dest_un_name=legs['Calls'][-1]['Name'],
-                        dest_un_code=legs['Calls'][-1]['Code'],
-                        dest_term_name=legs['Calls'][-1]['EHF']['Description'],
-                        dest_term_code=legs['Calls'][-1]['ArrivalEHFSMDGCode'] if legs['Calls'][-1]['ArrivalEHFSMDGCode'] != '' else None,
-                        etd=etd,
-                        eta=eta,
+
+                leg_list:list = [mapping_template.produce_leg_body(
+                        origin_un_name=leg['Calls'][0]['Name'],
+                        origin_un_code=leg['Calls'][0]['Code'],
+                        origin_term_name=leg['Calls'][0]['EHF']['Description'],
+                        origin_term_code=leg['Calls'][0]['DepartureEHFSMDGCode'] if leg['Calls'][0]['DepartureEHFSMDGCode'] != '' else None,
+                        dest_un_name=leg['Calls'][-1]['Name'],
+                        dest_un_code=leg['Calls'][-1]['Code'],
+                        dest_term_name=leg['Calls'][-1]['EHF']['Description'],
+                        dest_term_code=leg['Calls'][-1]['ArrivalEHFSMDGCode'] if leg['Calls'][-1]['ArrivalEHFSMDGCode'] != '' else None,
+                        etd=(etd:=next(led['CallDateTime'] for led in leg['Calls'][0]['CallDates'] if (cut_off_type:=led['Type']) == 'ETD')),
+                        eta=(eta:=next(lea['CallDateTime'] for lea in leg['Calls'][-1]['CallDates'] if lea['Type']== 'ETA')),
                         tt=int((datetime.fromisoformat(eta) - datetime.fromisoformat(etd)).days),
-                        cy_cutoff=next((led['CallDateTime'] for led in legs['Calls'][0]['CallDates'] if led['Type'] == 'CYCUTOFF' and led.get('CallDateTime')), None),
-                        si_cutoff=next((led['CallDateTime'] for led in legs['Calls'][0]['CallDates'] if led['Type'] == 'SI' and led.get('CallDateTime')), None),
-                        vgm_cutoff=next((led['CallDateTime'] for led in legs['Calls'][0]['CallDates'] if led['Type'] == 'VGM' and led.get('CallDateTime')), None),
+                        cy_cutoff=next((led['CallDateTime'] for led in leg['Calls'][0]['CallDates'] if cut_off_type == 'CYCUTOFF' and (cut_offs:= led.get('CallDateTime'))), None),
+                        si_cutoff=next((led['CallDateTime'] for led in leg['Calls'][0]['CallDates'] if cut_off_type == 'SI' and cut_offs), None),
+                        vgm_cutoff=next((led['CallDateTime'] for led in leg['Calls'][0]['CallDates'] if cut_off_type == 'VGM' and cut_offs), None),
                         transport_type='Vessel',
-                        transport_name=legs.get('TransportationMeansName'),
-                        reference_type='IMO' if vessel_imo and vessel_imo != '' else None,
+                        transport_name=leg.get('TransportationMeansName'),
+                        reference_type='IMO' if (vessel_imo := leg.get('IMONumber')) and vessel_imo != '' else None,
                         reference=vessel_imo if vessel_imo != '' else None,
-                        service_code=legs['Service']['Description'] if legs.get('Service') else None,
-                        internal_voy=legs['Voyages'][0]['Description'] if legs.get('Voyages') else None))
+                        service_code=leg['Service']['Description'] if leg.get('Service') else None,
+                        internal_voy=leg['Voyages'][0]['Description'] if leg.get('Voyages') else None) for leg in task['Schedules']]
                 total_schedule_list.append(mapping_template.produce_schedule(schedule=schedule_body,legs=leg_list))
         return total_schedule_list
