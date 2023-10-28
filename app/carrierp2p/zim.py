@@ -1,6 +1,7 @@
 from app.routers.router_config import HTTPXClientWrapper
 from app.background_tasks import db
 from uuid import uuid5,NAMESPACE_DNS
+from app.carrierp2p import mapping_template
 import datetime
 
 
@@ -12,10 +13,8 @@ async def get_zim_access_token(client,background_task, url: str, api_key: str, c
                          }
         params: dict = {'grant_type': 'client_credentials', 'client_id': client_id,
                         'client_secret': secret, 'scope': 'Vessel Schedule'}
-        response = await anext(HTTPXClientWrapper.call_client(client=client,background_tasks=background_task,method='POST',url=url, headers=headers, data=params,token_key=zim_token_key,expire=datetime.timedelta(minutes=40)))
-        response_token = response.json()
+        response_token = await anext(HTTPXClientWrapper.call_client(client=client,background_tasks=background_task,method='POST',url=url, headers=headers, data=params,token_key=zim_token_key,expire=datetime.timedelta(minutes=40)))
     yield response_token['access_token']
-
 
 async def get_zim_p2p(client, background_task,url: str, turl: str, pw: str, zim_client: str, zim_secret: str, pol: str, pod: str,
                       search_range: int,
@@ -24,72 +23,50 @@ async def get_zim_p2p(client, background_task,url: str, turl: str, pw: str, zim_
 
     token = await anext(get_zim_access_token(client=client,background_task=background_task, url=turl, api_key=pw, client_id=zim_client, secret=zim_secret))
     headers: dict = {'Ocp-Apim-Subscription-Key': pw, 'Authorization': f'Bearer {token}','Accept': 'application/json'}
-    response = await anext(HTTPXClientWrapper.call_client(client=client, method='GET', url=url, params=params,headers=headers))
-
-    # # Performance Enhancement - No meomory is used:async generator object - schedules
-    async def schedules():
-        if response.status_code == 200:
-            response_json:dict = response.json()
-            for task in response_json['response']['routes']:
-                # Additional check on service code/name in order to fullfill business requirment(query the result by service code)
-                check_service_code: bool = next((True for services in task['routeLegs'] if services.get('voyage') and services['line'] == service),False) if service else False
-                check_transshipment: bool = True if task['routeLegCount'] > 1 else False
-                transshipment_port: bool = next((True for tsport in task['routeLegs'][1:] if tsport['departurePort'] == tsp),False) if check_transshipment and tsp else False
-                if transshipment_port or not tsp:
-                    if direct_only is None or (not check_transshipment  and direct_only is True) or (check_transshipment and direct_only is False):
-                        if check_service_code or not service:
-                            carrier_code:str = 'ZIMU'
-                            transit_time:int = task['transitTime']
-                            first_point_from:str = task['departurePort']
-                            last_point_to:str = task['arrivalPort']
-                            first_etd:str = task['departureDate']
-                            last_eta:str = task['arrivalDate']
-                            schedule_body: dict = {'scac': carrier_code, 'pointFrom': first_point_from,
-                                                   'pointTo': last_point_to, 'etd': first_etd, 'eta': last_eta,
-                                                   'transitTime': transit_time,
-                                                   'transshipment': check_transshipment
-                                                   }
-
-                            # Performance Enhancement - No meomory is used:async generator object - schedule leg
-                            async def schedule_leg():
-                                for legs in task['routeLegs']:
-                                    legs: dict
-                                    vessel_type:dict = {'Land Trans': 'Truck', 'Feeder': 'Feeder', 'TO BE NAMED': 'Vessel'}
-                                    vessel_name: str | None = legs.get('vesselName')
-                                    vessel_imo = legs.get('vesselCode')
-                                    leg_body:dict = {
-                                                'pointFrom': {'locationCode': legs['departurePort'],
-                                                              'locationName': legs['departurePortName']},
-                                                'pointTo': {'locationCode': legs['arrivalPort'],
-                                                            'locationName': legs['arrivalPortName']},
-                                                'etd': legs['departureDate'],
-                                                'eta': legs['arrivalDate'],
-                                                'transitTime': int((datetime.datetime.fromisoformat(legs['arrivalDate']) - datetime.datetime.fromisoformat(legs['departureDate'])).days),
-
-                                                'transportations': {
-                                                    'transportType': vessel_type.get(legs['vesselName'], 'Vessel'),
-                                                    'transportName': None if vessel_name == 'TO BE NAMED' else vessel_name,
-                                                    'referenceType': 'Call Sign' if vessel_imo and vessel_name != 'TO BE NAMED' else None,
-                                                    'reference': vessel_imo if vessel_name != 'TO BE NAMED' else None}
-                                                }
-
-                                    if legs.get('voyage'):
-                                        voyage_body: dict = {'internalVoyage': legs['voyage'] + legs['leg']}
-                                        service_body: dict = {'serviceCode': legs['line']}
-
-                                        leg_body.update({'voyages': voyage_body, 'services': service_body})
-                                    yield leg_body
-
-                            schedule_body.update({'legs': [sl async for sl in schedule_leg()]})
-                            yield schedule_body
-                        else:
-                            pass
-                    else:
-                        pass
-                else:
-                    pass
-            else:
-                pass
-    yield [s async for s in schedules()]
+    response_json = await anext(HTTPXClientWrapper.call_client(client=client, method='GET', url=url, params=params,headers=headers))
+    if response_json:
+        total_schedule_list:list = []
+        for task in response_json['response']['routes']:
+            # Additional check on service code/name in order to fullfill business requirment(query the result by service code)
+            check_service_code:bool = any(service == services['line'] for services in task['routeLegs'] if services.get('voyage')) if service else True
+            check_transshipment: bool = task['routeLegCount'] > 1
+            transshipment_port:bool = any(tsport['departurePort'] == tsp for tsport in task['routeLegs'][1:]) if check_transshipment and tsp else False
+            if (transshipment_port or not tsp) and (direct_only is None or direct_only != check_transshipment )and (check_service_code or not service):
+                carrier_code:str = 'ZIMU'
+                transit_time:int = task['transitTime']
+                first_point_from:str = task['departurePort']
+                last_point_to:str = task['arrivalPort']
+                first_etd:str = task['departureDate']
+                last_eta:str = task['arrivalDate']
+                schedule_body: dict = mapping_template.produce_schedule_body(
+                    carrier_code=carrier_code,
+                    first_point_from=first_point_from,
+                    last_point_to=last_point_to,
+                    first_etd=first_etd,
+                    last_eta=last_eta,
+                    transit_time=transit_time,
+                    check_transshipment=check_transshipment)
+                leg_list: list = []
+                for legs in task['routeLegs']:
+                    vessel_type:dict = {'Land Trans': 'Truck', 'Feeder': 'Feeder', 'TO BE NAMED': 'Vessel'}
+                    vessel_name: str | None = legs.get('vesselName')
+                    vessel_imo = legs.get('vesselCode')
+                    check_voyage = legs.get('voyage')
+                    leg_list.append(mapping_template.produce_leg_body(
+                        origin_un_name=legs['departurePortName'],
+                        origin_un_code=legs['departurePort'],
+                        dest_un_name=legs['arrivalPortName'],
+                        dest_un_code=legs['arrivalPort'],
+                        etd=legs['departureDate'],
+                        eta=legs['arrivalDate'],
+                        tt=int((datetime.datetime.fromisoformat(legs['arrivalDate']) - datetime.datetime.fromisoformat(legs['departureDate'])).days),
+                        transport_type=vessel_type.get(legs['vesselName'], 'Vessel'),
+                        transport_name=None if vessel_name == 'TO BE NAMED' else vessel_name,
+                        reference_type='Call Sign' if vessel_imo and vessel_name != 'TO BE NAMED' else None,
+                        reference=vessel_imo if vessel_name != 'TO BE NAMED' else None,
+                        service_code=legs['line'] if check_voyage else None,
+                        internal_voy=check_voyage + legs['leg'] if check_voyage else None))
+                total_schedule_list.append(mapping_template.produce_schedule(schedule=schedule_body, legs=leg_list))
+        return total_schedule_list
 
 

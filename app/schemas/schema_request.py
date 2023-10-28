@@ -13,8 +13,6 @@ class CarrierCode(str, Enum):
     APLU = 'APLU'
     CHNL = 'CHNL'
     CSFU = 'CSFU'
-    SUDU = 'SUDU'
-    ANRM = 'ANRM'
     ONEY = 'ONEY'
     HDMU = 'HDMU'
     ZIMU = 'ZIMU'
@@ -26,6 +24,9 @@ class CarrierCode(str, Enum):
     OOLU = 'OOLU'
     COSU = 'COSU'
     HLCU = 'HLCU'
+    # SUDU = 'SUDU'
+    # ANRM = 'ANRM'
+
 
     def __str__(self):
         return str(self.value)

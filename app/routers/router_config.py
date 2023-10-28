@@ -24,7 +24,9 @@ def get_settings():
 def flatten_list(matrix) -> list:
     flat_list: list = []
     for row in matrix:
-        flat_list.extend(row)
+        if row is not None:
+            flat_list.extend(row)
+        else:pass
     return flat_list
 
 
@@ -62,9 +64,15 @@ class HTTPXClientWrapper:
                           stream: bool = False):
         if not stream:
             response = await client.request(method=method, url=url, params=params, headers=headers, json=json,data=data)
-            if background_tasks:
-                background_tasks.add_task(db.set, key=token_key, value=response.json(), expire=expire)
-            yield response
+            if response.status_code == 206:
+                yield response
+            if response.status_code == 200:
+                response_json = response.json()
+                if background_tasks:
+                    background_tasks.add_task(db.set, key=token_key, value=response_json, expire=expire)
+                yield response_json
+
+            else:yield None
         else:
             """
             At the moment Only Maersk('MAEU', 'SEAU', 'SEJJ', 'MCPU', 'MAEI') need consumer to stream the response

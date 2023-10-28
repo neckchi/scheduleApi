@@ -1,18 +1,12 @@
 import logging
 from uuid import UUID
 from datetime import datetime
-from typing_extensions import Annotated
 from pydantic import BaseModel, Field, PositiveInt,field_validator,model_validator
-from pydantic.functional_serializers import PlainSerializer
 from .schema_request import CarrierCode
+from functools import cache
 
 def convert_datetime_to_iso_8601(dt: datetime) -> str:
     return dt.strftime('%Y-%m-%dT%H:%M:%S')
-
-datetime = Annotated[
-    datetime, PlainSerializer(convert_datetime_to_iso_8601, return_type=str, when_used='json')
-]
-
 
 class PointBase(BaseModel):
     locationName: str | None = Field(max_length=100, default=None, example='Hong Kong')
@@ -22,13 +16,13 @@ class PointBase(BaseModel):
 
 
 class Cutoff(BaseModel):
-    bookingCutoff: datetime | None = Field(default=None,example='2023-11-09T22:00:00')
     cyCuttoff: datetime | None = Field(default=None,example='2023-11-11T22:00:00')
     siCuttoff: datetime | None = Field(default=None,example='2023-11-11T22:00:00')
     vgmCutoff: datetime | None = Field(default=None,example='2023-11-11T22:00:00')
-    customsCutoff: datetime | None = Field(default=None,example='2023-11-11T22:00:00')
-    securityFilingCutoff: datetime | None = Field(default=None,example='2023-11-11T22:00:00')
-
+    class Config:
+        json_encoders = {
+            datetime: convert_datetime_to_iso_8601
+        }
 
 class Transportation(BaseModel):
     transportType: str = Field(description='e.g:Vessel,Barge,Feeder,Truck,Rail,Truck / Rail,Intermodal', example='Vessel')
@@ -74,8 +68,6 @@ class Leg(BaseModel):
     transportations: Transportation | None
     voyages: Voyage | None = Field(default=None, title="Voyage Number.Keep in mind that voyage number is not mandatory")
     services: Service | None = Field(default=None, title="Service Loop")
-    # _check_etd_eta = root_validator(pre=True, allow_reuse=True)(check_etd_eta)
-
     @model_validator(mode='after')
     def check_reference_type_or_reference(self) -> 'Leg':
         etd = self.etd
@@ -84,6 +76,11 @@ class Leg(BaseModel):
             return self
         logging.error('ETA must be equal  or greater than ETD.vice versa')
         raise ValueError('ETA must be equal  or greater than ETD.vice versa')
+    class Config:
+        json_encoders = {
+            datetime: convert_datetime_to_iso_8601
+        }
+
 
 class Schedule(BaseModel):
     scac: CarrierCode = Field(max_length=4, title="Carrier Code", description="This is SCAC.It must be 4 characters",
@@ -99,6 +96,7 @@ class Schedule(BaseModel):
                              description="Transit Time on Schedule Level")
     transshipment: bool = Field(title="Is transshipment?",example=False)
     legs: list[Leg] = Field(default_factory=list)
+
     @model_validator(mode='after')
     def check_reference_type_or_reference(self) -> 'Schedule':
         etd = self.etd
@@ -107,6 +105,11 @@ class Schedule(BaseModel):
             return self
         logging.error('ETA must be equal or greater than ETD.vice versa')
         raise ValueError('ETA must be equal or greater than ETD.vice versa')
+
+    class Config:
+        json_encoders = {
+            datetime: convert_datetime_to_iso_8601
+        }
 
 
 class Product(BaseModel):
