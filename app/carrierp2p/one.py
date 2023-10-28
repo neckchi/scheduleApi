@@ -27,7 +27,7 @@ async def get_one_p2p(client, background_task,url: str, turl: str, pw: str, auth
     headers: dict = {'apikey': pw, 'Authorization': f'Bearer {token}', 'Accept': 'application/json'}
     response_json = await anext(HTTPXClientWrapper.call_client(client=client, method='GET', url=url, params=params,headers=headers))
     if response_json and response_json.get('errorMessages') is None:
-        schedule_type = response_json.get('Direct', response_json['Transshipment'])
+        schedule_type = response_json.get('Direct', response_json.get('Transshipment'))
         total_schedule_list :list =[]
         for task in schedule_type:
             service_code:str = task['serviceCode']
