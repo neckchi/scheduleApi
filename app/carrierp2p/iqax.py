@@ -64,4 +64,4 @@ async def get_iqax_p2p(client, url: str, pw: str, pol: str, pod: str, search_ran
                                 service_code=legs['service']['code']if check_service else None,
                                 internal_voy=legs.get('internalVoyageNumber'),external_voy=legs.get('externalVoyageNumber')))
                         total_schedule_list.append(mapping_template.produce_schedule(schedule=schedule_body,legs=leg_list))
-            return total_schedule_list
+    return total_schedule_list
