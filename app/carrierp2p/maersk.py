@@ -95,9 +95,9 @@ async def get_maersk_p2p(client,background_task,url: str, location_url: str, cut
                                     tt=int((datetime.fromisoformat(eta) - datetime.fromisoformat(etd)).days),
                                     transport_type=transport_type.get(leg['transport']['transportMode']),
                                     transport_name=deepget(leg['transport'], 'vessel', 'vesselName'),
-                                    reference_type='IMO' if transport_type.get(leg['transport']['transportMode'],'UNKNOWN') in ('Vessel', 'Feeder','Barge')
-                                                            and (vessel_imo:=deepget(leg['transport'], 'vessel', 'vesselIMONumber'))
-                                                            and vessel_imo != '9999999' else None,
+                                    # reference_type='IMO' if transport_type.get(leg['transport']['transportMode'],'UNKNOWN') in ('Vessel', 'Feeder','Barge','Truck')
+                                    #                         and (vessel_imo:=deepget(leg['transport'], 'vessel', 'vesselIMONumber')) and vessel_imo != '9999999' else None,
+                                    reference_type='IMO' if (vessel_imo := deepget(leg['transport'], 'vessel','vesselIMONumber')) and vessel_imo != '9999999' else None,
                                     reference=vessel_imo if vessel_imo != '9999999' else None,
                                     service_code=service_name if (service_name:=leg['transport'].get('carrierServiceName')) else leg['transport'].get('carrierServiceCode'),
                                     internal_voy=(voyage_num:=leg['transport'].get('carrierDepartureVoyageNumber')),
@@ -105,7 +105,7 @@ async def get_maersk_p2p(client,background_task,url: str, location_url: str, cut
                                                       pol=pol_name,imo=vessel_imo,voyage=voyage_num))).get('cyCuttoff') if  (first_valid_leg:=index == 1 and vessel_imo and vessel_imo != '9999999' and voyage_num) else None,
                                     si_cutoff=cutoffseries.get('siCuttoff') if  first_valid_leg else None,
                                     vgm_cutoff=cutoffseries.get('vgmCutoff') if  first_valid_leg else None ) for index, leg in enumerate(task['transportLegs'], start=1)]
-                            total_schedule_list.append(mapping_template.produce_schedule(schedule=schedule_body, legs=leg_list))
+                            total_schedule_list.append(mapping_template.produce_schedule(schedule=schedule_body, legs=sorted(leg_list,key=lambda d: d['etd'])))
                 return total_schedule_list
 
 
