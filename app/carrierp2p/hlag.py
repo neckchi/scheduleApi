@@ -1,8 +1,8 @@
 from app.routers.router_config import HTTPXClientWrapper
-from datetime import datetime,timedelta
+from app.schemas import schema_response
 from app.background_tasks import db
+from datetime import datetime,timedelta
 from uuid import uuid5,NAMESPACE_DNS
-from app.carrierp2p import mapping_template
 async def get_hlag_access_token(client,background_task, url: str,pw:str,user:str, client_id: str,client_secret:str):
     hlcu_token_key = uuid5(NAMESPACE_DNS, 'hlcu-token-uuid-kuehne-nagel')
     response_token = await db.get(key=hlcu_token_key)
@@ -37,29 +37,25 @@ async def get_hlag_p2p(client,background_task, url: str, turl: str,user:str, pw:
             first_vgm_cuttoff:datetime  = next((cutoff['cutOffDateTime'] for cutoff in task['gateInCutOffDateTimes'] if cutoff['cutOffDateTimeCode'] == 'VCO'), None)
             first_doc_cutoff:datetime  = next((cutoff['cutOffDateTime'] for cutoff in task['gateInCutOffDateTimes'] if cutoff['cutOffDateTimeCode'] == 'LCO'), None)
             check_transshipment:bool = len(task['legs']) > 1
-            schedule_body: dict = mapping_template.produce_schedule_body(
-                carrier_code='HLCU',
-                first_point_from=first_point_from,
-                last_point_to=last_point_to,
-                first_etd=first_etd,
-                last_eta=last_eta, cy_cutoff=first_cy_cutoff, doc_cutoff=first_doc_cutoff,vgm_cutoff=first_vgm_cuttoff,
-                transit_time=transit_time,
-                check_transshipment=check_transshipment)
-            leg_list:list = [mapping_template.produce_leg_body(
-                    origin_un_name=leg['departureLocation']['locationName'],
-                    origin_un_code=leg['departureLocation']['UNLocationCode'],
-                    dest_un_name=leg['arrivalLocation']['locationName'],
-                    dest_un_code=leg['arrivalLocation']['UNLocationCode'],
-                    etd=(etd:=leg['departureDateTime']),
-                    eta=(eta:=leg['arrivalDateTime']),
-                    tt=int((datetime.fromisoformat(eta) - datetime.fromisoformat(etd)).days),
-                    transport_type=str(leg['modeOfTransport']).title(),
-                    transport_name=leg['vesselName'] if (vessel_imo := leg.get('vesselImoNumber')) else None,
-                    reference_type='IMO' if vessel_imo and vessel_imo != '0000000' else None,
-                    reference=vessel_imo if vessel_imo != '0000000' else None,
-                    service_name=leg.get('serviceName'),
-                    internal_voy=leg.get('importVoyageNumber'))for leg in task['legs']]
-            total_schedule_list.append(mapping_template.produce_schedule(schedule=schedule_body, legs=leg_list))
+            leg_list:list = [schema_response.Leg.model_construct(
+                                pointFrom={'locationName': leg['departureLocation']['locationName'],
+                                           'locationCode': leg['departureLocation']['UNLocationCode']},
+                                pointTo={'locationName': leg['arrivalLocation']['locationName'],
+                                         'locationCode': leg['arrivalLocation']['UNLocationCode']},
+                                etd=(etd:=leg['departureDateTime']),
+                                eta=(eta:=leg['arrivalDateTime']),
+                                transitTime=int((datetime.fromisoformat(eta) - datetime.fromisoformat(etd)).days),
+                                transportations={'transportType': str(leg['modeOfTransport']).title(),
+                                                 'transportName': leg['vesselName'] if (vessel_imo := leg.get('vesselImoNumber')) else None,
+                                                 'referenceType': 'IMO' if vessel_imo and vessel_imo != '0000000' else None,
+                                                 'reference': vessel_imo if vessel_imo != '0000000' else None},
+                                services={'serviceName': check_service} if (check_service:=leg.get('serviceName')) else None,
+                                voyages={'internalVoyage': internal_voy} if (internal_voy:= leg.get('importVoyageNumber')) else None) for leg in task['legs']]
+            schedule_body: dict = schema_response.Schedule.model_construct(scac='HLCU',pointFrom=first_point_from,pointTo=last_point_to, etd=first_etd,
+                                                                           eta=last_eta,cyCutOffDate=first_cy_cutoff,docCutoffDate=first_doc_cutoff,vgmCutOffDate=first_vgm_cuttoff,
+                                                                           transitTime=transit_time,transshipment=check_transshipment,
+                                                                           legs=leg_list).model_dump(warnings=False)
+            total_schedule_list.append(schedule_body)
         return total_schedule_list
 
 

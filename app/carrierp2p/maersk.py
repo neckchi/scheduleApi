@@ -2,9 +2,10 @@ import asyncio
 from app.carrierp2p.helpers import deepget
 from app.routers.router_config import HTTPXClientWrapper
 from app.background_tasks import db
+from app.schemas import schema_response
 from uuid import uuid5,NAMESPACE_DNS
 from datetime import timedelta,datetime
-from app.carrierp2p import mapping_template
+
 
 async def get_maersk_cutoff(client, url: str, headers: dict, country: str, pol: str, imo: str, voyage: str):
     params: dict = {'ISOCountryCode': country, 'portOfLoad': pol, 'vesselIMONumber': imo, 'voyage': voyage}
@@ -13,11 +14,11 @@ async def get_maersk_cutoff(client, url: str, headers: dict, country: str, pol: 
             cut_off_body: dict = {}
             for cutoff in response_json[0]['shipmentDeadlines']['deadlines']:
                 if cutoff.get('deadlineName') == 'Commercial Cargo Cutoff':
-                    cut_off_body.update({'cyCuttoff': cutoff.get('deadlineLocal')})
+                    cut_off_body.update({'cyCutoffDate': cutoff.get('deadlineLocal')})
                 if cutoff.get('deadlineName') in ('Shipping Instructions Deadline','Shipping Instructions Deadline for Advance Manifest Cargo','Special Cargo Documentation Deadline'):
-                    cut_off_body.update({'siCuttoff': cutoff.get('deadlineLocal')})
+                    cut_off_body.update({'siCutoffDate': cutoff.get('deadlineLocal')})
                 if cutoff.get('deadlineName') == 'Commercial Verified Gross Mass Deadline':
-                    cut_off_body.update({'vgmCutoff': cutoff.get('deadlineLocal')})
+                    cut_off_body.update({'vgmCutoffDate': cutoff.get('deadlineLocal')})
             yield cut_off_body
         yield None
 
@@ -59,8 +60,11 @@ async def get_maersk_p2p(client,background_task,url: str, location_url: str, cut
             check_oceanProducts = response_json.get('oceanProducts') if response_json else None
             if check_oceanProducts:
                 total_schedule_list: list = []
+                transport_type: dict = {'BAR': 'Barge', 'BCO': 'Barge', 'FEF': 'Feeder', 'FEO': 'Feeder',
+                                        'MVS': 'Vessel', 'RCO': 'Rail', 'RR': 'Rail', 'TRK': 'Truck',
+                                        'VSF': 'Feeder', 'VSL': 'Feeder', 'VSM': 'Vessel'}
                 for resp in check_oceanProducts:
-                    carrier_code:str = resp['vesselOperatorCarrierCode']
+                    carrier_code: str = resp['vesselOperatorCarrierCode']
                     for task in resp['transportSchedules']:
                         check_service_code:bool = any(services['transport']['carrierServiceCode'] == service for services in task['transportLegs'] if services['transport'].get('carrierServiceCode') ) if service else True
                         check_service_name: bool = any(services['transport']['carrierServiceName'] == service for services in task['transportLegs'] if services['transport'].get('carrierServiceName') ) if service else True
@@ -68,46 +72,34 @@ async def get_maersk_p2p(client,background_task,url: str, location_url: str, cut
                         transshipment_port:bool = any(tsport['facilities']['startLocation']['UNLocationCode'] == tsp  for tsport in task['transportLegs'][1:]) if check_transshipment and tsp else False
                         if (transshipment_port or not tsp) and (direct_only is None or check_transshipment != direct_only) and (check_service_code or check_service_name):
                             transit_time:int = round(int(task['transitTime']) / 1400)
-                            transport_type: dict = {'BAR': 'Barge', 'BCO': 'Barge', 'FEF': 'Feeder', 'FEO': 'Feeder',
-                                                    'MVS': 'Vessel', 'RCO': 'Rail', 'RR': 'Rail', 'TRK': 'Truck',
-                                                    'VSF': 'Feeder', 'VSL': 'Feeder', 'VSM': 'Vessel'}
                             first_point_from:str = task['facilities']['collectionOrigin']['UNLocationCode']
                             last_point_to:str = task['facilities']['deliveryDestination']['UNLocationCode']
                             first_etd = task['departureDateTime']
                             last_eta = task['arrivalDateTime']
-                            schedule_body: dict = mapping_template.produce_schedule_body(
-                                carrier_code=carrier_code,
-                                first_point_from=first_point_from,
-                                last_point_to=last_point_to,
-                                first_etd=first_etd,
-                                last_eta=last_eta,
-                                transit_time=transit_time,
-                                check_transshipment=check_transshipment)
-                            leg_list:list = [mapping_template.produce_leg_body(
-                                    origin_un_name=(pol_name:=leg['facilities']['startLocation']['cityName']),
-                                    origin_un_code=leg['facilities']['startLocation']['UNLocationCode'],
-                                    origin_term_name=leg['facilities']['startLocation']['locationName'],
-                                    dest_un_name=leg['facilities']['endLocation']['cityName'],
-                                    dest_un_code=leg['facilities']['endLocation']['UNLocationCode'],
-                                    dest_term_name=leg['facilities']['endLocation']['locationName'],
-                                    etd=(etd:=leg['departureDateTime']),
-                                    eta=(eta:=leg['arrivalDateTime']),
-                                    tt=int((datetime.fromisoformat(eta) - datetime.fromisoformat(etd)).days),
-                                    transport_type=transport_type.get(leg['transport']['transportMode']),
-                                    transport_name=deepget(leg['transport'], 'vessel', 'vesselName'),
-                                    # reference_type='IMO' if transport_type.get(leg['transport']['transportMode'],'UNKNOWN') in ('Vessel', 'Feeder','Barge','Truck')
-                                    #                         and (vessel_imo:=deepget(leg['transport'], 'vessel', 'vesselIMONumber')) and vessel_imo != '9999999' else None,
-                                    reference_type='IMO' if (vessel_imo := deepget(leg['transport'], 'vessel','vesselIMONumber')) and vessel_imo != '9999999' else None,
-                                    reference=vessel_imo if vessel_imo != '9999999' else None,
-                                    service_code=service_name if (service_name:=leg['transport'].get('carrierServiceName')) else leg['transport'].get('carrierServiceCode'),
-                                    internal_voy=(voyage_num:=leg['transport'].get('carrierDepartureVoyageNumber')),
-                                    cy_cutoff=(cutoffseries:=await anext(get_maersk_cutoff(client=client, url=cutoff_url,headers={'Consumer-Key': pw},country=leg['facilities']['startLocation']['countryCode'],
-                                                      pol=pol_name,imo=vessel_imo,voyage=voyage_num))).get('cyCuttoff') if  (first_valid_leg:=index == 1 and vessel_imo and vessel_imo != '9999999' and voyage_num) else None,
-                                    si_cutoff=cutoffseries.get('siCuttoff') if  first_valid_leg else None,
-                                    vgm_cutoff=cutoffseries.get('vgmCutoff') if  first_valid_leg else None ) for index, leg in enumerate(task['transportLegs'], start=1)]
-                            total_schedule_list.append(mapping_template.produce_schedule(schedule=schedule_body, legs=sorted(leg_list,key=lambda d: d['etd'])))
+                            leg_list: list = [schema_response.Leg.model_construct(
+                                pointFrom={'locationName': (pol_name:=leg['facilities']['startLocation']['cityName']),
+                                           'locationCode': leg['facilities']['startLocation']['UNLocationCode'],
+                                           'terminalName': leg['facilities']['startLocation']['locationName']},
+                                pointTo={'locationName': leg['facilities']['endLocation']['cityName'],
+                                         'locationCode': leg['facilities']['endLocation']['UNLocationCode'],
+                                         'terminalName': leg['facilities']['endLocation']['locationName']},
+                                etd=(etd:=leg['departureDateTime']),
+                                eta=(eta:=leg['arrivalDateTime']),
+                                transitTime=int((datetime.fromisoformat(eta) - datetime.fromisoformat(etd)).days),
+                                transportations={'transportType': transport_type.get(leg['transport']['transportMode']),
+                                                 'transportName': deepget(leg['transport'], 'vessel', 'vesselName'),
+                                                 'referenceType':'IMO' if (vessel_imo := deepget(leg['transport'], 'vessel','vesselIMONumber')) and vessel_imo != '9999999' else None,
+                                                 'reference': vessel_imo if vessel_imo != '9999999' else None},
+                                services={'serviceCode': service_name } if (service_name:=leg['transport'].get('carrierServiceName',leg['transport'].get('carrierServiceCode'))) else None,
+                                voyages={'internalVoyage':voyage_num} if (voyage_num:=leg['transport'].get('carrierDepartureVoyageNumber')) else None,
+                                cutoffs = await anext(get_maersk_cutoff(client=client, url=cutoff_url,headers={'Consumer-Key': pw},country=leg['facilities']['startLocation']['countryCode'],pol=pol_name,imo=vessel_imo,voyage=voyage_num))
+                                          if  index == 1 and vessel_imo and vessel_imo != '9999999' and voyage_num else None).model_dump(warnings=False) for index, leg in enumerate(task['transportLegs'], start=1)]
+                            schedule_body: dict = schema_response.Schedule.model_construct(scac=carrier_code,
+                                                                                           pointFrom=first_point_from,
+                                                                                           pointTo=last_point_to,
+                                                                                           etd=first_etd, eta=last_eta,
+                                                                                           transitTime=transit_time,
+                                                                                           transshipment=check_transshipment,
+                                                                                           legs=sorted(leg_list,key=lambda d: d['etd']) if check_transshipment else leg_list).model_dump(warnings=False)
+                            total_schedule_list.append(schedule_body)
                 return total_schedule_list
-
-
-# # Maersk API known issue - sometime they mess up the leg sequence
-# schedule_body['legs'].sort(key=lambda l: l['etd']) if check_transshipment else ...

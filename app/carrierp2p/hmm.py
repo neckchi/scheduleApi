@@ -1,6 +1,6 @@
 import datetime
 from app.routers.router_config import HTTPXClientWrapper
-from app.carrierp2p import mapping_template
+from app.schemas import schema_response
 
 async def get_hmm_p2p(client, url: str, pw: str, pol: str, pod: str, search_range: str, direct_only: bool|None,
                       start_date: datetime,
@@ -34,61 +34,55 @@ async def get_hmm_p2p(client, url: str, pw: str, pol: str, pod: str, search_rang
                 last_eta:str = task['arrivalDate']
                 first_cy_cutoff:str = task.get('cargoCutOffTime')
                 first_doc_cutoff:str = task.get('docuCutOffTime')
-                schedule_body: dict = mapping_template.produce_schedule_body(
-                    carrier_code=carrier_code,
-                    first_point_from=first_point_from,
-                    last_point_to=last_point_to,
-                    first_etd=first_etd,
-                    last_eta=last_eta, cy_cutoff=first_cy_cutoff, doc_cutoff=first_doc_cutoff,
-                    transit_time=transit_time,
-                    check_transshipment=check_transshipment)
-
                 #outbound
-                leg_list:list = [mapping_template.produce_leg_body(
-                    origin_un_name=task['outboundInland']['fromLocationName'],
-                    origin_un_code=task['outboundInland']['fromUnLocationCode'],
-                    origin_term_name=task['porFacilityName'],
-                    origin_term_code=task['porFacilityCode'],
-                    dest_un_name=task['outboundInland']['toLocationName'],
-                    dest_un_code=task['outboundInland']['toUnLocationCode'],
-                    dest_term_name=first_pol_terminal_name,
-                    dest_term_code=first_pol_terminal_code,
+                leg_list:list = [schema_response.Leg.model_construct(
+                    pointFrom={'locationName': task['outboundInland']['fromLocationName'],
+                               'locationCode': task['outboundInland']['fromUnLocationCode'],
+                               'terminalName': task['porFacilityName'],
+                               'terminalCode': task['porFacilityCode']},
+                    pointTo={'locationName': task['outboundInland']['toLocationName'],
+                             'locationCode': task['outboundInland']['toUnLocationCode'],
+                             'terminalName': first_pol_terminal_name,
+                             'terminalCode': first_pol_terminal_code},
                     etd=(outbound_etd:=task['outboundInland']['fromLocationDepatureDate']),
                     eta=(outbound_eta:=task['outboundInland']['toLocationArrivalDate']),
-                    tt=int((datetime.datetime.fromisoformat(outbound_eta) - datetime.datetime.fromisoformat(outbound_etd)).days),
-                    transport_type=task['outboundInland']['transMode'])] if task.get('outboundInland') else []
+                    transitTime=int((datetime.datetime.fromisoformat(outbound_eta) - datetime.datetime.fromisoformat(outbound_etd)).days),
+                    transportations={'transportType': task['outboundInland']['transMode']})] if task.get('outboundInland') else []
                 #main routing
-                leg_list += [mapping_template.produce_leg_body(
-                        origin_un_name=legs['loadPort'],
-                        origin_un_code=first_point_from if legs['vesselSequence'] == 1 else first_pot_code,
-                        origin_term_name=first_pol_terminal_name if legs['vesselSequence'] == 1 else first_pot_terminal_name,
-                        origin_term_code=first_pol_terminal_code if legs['vesselSequence'] == 1 else first_pot_terminal_code,
-                        dest_un_name=legs['dischargePort'],
-                        dest_un_code=first_pot_code if check_transshipment and legs['vesselSequence'] == 1 else last_point_to,
-                        dest_term_name=first_pot_terminal_name if check_transshipment and legs['vesselSequence'] == 1 else last_pod_terminal_name,
-                        dest_term_code=first_pot_terminal_code if check_transshipment and legs['vesselSequence'] == 1 else last_pod_terminal_code,
-                        etd=etd,
-                        eta=(eta:=legs.get('vesselArrivalDate')),
-                        tt=int((datetime.datetime.fromisoformat(eta) - datetime.datetime.fromisoformat(etd)).days),
-                        transport_type='Vessel' if (vessel_name:=legs.get('vesselName')) else 'Barge',
-                        transport_name=vessel_name,
-                        reference_type='IMO' if (vessel_imo:=legs.get('lloydRegisterNo')) else None,
-                        reference=vessel_imo,
-                        service_code=legs.get('vesselLoop'),
-                        internal_voy=legs.get('voyageNumber')) for legs in task['vessel'] if (etd:=legs.get('vesselDepartureDate'))]
+                leg_list += [schema_response.Leg.model_construct(
+                                pointFrom={'locationName': legs['loadPort'],
+                                           'locationCode': first_point_from if legs['vesselSequence'] == 1 else first_pot_code,
+                                           'terminalName': first_pol_terminal_name if legs['vesselSequence'] == 1 else first_pot_terminal_name,
+                                           'terminalCode':first_pol_terminal_code if legs['vesselSequence'] == 1 else first_pot_terminal_code},
+                                pointTo={'locationName': legs['dischargePort'],
+                                         'locationCode': first_pot_code if check_transshipment and legs['vesselSequence'] == 1 else last_point_to,
+                                         'terminalName': first_pot_terminal_name if check_transshipment and legs['vesselSequence'] == 1 else last_pod_terminal_name,
+                                         'terminalCode':first_pot_terminal_code if check_transshipment and legs['vesselSequence'] == 1 else last_pod_terminal_code},
+                                etd=etd,
+                                eta=(eta:=legs.get('vesselArrivalDate')),
+                                transitTime=int((datetime.datetime.fromisoformat(eta) - datetime.datetime.fromisoformat(etd)).days),
+                                transportations={'transportType': 'Vessel' if (vessel_name:=legs.get('vesselName')) else 'Barge',
+                                                 'transportName': vessel_name,
+                                                 'referenceType': 'IMO' if (vessel_imo:=legs.get('lloydRegisterNo')) else None,
+                                                 'reference': vessel_imo},
+                                services={'serviceCode': check_service} if (check_service:=legs.get('vesselLoop')) else None,
+                                voyages={'internalVoyage': internal_voy} if (internal_voy:= legs.get('voyageNumber')) else None) for legs in task['vessel'] if (etd:=legs.get('vesselDepartureDate'))]
                 # inbound
-                leg_list += [mapping_template.produce_leg_body(
-                        origin_un_name=task['inboundInland']['fromLocationName'],
-                        origin_un_code=task['inboundInland']['fromUnLocationCode'],
-                        origin_term_name=last_pod_terminal_name,
-                        origin_term_code=last_pod_terminal_code,
-                        dest_un_name=task['inboundInland']['toLocationName'],
-                        dest_un_code=task['inboundInland']['toUnLocationCode'],
-                        dest_term_name=task['deliveryFacilityName'],
-                        dest_term_code=task['deliveryFaciltyCode'],
-                        etd=(inbound_etd:=task['inboundInland']['fromLocationDepatureDate']),
-                        eta=(inbound_eta:=task['inboundInland']['toLocationArrivalDate']),
-                        tt=int((datetime.datetime.fromisoformat(inbound_eta) - datetime.datetime.fromisoformat(inbound_etd)).days),
-                        transport_type=task['inboundInland']['transMode'])] if task.get('inboundInland') else []
-                total_schedule_list.append(mapping_template.produce_schedule(schedule=schedule_body, legs=leg_list))
+                leg_list += [schema_response.Leg.model_construct(
+                    pointFrom={'locationName': task['inboundInland']['fromLocationName'],
+                               'locationCode': task['inboundInland']['fromUnLocationCode'],
+                               'terminalName': last_pod_terminal_name,
+                               'terminalCode': last_pod_terminal_code},
+                    pointTo={'locationName': task['inboundInland']['toLocationName'],
+                             'locationCode': task['inboundInland']['toUnLocationCode'],
+                             'terminalName': task['deliveryFacilityName'],
+                             'terminalCode': task['deliveryFaciltyCode']},
+                    etd=(inbound_etd:=task['inboundInland']['fromLocationDepatureDate']),
+                    eta=(inbound_eta:=task['inboundInland']['toLocationArrivalDate']),
+                    transitTime=int((datetime.datetime.fromisoformat(inbound_eta) - datetime.datetime.fromisoformat(inbound_etd)).days),
+                    transportations={'transportType': task['inboundInland']['transMode']})] if task.get('inboundInland') else []
+                schedule_body: dict = schema_response.Schedule.model_construct(scac=carrier_code,pointFrom=first_point_from,pointTo=last_point_to, etd=first_etd,eta=last_eta,
+                                                                               cyCutOffDate=first_cy_cutoff,docCutoffDate=first_doc_cutoff,transitTime=transit_time,
+                                                                               transshipment=check_transshipment,legs=leg_list).model_dump(warnings=False)
+                total_schedule_list.append(schedule_body)
         return total_schedule_list

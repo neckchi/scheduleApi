@@ -16,9 +16,9 @@ class PointBase(BaseModel):
 
 
 class Cutoff(BaseModel):
-    cyCuttoff: datetime | None = Field(default=None,example='2023-11-11T22:00:00')
-    siCuttoff: datetime | None = Field(default=None,example='2023-11-11T22:00:00')
-    vgmCutoff: datetime | None = Field(default=None,example='2023-11-11T22:00:00')
+    cyCutoffDate: datetime | None = Field(default=None,example='2023-11-11T22:00:00')
+    siCutoffDate: datetime | None = Field(default=None,example='2023-11-11T22:00:00')
+    vgmCutoffDate: datetime | None = Field(default=None,example='2023-11-11T22:00:00')
     class Config:
         json_encoders = {
             datetime: convert_datetime_to_iso_8601

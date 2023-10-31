@@ -5,8 +5,8 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 from app.routers.router_config import HTTPXClientWrapper
 from app.background_tasks import db
+from app.schemas import schema_response
 from uuid import uuid5,NAMESPACE_DNS
-from app.carrierp2p import mapping_template
 
 
 async def get_msc_token(client,background_task, oauth: str, aud: str, rsa: str, msc_client: str, msc_scope: str, msc_thumbprint: str):
@@ -30,8 +30,6 @@ async def get_msc_token(client,background_task, oauth: str, aud: str, rsa: str, 
         response_token = await anext(HTTPXClientWrapper.call_client(client=client,background_tasks =background_task,method='POST',url=oauth, headers=headers, data=params,token_key=msc_token_key,expire = timedelta(minutes=40)))
     yield response_token['access_token']
 
-
-
 async def get_msc_p2p(client, background_task,url: str, oauth: str, aud: str, pw: str, msc_client: str, msc_scope: str,
                       msc_thumbprint: str, pol: str, pod: str,
                       search_range: int, start_date_type: str,
@@ -53,39 +51,29 @@ async def get_msc_p2p(client, background_task,url: str, oauth: str, aud: str, pw
                 last_point_to:str = task['Schedules'][-1]['Calls'][-1]['Code']
                 first_etd = next(ed['CallDateTime'] for ed in task['Schedules'][0]['Calls'][0]['CallDates'] if ed['Type'] == 'ETD')
                 last_eta = next(ed['CallDateTime'] for ed in task['Schedules'][-1]['Calls'][-1]['CallDates'] if ed['Type'] == 'ETA')
-                first_cy_cutoff = next((led['CallDateTime'] for led in task['Schedules'][0]['Calls'][0]['CallDates'] if led['Type'] == 'CYCUTOFF' and led.get('CallDateTime')), None)
-                first_doc_cutoff = next((led['CallDateTime'] for led in task['Schedules'][0]['Calls'][0]['CallDates'] if led['Type'] == 'SI' and led.get('CallDateTime')), None)
-                first_vgm_cutoff = next((led['CallDateTime'] for led in task['Schedules'][0]['Calls'][0]['CallDates'] if led['Type'] == 'VGM' and led.get('CallDateTime')), None)
+                first_cy_cutoff = next((led['CallDateTime'] for led in task['Schedules'][0]['Calls'][0]['CallDates'] if led['Type'] == 'CYCUTOFF' and (first_cut_offs:=led.get('CallDateTime'))), None)
+                first_doc_cutoff = next((led['CallDateTime'] for led in task['Schedules'][0]['Calls'][0]['CallDates'] if led['Type'] == 'SI' and first_cut_offs), None)
+                first_vgm_cutoff = next((led['CallDateTime'] for led in task['Schedules'][0]['Calls'][0]['CallDates'] if led['Type'] == 'VGM' and first_cut_offs), None)
                 transit_time = int((datetime.fromisoformat(last_eta) - datetime.fromisoformat(first_etd)).days)
-                schedule_body:dict = mapping_template.produce_schedule_body(
-                                                                        carrier_code=carrier_code,
-                                                                         first_point_from=first_point_from,
-                                                                         last_point_to=last_point_to,
-                                                                         first_etd=first_etd,
-                                                                         last_eta=last_eta,cy_cutoff=first_cy_cutoff,doc_cutoff=first_doc_cutoff,vgm_cutoff=first_vgm_cutoff,
-                                                                         transit_time=transit_time,
-                                                                         check_transshipment=check_transshipment)
-
-                leg_list:list = [mapping_template.produce_leg_body(
-                        origin_un_name=leg['Calls'][0]['Name'],
-                        origin_un_code=leg['Calls'][0]['Code'],
-                        origin_term_name=leg['Calls'][0]['EHF']['Description'],
-                        origin_term_code=leg['Calls'][0]['DepartureEHFSMDGCode'] if leg['Calls'][0]['DepartureEHFSMDGCode'] != '' else None,
-                        dest_un_name=leg['Calls'][-1]['Name'],
-                        dest_un_code=leg['Calls'][-1]['Code'],
-                        dest_term_name=leg['Calls'][-1]['EHF']['Description'],
-                        dest_term_code=leg['Calls'][-1]['ArrivalEHFSMDGCode'] if leg['Calls'][-1]['ArrivalEHFSMDGCode'] != '' else None,
-                        etd=(etd:=next(led['CallDateTime'] for led in leg['Calls'][0]['CallDates'] if (cut_off_type:=led['Type']) == 'ETD')),
-                        eta=(eta:=next(lea['CallDateTime'] for lea in leg['Calls'][-1]['CallDates'] if lea['Type']== 'ETA')),
-                        tt=int((datetime.fromisoformat(eta) - datetime.fromisoformat(etd)).days),
-                        cy_cutoff=next((led['CallDateTime'] for led in leg['Calls'][0]['CallDates'] if cut_off_type == 'CYCUTOFF' and (cut_offs:= led.get('CallDateTime'))), None),
-                        si_cutoff=next((led['CallDateTime'] for led in leg['Calls'][0]['CallDates'] if cut_off_type == 'SI' and cut_offs), None),
-                        vgm_cutoff=next((led['CallDateTime'] for led in leg['Calls'][0]['CallDates'] if cut_off_type == 'VGM' and cut_offs), None),
-                        transport_type='Vessel',
-                        transport_name=leg.get('TransportationMeansName'),
-                        reference_type='IMO' if (vessel_imo := leg.get('IMONumber')) and vessel_imo != '' else None,
-                        reference=vessel_imo if vessel_imo != '' else None,
-                        service_code=leg['Service']['Description'] if leg.get('Service') else None,
-                        internal_voy=leg['Voyages'][0]['Description'] if leg.get('Voyages') else None) for leg in task['Schedules']]
-                total_schedule_list.append(mapping_template.produce_schedule(schedule=schedule_body,legs=leg_list))
+                leg_list: list = [schema_response.Leg.model_construct(
+                    pointFrom={'locationName':leg['Calls'][0]['Name'],'locationCode': leg['Calls'][0]['Code'],
+                              'terminalName':leg['Calls'][0]['EHF']['Description'], 'terminalCode':leg['Calls'][0]['DepartureEHFSMDGCode'] if leg['Calls'][0]['DepartureEHFSMDGCode'] != '' else None},
+                    pointTo={'locationName':leg['Calls'][-1]['Name'],'locationCode': leg['Calls'][-1]['Code'],
+                              'terminalName':leg['Calls'][-1]['EHF']['Description'], 'terminalCode':leg['Calls'][-1]['ArrivalEHFSMDGCode'] if leg['Calls'][-1]['ArrivalEHFSMDGCode'] != '' else None},
+                    etd=(etd:=next(led['CallDateTime'] for led in leg['Calls'][0]['CallDates'] if led['Type'] == 'ETD')),
+                    eta=(eta:=next(lea['CallDateTime'] for lea in leg['Calls'][-1]['CallDates'] if lea['Type']== 'ETA')),
+                    transitTime=int((datetime.fromisoformat(eta) - datetime.fromisoformat(etd)).days),
+                    cutoffs={'siCutoffDate':si_cutoff,'cyCutoffDate': next((led['CallDateTime'] for led in leg['Calls'][0]['CallDates'] if cut_offs and led['Type'] == 'CYCUTOFF'), None),
+                             'vgmCutoffDate': next((led['CallDateTime'] for led in leg['Calls'][0]['CallDates'] if cut_offs and led['Type'] == 'VGM'), None)}
+                            if (si_cutoff:=next((led['CallDateTime'] for led in leg['Calls'][0]['CallDates'] if led['Type'] == 'SI' and (cut_offs:= led.get('CallDateTime'))), None)) else None,
+                    transportations={'transportType': 'Vessel',
+                                     'transportName': leg.get('TransportationMeansName'),
+                                     'referenceType': 'IMO' if (vessel_imo := leg.get('IMONumber')) and vessel_imo != '' else None,
+                                     'reference': vessel_imo if vessel_imo != '' else None},
+                    services={'serviceName': leg['Service']['Description']} if leg.get('Service') else None,
+                    voyages={'internalVoyage': leg['Voyages'][0]['Description']} if leg.get('Voyages') else None) for leg in task['Schedules']]
+                schedule_body: dict = schema_response.Schedule.model_construct(scac=carrier_code,pointFrom=first_point_from,pointTo=last_point_to, etd=first_etd,eta=last_eta,
+                                                                               cyCutOffDate=first_cy_cutoff,siCuttoffDate=first_doc_cutoff,vgmCutOffDate=first_vgm_cutoff,transitTime=transit_time,
+                                                                               transshipment=check_transshipment,legs=leg_list).model_dump(warnings=False)
+                total_schedule_list.append(schedule_body)
         return total_schedule_list
