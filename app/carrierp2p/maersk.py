@@ -11,6 +11,7 @@ async def get_maersk_cutoff(client, url: str, headers: dict, country: str, pol: 
     params: dict = {'ISOCountryCode': country, 'portOfLoad': pol, 'vesselIMONumber': imo, 'voyage': voyage}
     async for response_json in HTTPXClientWrapper.call_client(client=client,url=url,method ='GET',stream=True,headers=headers, params=params):
         if response_json:
+            lookup_key = hash(country+pol+imo+voyage)
             cut_off_body: dict = {}
             for cutoff in response_json[0]['shipmentDeadlines']['deadlines']:
                 if cutoff.get('deadlineName') == 'Commercial Cargo Cutoff':
@@ -19,7 +20,7 @@ async def get_maersk_cutoff(client, url: str, headers: dict, country: str, pol: 
                     cut_off_body.update({'siCutoffDate': cutoff.get('deadlineLocal')})
                 if cutoff.get('deadlineName') == 'Commercial Verified Gross Mass Deadline':
                     cut_off_body.update({'vgmCutoffDate': cutoff.get('deadlineLocal')})
-            yield cut_off_body
+            yield {lookup_key: cut_off_body}
         yield None
 
 
@@ -33,9 +34,7 @@ async def get_maersk_p2p(client,background_task,url: str, location_url: str, cut
 
     if not origingeolocation or not destinationgeolocation:
         port_loading,port_discharge  = pol if not origingeolocation else None, pod if not destinationgeolocation else None
-        location_tasks = (asyncio.create_task(anext(HTTPXClientWrapper.call_client(client=client,background_tasks=background_task,method='GET',
-                                                                                             stream=True, url=location_url, headers={'Consumer-Key': pw},
-                                                                                             params= {'locationType':'CITY','UNLocationCode': port},
+        location_tasks = (asyncio.create_task(anext(HTTPXClientWrapper.call_client(client=client,background_tasks=background_task,method='GET',stream=True, url=location_url, headers={'Consumer-Key': pw},params= {'locationType':'CITY','UNLocationCode': port},
                                                                                              token_key=maersk_uuid(port=port),expire=timedelta(days=180)))) for port in [port_loading, port_discharge] if port)
         location = await asyncio.gather(*location_tasks)
         if origingeolocation is None and destinationgeolocation is None:
@@ -44,7 +43,7 @@ async def get_maersk_p2p(client,background_task,url: str, location_url: str, cut
             location[0] if destinationgeolocation is None and origingeolocation is not None else destinationgeolocation
 
     if origingeolocation and destinationgeolocation:
-        params: dict = {'collectionOriginCountryCode': origingeolocation[0]['countryCode'],
+        params:dict= {'collectionOriginCountryCode': origingeolocation[0]['countryCode'],
                         'collectionOriginCityName': origingeolocation[0]['cityName'],
                         'collectionOriginUNLocationCode': origingeolocation[0]['UNLocationCode'],
                         'deliveryDestinationCountryCode': destinationgeolocation[0]['countryCode'],
@@ -53,7 +52,7 @@ async def get_maersk_p2p(client,background_task,url: str, location_url: str, cut
                         'dateRange': f'P{search_range}W', 'startDateType': date_type, 'startDate': start_date}
         params.update({'vesselFlagCode': vessel_flag}) if vessel_flag else ...
         maersk_list: set = {'MAEU', 'SEAU', 'SEJJ', 'MCPU', 'MAEI'} if scac is None else {scac}
-        p2p_resp_tasks:list = [asyncio.create_task(anext(HTTPXClientWrapper.call_client(client=client,stream = True, method='GET', url=url,params=dict(params, **{'vesselOperatorCarrierCode': mseries}),
+        p2p_resp_tasks:list = [asyncio.create_task(anext(HTTPXClientWrapper.call_client(client=client,stream = True, method='GET', url=url,params= dict(params, **{'vesselOperatorCarrierCode': mseries}),
                                                                                         headers={'Consumer-Key': pw2}))) for mseries in maersk_list]
         for response in asyncio.as_completed(p2p_resp_tasks):
             response_json = await response
@@ -63,6 +62,16 @@ async def get_maersk_p2p(client,background_task,url: str, location_url: str, cut
                 transport_type: dict = {'BAR': 'Barge', 'BCO': 'Barge', 'FEF': 'Feeder', 'FEO': 'Feeder',
                                         'MVS': 'Vessel', 'RCO': 'Rail', 'RR': 'Rail', 'TRK': 'Truck',
                                         'VSF': 'Feeder', 'VSL': 'Feeder', 'VSM': 'Vessel'}
+                #BU only want the first leg having cut off date
+                get_all_first_leg: list[dict] = [{'country': leg['transportLegs'][0]['facilities']['startLocation']['countryCode'],'pol': leg['transportLegs'][0]['facilities']['startLocation']['cityName'],'imo': imo, 'voyage': voyage}
+                                           for schedule in check_oceanProducts for leg in schedule['transportSchedules']  if (imo := deepget(leg['transportLegs'][0]['transport'], 'vessel','vesselIMONumber')) and imo != '9999999'
+                                           and (voyage := leg['transportLegs'][0]['transport'].get('carrierDepartureVoyageNumber'))]
+
+                cut_off_leg:list = [asyncio.create_task(anext(get_maersk_cutoff(client=client, url=cutoff_url,headers={'Consumer-Key': pw},country=leg.get('country'),
+                                                                           pol=leg.get('pol'),imo=leg.get('imo'),voyage=leg.get('voyage'))))
+                                                                            for index,leg in enumerate(get_all_first_leg) if leg not in get_all_first_leg[:index]]
+                get_cut_offs = await asyncio.gather(*cut_off_leg)
+                merged_dict:dict = {key: value for cutoff in get_cut_offs if cutoff is not None for key, value in cutoff.items()}
                 for resp in check_oceanProducts:
                     carrier_code: str = resp['vesselOperatorCarrierCode']
                     for task in resp['transportSchedules']:
@@ -88,18 +97,12 @@ async def get_maersk_p2p(client,background_task,url: str, location_url: str, cut
                                 transitTime=int((datetime.fromisoformat(eta) - datetime.fromisoformat(etd)).days),
                                 transportations={'transportType': transport_type.get(leg['transport']['transportMode']),
                                                  'transportName': deepget(leg['transport'], 'vessel', 'vesselName'),
-                                                 'referenceType':'IMO' if (vessel_imo := deepget(leg['transport'], 'vessel','vesselIMONumber')) and vessel_imo != '9999999' else None,
+                                                 'referenceType':'IMO' if (vessel_imo := str(deepget(leg['transport'], 'vessel','vesselIMONumber'))) and vessel_imo != '9999999' else None,
                                                  'reference': vessel_imo if vessel_imo != '9999999' else None},
                                 services={'serviceCode': service_name } if (service_name:=leg['transport'].get('carrierServiceName',leg['transport'].get('carrierServiceCode'))) else None,
                                 voyages={'internalVoyage':voyage_num} if (voyage_num:=leg['transport'].get('carrierDepartureVoyageNumber')) else None,
-                                cutoffs = await anext(get_maersk_cutoff(client=client, url=cutoff_url,headers={'Consumer-Key': pw},country=leg['facilities']['startLocation']['countryCode'],pol=pol_name,imo=vessel_imo,voyage=voyage_num))
-                                          if  index == 1 and vessel_imo and vessel_imo != '9999999' and voyage_num else None).model_dump(warnings=False) for index, leg in enumerate(task['transportLegs'], start=1)]
-                            schedule_body: dict = schema_response.Schedule.model_construct(scac=carrier_code,
-                                                                                           pointFrom=first_point_from,
-                                                                                           pointTo=last_point_to,
-                                                                                           etd=first_etd, eta=last_eta,
-                                                                                           transitTime=transit_time,
-                                                                                           transshipment=check_transshipment,
+                                cutoffs= merged_dict.get(hash(leg['facilities']['startLocation']['countryCode']+pol_name+vessel_imo+voyage_num)) if pol_name and vessel_imo and voyage_num else None).model_dump(warnings=False) for leg in task['transportLegs']]
+                            schedule_body: dict = schema_response.Schedule.model_construct(scac=carrier_code,pointFrom=first_point_from,pointTo=last_point_to,etd=first_etd, eta=last_eta,transitTime=transit_time,transshipment=check_transshipment,
                                                                                            legs=sorted(leg_list,key=lambda d: d['etd']) if check_transshipment else leg_list).model_dump(warnings=False)
                             total_schedule_list.append(schedule_body)
                 return total_schedule_list
