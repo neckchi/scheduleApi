@@ -147,8 +147,8 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                           vessel_flag = vessel_flag_code))
 
         # 👇 Await ALL
-        # p2p_schedules: list = await asyncio.gather(*{ap2ps async for ap2ps in awaitable_p2p_schedules()})
-        p2p_schedules: list = [await coro for coro in asyncio.as_completed({ap2ps async for ap2ps in awaitable_p2p_schedules()})]
+        p2p_schedules: list = await asyncio.gather(*{ap2ps async for ap2ps in awaitable_p2p_schedules()})
+        # p2p_schedules: list = [await coro for coro in asyncio.as_completed({ap2ps async for ap2ps in awaitable_p2p_schedules()})]
         # 👇 Best built o(1) function to flatten_p2p the loops
         flatten_p2p:list = flatten_list(p2p_schedules)
         sorted_schedules = sorted(flatten_p2p, key=lambda tt: (tt['etd'][:10], tt['transitTime']))

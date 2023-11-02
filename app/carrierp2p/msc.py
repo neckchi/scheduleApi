@@ -51,9 +51,10 @@ async def get_msc_p2p(client, background_task,url: str, oauth: str, aud: str, pw
                 last_point_to:str = task['Schedules'][-1]['Calls'][-1]['Code']
                 first_etd = next(ed['CallDateTime'] for ed in task['Schedules'][0]['Calls'][0]['CallDates'] if ed['Type'] == 'ETD')
                 last_eta = next(ed['CallDateTime'] for ed in task['Schedules'][-1]['Calls'][-1]['CallDates'] if ed['Type'] == 'ETA')
-                first_cy_cutoff = next((led['CallDateTime'] for led in task['Schedules'][0]['Calls'][0]['CallDates'] if led['Type'] == 'CYCUTOFF' and (first_cut_offs:=led.get('CallDateTime'))), None)
-                first_doc_cutoff = next((led['CallDateTime'] for led in task['Schedules'][0]['Calls'][0]['CallDates'] if led['Type'] == 'SI' and first_cut_offs), None)
-                first_vgm_cutoff = next((led['CallDateTime'] for led in task['Schedules'][0]['Calls'][0]['CallDates'] if led['Type'] == 'VGM' and first_cut_offs), None)
+                find_cutoff = lambda task, cutoff_type: next((led['CallDateTime'] for led in task['Schedules'][0]['Calls'][0]['CallDates'] if led['Type'] == cutoff_type and led.get('CallDateTime')), None)
+                first_cy_cutoff = find_cutoff(task, 'CYCUTOFF')
+                first_doc_cutoff = find_cutoff(task, 'SI')
+                first_vgm_cutoff = find_cutoff(task, 'VGM')
                 transit_time = int((datetime.fromisoformat(last_eta) - datetime.fromisoformat(first_etd)).days)
                 leg_list: list = [schema_response.Leg.model_construct(
                     pointFrom={'locationName':leg['Calls'][0]['Name'],'locationCode': leg['Calls'][0]['Code'],

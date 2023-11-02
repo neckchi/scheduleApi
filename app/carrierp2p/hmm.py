@@ -20,18 +20,18 @@ async def get_hmm_p2p(client, url: str, pw: str, pol: str, pod: str, search_rang
             first_pot_code:str = task.get('transshipPortCode')
             if ((check_transshipment and tsp and first_pot_code) or not tsp) and check_service_code:
                 carrier_code:str = 'HDMU'
-                transit_time:int = task['totalTransitDay']
-                first_point_from:str = task['loadingPortCode']
+                transit_time:int = task.get('totalTransitDay')
+                first_point_from:str = task.get('loadingPortCode')
                 first_pot_code:str = task.get('transshipPortCode')
-                first_pol_terminal_name:str = task['loadingTerminalName']
-                first_pol_terminal_code:str = task['loadingTerminalCode']
+                first_pol_terminal_name:str = task.get('loadingTerminalName')
+                first_pol_terminal_code:str = task.get('loadingTerminalCode')
                 first_pot_terminal_name:str = task.get('transshipTerminalName')
                 first_pot_terminal_code:str = task.get('transshipTerminalCode')
-                last_pod_terminal_name:str = task['dischargeTerminalName']
-                last_pod_terminal_code:str = task['dischargeTerminalCode']
-                last_point_to:str = task['dischargePortCode']
-                first_etd:str = task['departureDate']
-                last_eta:str = task['arrivalDate']
+                last_pod_terminal_name:str = task.get('dischargeTerminalName')
+                last_pod_terminal_code:str = task.get('dischargeTerminalCode')
+                last_point_to:str = task.get('dischargePortCode')
+                first_etd:str = task.get('departureDate')
+                last_eta:str = task.get('arrivalDate')
                 first_cy_cutoff:str = task.get('cargoCutOffTime')
                 first_doc_cutoff:str = task.get('docuCutOffTime')
                 #outbound
