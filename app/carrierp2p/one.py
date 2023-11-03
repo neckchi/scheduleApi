@@ -7,7 +7,7 @@ from datetime import timedelta,datetime
 async def get_one_access_token(client,background_task, url: str, auth: str, api_key: str):
     one_token_key = uuid5(NAMESPACE_DNS, 'one-token-uuid-kuehne-nagel')
     response_token = await db.get(key=one_token_key)
-    if not response_token:
+    if response_token is None:
         headers: dict = {'apikey': api_key,
                          'Authorization': auth,
                          'Accept': 'application/json'

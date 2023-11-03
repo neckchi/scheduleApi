@@ -35,7 +35,7 @@ async def get_maersk_p2p(client,background_task,url: str, location_url: str, cut
     if not origingeolocation or not destinationgeolocation:
         port_loading,port_discharge  = pol if not origingeolocation else None, pod if not destinationgeolocation else None
         location_tasks = (asyncio.create_task(anext(HTTPXClientWrapper.call_client(client=client,background_tasks=background_task,method='GET',stream=True, url=location_url, headers={'Consumer-Key': pw},params= {'locationType':'CITY','UNLocationCode': port},
-                                                                                             token_key=maersk_uuid(port=port),expire=timedelta(days=180)))) for port in [port_loading, port_discharge] if port)
+                                                                                             token_key=maersk_uuid(port=port),expire=timedelta(days=360)))) for port in [port_loading, port_discharge] if port)
         location = await asyncio.gather(*location_tasks)
         if origingeolocation is None and destinationgeolocation is None:
             origingeolocation, destinationgeolocation = location
@@ -97,8 +97,8 @@ async def get_maersk_p2p(client,background_task,url: str, location_url: str, cut
                                 transitTime=int((datetime.fromisoformat(eta) - datetime.fromisoformat(etd)).days),
                                 transportations={'transportType': transport_type.get(leg['transport']['transportMode']),
                                                  'transportName': deepget(leg['transport'], 'vessel', 'vesselName'),
-                                                 'referenceType':'IMO' if (vessel_imo := str(deepget(leg['transport'], 'vessel','vesselIMONumber'))) and vessel_imo != '9999999' else None,
-                                                 'reference': vessel_imo if vessel_imo != '9999999' else None},
+                                                 'referenceType':'IMO' if (vessel_imo := str(deepget(leg['transport'], 'vessel','vesselIMONumber'))) and vessel_imo not in ('9999999','None')  else None,
+                                                 'reference': vessel_imo if vessel_imo not in ('9999999','None') else None},
                                 services={'serviceCode': service_name } if (service_name:=leg['transport'].get('carrierServiceName',leg['transport'].get('carrierServiceCode'))) else None,
                                 voyages={'internalVoyage':voyage_num} if (voyage_num:=leg['transport'].get('carrierDepartureVoyageNumber')) else None,
                                 cutoffs= merged_dict.get(hash(leg['facilities']['startLocation']['countryCode']+pol_name+vessel_imo+voyage_num)) if pol_name and vessel_imo and voyage_num else None).model_dump(warnings=False) for leg in task['transportLegs']]

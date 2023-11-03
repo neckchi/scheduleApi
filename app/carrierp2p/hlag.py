@@ -6,7 +6,7 @@ from uuid import uuid5,NAMESPACE_DNS
 async def get_hlag_access_token(client,background_task, url: str,pw:str,user:str, client_id: str,client_secret:str):
     hlcu_token_key = uuid5(NAMESPACE_DNS, 'hlcu-token-uuid-kuehne-nagel')
     response_token = await db.get(key=hlcu_token_key)
-    if not response_token:
+    if response_token is None:
         headers: dict = {'X-IBM-Client-Id': client_id,
                          'X-IBM-Client-Secret': client_secret,
                          'Accept': 'application/json'}

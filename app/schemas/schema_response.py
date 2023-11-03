@@ -3,7 +3,6 @@ from uuid import UUID
 from datetime import datetime
 from pydantic import BaseModel, Field, PositiveInt,field_validator,model_validator
 from .schema_request import CarrierCode
-from functools import cache
 
 def convert_datetime_to_iso_8601(dt: datetime) -> str:
     return dt.strftime('%Y-%m-%dT%H:%M:%S')

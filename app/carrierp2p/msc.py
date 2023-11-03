@@ -12,7 +12,7 @@ from uuid import uuid5,NAMESPACE_DNS
 async def get_msc_token(client,background_task, oauth: str, aud: str, rsa: str, msc_client: str, msc_scope: str, msc_thumbprint: str):
     msc_token_key = uuid5(NAMESPACE_DNS, 'msc-token-uuid-kuehne-nagel')
     response_token = await db.get(key=msc_token_key)
-    if not response_token:
+    if response_token is None:
         x5t: bytes = base64.b64encode(bytearray.fromhex(msc_thumbprint))
         payload_header: dict = {'x5t': x5t.decode(), 'typ': 'JWT'}
         payload_data: dict = {'aud': aud,

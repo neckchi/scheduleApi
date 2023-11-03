@@ -8,7 +8,7 @@ import datetime
 async def get_zim_access_token(client,background_task, url: str, api_key: str, client_id: str, secret: str):
     zim_token_key = uuid5(NAMESPACE_DNS, 'zim-token-uuid-kuehne-nagel')
     response_token = await db.get(key=zim_token_key)
-    if not response_token:
+    if response_token is None:
         headers: dict = {'Ocp-Apim-Subscription-Key': api_key,
                          }
         params: dict = {'grant_type': 'client_credentials', 'client_id': client_id,
