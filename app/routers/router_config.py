@@ -44,9 +44,10 @@ class HTTPXClientWrapper:
                 yield client
                 logging.info(f'Client Session Closed')
                 # close the client when the request is done
-        except Exception as eg:
-            logging.exception(f'A client session error occured:{eg}')
-            raise HTTPException(status_code=500, detail=f'An error occured while creating the client - {eg}')
+        except ExceptionGroup as eg:
+            group_exception:list = [f'Error:{index} - {sub_eg}' for index, sub_eg in enumerate(eg.exceptions,start=1)]
+            logging.error(group_exception)
+            raise HTTPException(status_code=500, detail=f'An error occured while creating the client - {group_exception}')
 
 
     @staticmethod
@@ -99,7 +100,7 @@ class GatheringTaskGroup(TaskGroup):
             task = super().create_task(coro, name=name, context=context)
             self.__tasks.append(task)
             return task
-        except* Exception as eg:
+        except ExceptionGroup as eg:
             for error in eg.exceptions:
                 logging.error(f'TaskGroup error occured:{error}')
                 pass
