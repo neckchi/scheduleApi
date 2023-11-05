@@ -8,7 +8,7 @@ from app.carrierp2p import cma, one, hmm, zim, maersk, msc, iqax,hlag
 from app.schemas import schema_response, schema_request
 from app.background_tasks import db
 from app.config import Settings
-from app.routers.router_config import get_settings,HTTPXClientWrapper,GatheringTaskGroup
+from app.routers.router_config import get_settings,HTTPXClientWrapper,AsyncTaskManager
 from app.routers.security import basic_auth
 
 router = APIRouter(prefix='/schedules', tags=["API Point To Point Schedules"])
@@ -44,8 +44,9 @@ async def get_schedules(background_tasks: BackgroundTasks,
 
 
     if not ttl_schedule:
+
         # 👇 Having this allows for waiting for all our tasks with strong safety guarantees,logic around cancellation for failures,coroutine-safe and grouping of exceptions.
-        async with GatheringTaskGroup() as task_group:
+        async with AsyncTaskManager() as task_group:
             for carriers in scac:
                 if carriers in {'CMDU', 'ANNU', 'APLU', 'CHNL', 'CSFU'} or carriers is None:
                     task_group.create_task(
@@ -145,7 +146,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                           vessel_flag = vessel_flag_code))
 
         # 👇 Await ALL
-        p2p_schedules = task_group.results()
+        p2p_schedules = await task_group.results()
         # 👇 Best built o(1) function to flatten_p2p the loops
         flatten_p2p:list = HTTPXClientWrapper.flatten_list(p2p_schedules)
         sorted_schedules = sorted(flatten_p2p, key=lambda tt: (tt['etd'][:10], tt['transitTime']))
@@ -162,8 +163,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
             destination=point_to, noofSchedule=count_schedules,
             schedules=sorted_schedules).model_dump(exclude_none=True)
 
-
-        background_tasks.add_task(db.set, value=data) # for MongoDB
+        background_tasks.add_task(db.set, value=data) if not task_group.error else ... # for MongoDB
         # background_tasks.add_task(db.set,key=product_id,value=data) #for Redis
 
         return data

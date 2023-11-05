@@ -1,3 +1,4 @@
+import asyncio
 from functools import cache
 from app import config
 from app.background_tasks import db
@@ -6,9 +7,7 @@ from fastapi import BackgroundTasks
 from starlette.background import BackgroundTask
 from starlette.responses import StreamingResponse
 from typing import Literal
-from asyncio import TaskGroup
 import httpx
-
 import logging
 import orjson
 
@@ -44,10 +43,10 @@ class HTTPXClientWrapper:
                 yield client
                 logging.info(f'Client Session Closed')
                 # close the client when the request is done
-        except ExceptionGroup as eg:
-            group_exception:list = [f'Error:{index} - {sub_eg}' for index, sub_eg in enumerate(eg.exceptions,start=1)]
-            logging.error(group_exception)
-            raise HTTPException(status_code=500, detail=f'An error occured while creating the client - {group_exception}')
+
+        except Exception as eg:
+            logging.error(f'{eg.__class__.__name__}:{eg}')
+            raise HTTPException(status_code=500, detail=f'An error occured while creating the client - {eg.__class__.__name__}:{eg}')
 
 
     @staticmethod
@@ -90,19 +89,28 @@ class HTTPXClientWrapper:
                 pass
         return flat_list
 
-class GatheringTaskGroup(TaskGroup):
-    def __init__(self):
-        super().__init__()
-        self.__tasks = []
 
-    def create_task(self, coro, *, name=None, context=None):
-        try:
-            task = super().create_task(coro, name=name, context=context)
-            self.__tasks.append(task)
-            return task
-        except ExceptionGroup as eg:
-            for error in eg.exceptions:
-                logging.error(f'TaskGroup error occured:{error}')
-                pass
-    def results(self):
-        return [task.result() for task in self.__tasks]
+
+class AsyncTaskManager:
+    """Currently there is no in build python class and method that we can prevent it from cancelling all async tasks if one of the tasks is cancelled e.g:timeout
+    From my perspective, all those carrier schedules are independent from one antoher so we shouldnt let one/more failed task to cancel all other successful tasks"""
+    def __init__(self):
+        self.__tasks:set = set()
+        self.error:bool = False #Once this becomes true, we wont do any caching.vice versa
+    async def __aenter__(self):
+        return self
+    async def __aexit__(self, exc_type, exc, tb):
+        if exc:
+            # If an exception occurred within the context, you can handle it here
+            return False  # Propagate the exception
+        # When exiting the context, wait for all tasks to complete
+    def create_task(self, coro):
+        self.__tasks.add(asyncio.create_task(coro))
+
+    async def results(self):
+        results = await asyncio.gather(*self.__tasks, return_exceptions=True)
+        self.error = any(isinstance(result, httpx.ConnectError) for result in results)
+        if self.error:
+            logging.error('ConnectError: Some carrier connections attempts failed')
+            results = [result for result in results if not isinstance(result, httpx.ConnectError)]
+        return results
