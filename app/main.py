@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
+from fastapi.middleware.gzip import GZipMiddleware
 from app.routers import schedules
 from app.background_tasks import db
 from os import path
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(docs_url=None, redoc_url=None)
 app.include_router(schedules.router)
-
+app.add_middleware(GZipMiddleware, minimum_size=4000)
 
 # # 👇 Initalize the MongoDB before starting the application
 @app.on_event('startup')
