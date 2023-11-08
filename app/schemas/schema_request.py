@@ -5,7 +5,6 @@ class StartDateType(str, Enum):
     departure = "Departure"
     arrival = "Arrival"
 
-
 class CarrierCode(str, Enum):
     MSCU = 'MSCU'
     CMDU = 'CMDU'
@@ -33,10 +32,10 @@ class CarrierCode(str, Enum):
 
 
 class SearchRange(Enum):
-    One = '1', 7
-    Two = '2', 14
-    Three = '3', 21
-    Four = '4', 28
+    One = ('1', 7)
+    Two = ('2', 14)
+    Three = ('3', 21)
+    Four = ('4', 28)
 
     def __new__(cls, value, days):
         member = object.__new__(cls)
@@ -44,5 +43,4 @@ class SearchRange(Enum):
         member.duration = days
         return member
 
-    def __int__(self):
-        return self.value
+
