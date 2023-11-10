@@ -1,11 +1,11 @@
-from enum import Enum
+from enum import Enum,Flag, auto
 
 
 class StartDateType(str, Enum):
     departure = "Departure"
     arrival = "Arrival"
 
-class CarrierCode(str, Enum):
+class CarrierCode(str,Enum):
     MSCU = 'MSCU'
     CMDU = 'CMDU'
     ANNU = 'ANNU'
@@ -26,10 +26,8 @@ class CarrierCode(str, Enum):
     # SUDU = 'SUDU'
     # ANRM = 'ANRM'
 
-
     def __str__(self):
-        return str(self.value)
-
+        return str(self.name)
 
 class SearchRange(Enum):
     One = ('1', 7)
@@ -42,5 +40,7 @@ class SearchRange(Enum):
         member._value_ = value
         member.duration = days
         return member
+
+
 
 

@@ -44,7 +44,6 @@ async def get_schedules(background_tasks: BackgroundTasks,
 
 
     if not ttl_schedule:
-
         # 👇 Having this allows for waiting for all our tasks with strong safety guarantees,logic around cancellation for failures,coroutine-safe and grouping of exceptions.
         async with AsyncTaskManager() as task_group:
             for carriers in scac:
@@ -67,7 +66,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
                 #                                 start_date=start_date, direct_only=direct_only, tsp=tsp,
                 #                                 date_type='earliestDeparture' if start_date_type is schema_request.StartDateType.departure else 'latestArrival',
                 #                                 pw=settings.sudu_token.get_secret_value()))
-
+                #
                 if carriers == 'ONEY' or carriers is None:
                     task_group.create_task(
                         one.get_one_p2p(client=client,background_task = background_tasks, url=settings.oney_url, turl=settings.oney_turl,
@@ -103,7 +102,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                               location_url=settings.maeu_location,
                                               cutoff_url=settings.maeu_cutoff,
                                               pol=point_from, pod=point_to, start_date=start_date,
-                                              search_range=search_range.value[0], scac=carriers,
+                                              search_range=search_range.value, scac=carriers,
                                               direct_only=direct_only, tsp=tsp,
                                               vessel_flag=vessel_flag_code,
                                               date_type='D' if start_date_type is schema_request.StartDateType.departure else 'A',
