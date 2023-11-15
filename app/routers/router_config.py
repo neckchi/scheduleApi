@@ -1,25 +1,14 @@
-import asyncio
-from functools import cache
-from app import config
 from app.background_tasks import db
-from fastapi import HTTPException
-from fastapi import BackgroundTasks
+from fastapi import status,HTTPException,BackgroundTasks
 from starlette.background import BackgroundTask
 from starlette.responses import StreamingResponse
 from typing import Literal
 import httpx
 import logging
 import orjson
+import asyncio
 
 
-@cache
-def get_settings():
-    """
-    Reading a file from disk is normally a costly (slow) operation
-    so we  want to do it only once and then re-use the same settings object, instead of reading it for each request.
-    And this is exactly why we need to use python in built wrapper functions - cache for caching the carrier credential
-    """
-    return config.Settings()
 
 class HTTPXClientWrapper:
     ##Creating new session for each request but this would probably incur performance overhead issue.
@@ -45,8 +34,8 @@ class HTTPXClientWrapper:
                 # close the client when the request is done
 
         except Exception as eg:
-            logging.error(f'{eg.__class__.__name__}:{eg}')
-            raise HTTPException(status_code=500, detail=f'An error occured while creating the client - {eg.__class__.__name__}:{eg}')
+            logging.error(f'{eg.__class__.__name__}:{eg.args}')
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f'An error occured while creating the client - {eg.__class__.__name__}:{eg}')
 
 
     @staticmethod
@@ -56,7 +45,7 @@ class HTTPXClientWrapper:
                           stream: bool = False):
         if not stream:
             response = await client.request(method=method, url=url, params=params, headers=headers, json=json,data=data)
-            if response.status_code == 206:
+            if response.status_code == 206: #only CMA returns 206 if the number of schedule is more than 49. That means we shouldnt deserialize the json response at the beginning coz there are more responses need to be fetched based on the header range.
                 yield response
             if response.status_code == 200:
                 response_json = response.json()
@@ -92,7 +81,7 @@ class HTTPXClientWrapper:
 
 
 class AsyncTaskManager:
-    """Currently there is no in build python class and method that we can prevent it from cancelling all async tasks if one of the tasks is cancelled e.g:timeout
+    """Currently there is no built in  python class and method that we can prevent it from cancelling all conroutine tasks if one of the tasks is cancelled e.g:timeout
     From my perspective, all those carrier schedules are independent from one antoher so we shouldnt let one/more failed task to cancel all other successful tasks"""
     def __init__(self):
         self.__tasks:set = set()
@@ -101,6 +90,7 @@ class AsyncTaskManager:
         return self
     async def __aexit__(self, exc_type, exc, tb):
         if exc:
+            logging.error(f'An error occured: {exc_type} - {exc}')
             # If an exception occurred within the context, you can handle it here
             return False  # Propagate the exception
         # When exiting the context, wait for all tasks to complete

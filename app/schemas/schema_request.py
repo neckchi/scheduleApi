@@ -1,5 +1,4 @@
-from enum import Enum,Flag, auto
-
+from enum import Enum
 
 class StartDateType(str, Enum):
     departure = "Departure"
@@ -23,9 +22,6 @@ class CarrierCode(str,Enum):
     OOLU = 'OOLU'
     COSU = 'COSU'
     HLCU = 'HLCU'
-    # SUDU = 'SUDU'
-    # ANRM = 'ANRM'
-
     def __str__(self):
         return str(self.name)
 

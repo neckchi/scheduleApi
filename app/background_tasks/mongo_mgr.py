@@ -1,9 +1,9 @@
-import pymongo.errors
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase, AsyncIOMotorCollection
-from app.config import Settings
+from app.config import Settings,load_yaml
 from datetime import datetime,timedelta
 import logging
 import uuid
+import pymongo.errors
 
 class MongoDBsetting:
     client: AsyncIOMotorClient = None
@@ -24,7 +24,7 @@ class MongoDBsetting:
         except Exception as disconnect:
             logging.error(f'Unable to connect to the MongoDB - {disconnect}')
 
-    async def set(self, value: dict| list,expire = timedelta(hours = 4),key:uuid.UUID|None = None):
+    async def set(self, value: dict| list,expire = timedelta(hours = load_yaml()['backgroundTasks']['scheduleExpiry']),key:uuid.UUID|None = None):
         now_utc_timestamp = datetime.utcnow()
         insert_cache = dict({'productid': key, 'cache': value} if key else value, **{'expiry': now_utc_timestamp + expire})
         try:

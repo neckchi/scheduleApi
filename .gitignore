@@ -25,6 +25,7 @@ verified network
 .env
 .csv
 .log
+app/test_main.py
 app/carrierp2p/hamburgsud.py
 # vim temporary files
 *~

@@ -1,7 +1,7 @@
 import secrets
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from app.routers.router_config import get_settings
+from app.config import get_settings
 
 security = HTTPBasic()
 def basic_auth(credentials: HTTPBasicCredentials = Depends(security)):

@@ -11,7 +11,7 @@ import logging.config
 
 
 # setup loggers
-log_file_path = path.join(path.dirname(path.abspath(__file__)), 'logging.conf')
+log_file_path = path.join(path.dirname(path.abspath(__file__)), 'logging.cfg')
 logging.config.fileConfig(log_file_path, disable_existing_loggers=False)
 
 # get root logger

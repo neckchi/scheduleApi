@@ -1,8 +1,8 @@
+import yaml
 from pydantic import SecretStr
+from functools import cache
 from pydantic_settings import BaseSettings,SettingsConfigDict
-# from dotenv import load_dotenv
 
-# load_dotenv()
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file='./app/.env', env_file_encoding='utf-8')
     # model_config = SettingsConfigDict(secrets_dir='/run/secrets')
@@ -49,7 +49,19 @@ class Settings(BaseSettings):
     hlcu_password: SecretStr
     basic_user : SecretStr
     basic_pw : SecretStr
-    #
-    # class Config:
-    #     # env_file = "app\.env"
-    #     env_file = "./app/.env"
+
+@cache
+def get_settings():
+    """
+    Reading a file from disk is normally a costly (slow) operation
+    so we  want to do it only once and then re-use the same settings object, instead of reading it for each request.
+    And this is exactly why we need to use python in built wrapper functions - cache for caching the carrier credential
+    """
+    return Settings()
+
+@cache
+def load_yaml() -> dict:
+    with open(file='./app/config.yaml',mode='r') as yml_file:
+        config = yaml.load(yml_file,Loader=yaml.FullLoader)
+    return config
+
