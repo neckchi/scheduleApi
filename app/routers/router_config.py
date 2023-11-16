@@ -9,7 +9,6 @@ import orjson
 import asyncio
 
 
-
 class HTTPXClientWrapper:
     ##Creating new session for each request but this would probably incur performance overhead issue.
     ##even so it also has its own advantage like fault islation, increased flexibility to each request and avoid concurrency issues.
@@ -32,10 +31,11 @@ class HTTPXClientWrapper:
                 yield client
                 logging.info(f'Client Session Closed')
                 # close the client when the request is done
-
+        except ValueError as value_error: ## Catch validation error
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f'{value_error.__class__.__name__}:{value_error}')
         except Exception as eg:
             logging.error(f'{eg.__class__.__name__}:{eg.args}')
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f'An error occured while creating the client - {eg.__class__.__name__}:{eg}')
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f'An error occured while creating the client - {eg.__class__.__name__}:{eg.args}')
 
 
     @staticmethod

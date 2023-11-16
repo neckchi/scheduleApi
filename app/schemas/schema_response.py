@@ -36,14 +36,14 @@ class Transportation(BaseModel):
         if (reference_type is not None and reference is not None ) or (reference_type is None and reference is None):
             return self
         logging.error(' Either both of reference type and reference existed or both are not existed ')
-        raise ValueError(' Either both of reference type and reference existed or both are not existed ')
+        raise ValueError(f'Either both of reference type and reference existed or both are not existed')
 
     @field_validator('transportType')
-    def check_transport_type(cls, v: str) -> str:
-        if v not in ('Vessel', 'Barge', 'Feeder', 'Truck', 'Rail','Truck / Rail', 'Intermodal'):
-            logging.error('must contain at least one of transport type')
-            raise ValueError('must contain at least one of transport type')
-        return v
+    def check_transport_type(cls, transport_type: str) -> str:
+        if transport_type not in ('Vessel', 'Barge', 'Feeder', 'Truck', 'Rail','Truck / Rail', 'Intermodal'):
+            logging.error('Leg  must contain at least one of transport type')
+            raise ValueError(f'Leg must contain at least one of transport type due to missing {transport_type}')
+        return transport_type
 
 
 class Voyage(BaseModel):
@@ -68,13 +68,13 @@ class Leg(BaseModel):
     voyages: Voyage | None = Field(default=None, title="Voyage Number.Keep in mind that voyage number is not mandatory")
     services: Service | None = Field(default=None, title="Service Loop")
     @model_validator(mode='after')
-    def check_reference_type_or_reference(self) -> 'Leg':
+    def check_etd_eta(self) -> 'Leg':
         etd = self.etd
         eta = self.eta
         if eta >= etd  or etd <= eta:
             return self
         logging.error('ETA must be equal  or greater than ETD.vice versa')
-        raise ValueError('ETA must be equal  or greater than ETD.vice versa')
+        raise ValueError(f'ETA must be equal  or greater than ETD.vice versa')
     class Config:
         json_encoders = {
             datetime: convert_datetime_to_iso_8601
@@ -97,13 +97,13 @@ class Schedule(BaseModel):
     legs: list[Leg] = Field(default_factory=list)
 
     @model_validator(mode='after')
-    def check_reference_type_or_reference(self) -> 'Schedule':
+    def check_etd_eta(self) -> 'Schedule':
         etd = self.etd
         eta = self.eta
         if eta >= etd  or etd <= eta:
             return self
         logging.error('ETA must be equal or greater than ETD.vice versa')
-        raise ValueError('ETA must be equal or greater than ETD.vice versa')
+        raise ValueError(f'ETA must be equal  or greater than ETD.vice versa')
 
     class Config:
         json_encoders = {
