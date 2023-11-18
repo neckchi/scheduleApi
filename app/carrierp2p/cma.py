@@ -9,12 +9,12 @@ from datetime import datetime
 async def get_all_schedule(client,cma_list:set,url:str,headers:dict,params:dict,extra_condition:bool):
     updated_params = lambda cma_internal_code: dict(params,**{'shippingCompany': cma_internal_code,'specificRoutings': 'USGovernment' if cma_internal_code == '0015' and extra_condition else 'Commercial'})
     p2p_resp_tasks: list = [asyncio.create_task(anext(HTTPXClientWrapper.call_client(client=client, method='GET', url=url,params= updated_params(cma_internal_code=cma_code),headers=headers))) for cma_code in cma_list]
+    all_schedule:list = []
     for response in asyncio.as_completed(p2p_resp_tasks):
         awaited_response = await response
-        check_extension:bool = awaited_response is not None and  type(awaited_response) != list and awaited_response.status_code == 206
-        all_schedule: list = awaited_response.json() if check_extension else awaited_response
-        # Each json response might have more than 49 results.if true, CMA will return http:206 and ask us to loop over the pages in order to get all the results from them
-        if check_extension:
+        check_extension:bool = awaited_response is not None and type(awaited_response) != list and awaited_response.status_code == 206
+        all_schedule.extend(awaited_response.json() if check_extension else awaited_response)
+        if check_extension: # Each json response might have more than 49 results.if true, CMA will return http:206 and ask us to loop over the pages in order to get all the results from them
             page: int = 50
             last_page: int = int((awaited_response.headers['content-range']).partition('/')[2])
             cma_code_header: str = awaited_response.headers['X-Shipping-Company-Routings']
@@ -25,7 +25,7 @@ async def get_all_schedule(client,cma_list:set,url:str,headers:dict,params:dict,
             for extra_p2p in asyncio.as_completed(extra_tasks):
                 result = await extra_p2p
                 all_schedule.extend(result.json())
-        return all_schedule
+    return all_schedule
 
 async def get_cma_p2p(client, url: str, pw: str, pol: str, pod: str, search_range: int, direct_only: bool | None,tsp: str | None = None,
                           departure_date: datetime.date = None,
