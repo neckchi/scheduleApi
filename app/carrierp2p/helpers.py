@@ -17,7 +17,7 @@ def deepget(dct: dict, *keys):
 @lru_cache(maxsize=None)
 def check_loop(file_path,scac:str,loop_code:str = None,loop_name:str = None):
     """
-    Check if the loop code/loop name exists in SCT
+    Check if the loop code/loop name exists in SCT for testing purpose only
     """
     with open(file_path, mode="r") as loop:
         reader = csv.reader(loop)

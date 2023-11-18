@@ -23,52 +23,46 @@ async def get_maersk_cutoff(client, url: str, headers: dict, country: str, pol: 
             yield {lookup_key: cut_off_body}
         yield None
 
+async def retrieve_geo_locations(client, background_task, pol:str, pod:str, location_url:str, pw:str):
+    maersk_uuid = lambda port: uuid5(NAMESPACE_DNS, f'maersk-loc-uuid-kuehne-nagel-{port}')
+    port_uuid:list = [maersk_uuid(port=port) for port in [pol, pod]]
+    [origingeolocation, destinationgeolocation] = await asyncio.gather(*(db.get(key=port_id) for port_id in port_uuid))
+    if not origingeolocation or not destinationgeolocation:
+        port_loading, port_discharge = pol if not origingeolocation else None, pod if not destinationgeolocation else None
+        location_tasks = (asyncio.create_task(anext(HTTPXClientWrapper.call_client(client=client,background_tasks=background_task,method='GET',
+                        stream=True,url=location_url,headers={'Consumer-Key': pw},params={'locationType': 'CITY', 'UNLocationCode': port},token_key=maersk_uuid(port=port),
+                        expire=timedelta(days=360)))) for port in [port_loading, port_discharge] if port)
+        location = await asyncio.gather(*location_tasks)
+        if origingeolocation is None and destinationgeolocation is None:
+            origingeolocation, destinationgeolocation = location
+        else:
+            origingeolocation, destinationgeolocation = (location[0] if origingeolocation is None else origingeolocation,location[0] if destinationgeolocation is None else destinationgeolocation)
+    return origingeolocation, destinationgeolocation
+
 
 async def get_maersk_p2p(client,background_task,url: str, location_url: str, cutoff_url: str, pw: str, pw2: str, pol: str, pod: str,
                          search_range: str, direct_only: bool|None = None, tsp: str | None = None, scac: str | None = None,
                          start_date: datetime.date = None,
                          date_type: str | None = None, service: str | None = None, vessel_flag: str | None = None):
-    maersk_uuid = lambda port:uuid5(NAMESPACE_DNS, f'maersk-loc-uuid-kuehne-nagel-{port}')
-    port_uuid:list = [maersk_uuid(port=port) for port in [pol,pod]]
-    [origingeolocation,destinationgeolocation] = await asyncio.gather(*(db.get(key=port_id) for port_id in port_uuid))
-
-    if not origingeolocation or not destinationgeolocation:
-        port_loading,port_discharge  = pol if not origingeolocation else None, pod if not destinationgeolocation else None
-        location_tasks = (asyncio.create_task(anext(HTTPXClientWrapper.call_client(client=client,background_tasks=background_task,method='GET',stream=True, url=location_url, headers={'Consumer-Key': pw},params= {'locationType':'CITY','UNLocationCode': port},
-                                                                                             token_key=maersk_uuid(port=port),expire=timedelta(days=360)))) for port in [port_loading, port_discharge] if port)
-        location = await asyncio.gather(*location_tasks)
-        if origingeolocation is None and destinationgeolocation is None:
-            origingeolocation, destinationgeolocation = location
-        else: origingeolocation,destinationgeolocation = location[0] if  origingeolocation is None and destinationgeolocation is not None else origingeolocation,\
-            location[0] if destinationgeolocation is None and origingeolocation is not None else destinationgeolocation
-
-    if origingeolocation and destinationgeolocation:
-        params:dict= {'collectionOriginCountryCode': origingeolocation[0]['countryCode'],
-                        'collectionOriginCityName': origingeolocation[0]['cityName'],
-                        'collectionOriginUNLocationCode': origingeolocation[0]['UNLocationCode'],
-                        'deliveryDestinationCountryCode': destinationgeolocation[0]['countryCode'],
-                        'deliveryDestinationCityName': destinationgeolocation[0]['cityName'],
-                        'deliveryDestinationUNLocationCode': destinationgeolocation[0]['UNLocationCode'],
+    origin_geo_location, des_geo_location = await retrieve_geo_locations(client=client,background_task=background_task,pol=pol,pod=pod,location_url=location_url,pw=pw)
+    if origin_geo_location and des_geo_location:
+        params:dict= {'collectionOriginCountryCode': origin_geo_location[0]['countryCode'],'collectionOriginCityName': origin_geo_location[0]['cityName'],'collectionOriginUNLocationCode': origin_geo_location[0]['UNLocationCode'],
+                        'deliveryDestinationCountryCode': des_geo_location[0]['countryCode'],'deliveryDestinationCityName': des_geo_location[0]['cityName'],'deliveryDestinationUNLocationCode': des_geo_location[0]['UNLocationCode'],
                         'dateRange': f'P{search_range}W', 'startDateType': date_type, 'startDate': start_date}
         params.update({'vesselFlagCode': vessel_flag}) if vessel_flag else ...
         maersk_list: set = {'MAEU', 'SEAU', 'SEJJ', 'MCPU', 'MAEI'} if scac is None else {scac}
-        p2p_resp_tasks:list = [asyncio.create_task(anext(HTTPXClientWrapper.call_client(client=client,stream = True, method='GET', url=url,params= dict(params, **{'vesselOperatorCarrierCode': mseries}),
-                                                                                        headers={'Consumer-Key': pw2}))) for mseries in maersk_list]
+        p2p_resp_tasks:list = [asyncio.create_task(anext(HTTPXClientWrapper.call_client(client=client,stream = True, method='GET', url=url,params= dict(params, **{'vesselOperatorCarrierCode': mseries}),headers={'Consumer-Key': pw2}))) for mseries in maersk_list]
         for response in asyncio.as_completed(p2p_resp_tasks):
             response_json = await response
             check_oceanProducts = response_json.get('oceanProducts') if response_json else None
             if check_oceanProducts:
                 total_schedule_list: list = []
-                transport_type: dict = {'BAR': 'Barge', 'BCO': 'Barge', 'FEF': 'Feeder', 'FEO': 'Feeder',
-                                        'MVS': 'Vessel', 'RCO': 'Rail', 'RR': 'Rail', 'TRK': 'Truck',
-                                        'VSF': 'Feeder', 'VSL': 'Feeder', 'VSM': 'Vessel'}
+                transport_type: dict = {'BAR': 'Barge', 'BCO': 'Barge', 'FEF': 'Feeder', 'FEO': 'Feeder','MVS': 'Vessel', 'RCO': 'Rail', 'RR': 'Rail', 'TRK': 'Truck','VSF': 'Feeder', 'VSL': 'Feeder', 'VSM': 'Vessel'}
                 #BU only want the first leg having cut off date
                 get_all_first_leg: list[dict] = [{'country': leg['transportLegs'][0]['facilities']['startLocation']['countryCode'],'pol': leg['transportLegs'][0]['facilities']['startLocation']['cityName'],'imo': imo, 'voyage': voyage}
                                            for schedule in check_oceanProducts for leg in schedule['transportSchedules']  if (imo := deepget(leg['transportLegs'][0]['transport'], 'vessel','vesselIMONumber')) and imo != '9999999'
                                            and (voyage := leg['transportLegs'][0]['transport'].get('carrierDepartureVoyageNumber'))]
-
-                cut_off_leg:list = [asyncio.create_task(anext(get_maersk_cutoff(client=client, url=cutoff_url,headers={'Consumer-Key': pw},country=leg.get('country'),
-                                                                           pol=leg.get('pol'),imo=leg.get('imo'),voyage=leg.get('voyage'))))
+                cut_off_leg:list = [asyncio.create_task(anext(get_maersk_cutoff(client=client, url=cutoff_url,headers={'Consumer-Key': pw},country=leg.get('country'),pol=leg.get('pol'),imo=leg.get('imo'),voyage=leg.get('voyage'))))
                                                                             for index,leg in enumerate(get_all_first_leg) if leg not in get_all_first_leg[:index]]
                 get_cut_offs = await asyncio.gather(*cut_off_leg)
                 merged_dict:dict = {key: value for cutoff in get_cut_offs if cutoff is not None for key, value in cutoff.items()}

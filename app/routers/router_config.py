@@ -14,7 +14,7 @@ class HTTPXClientWrapper:
     ##even so it also has its own advantage like fault islation, increased flexibility to each request and avoid concurrency issues.
     @staticmethod
     async def get_client():
-        timeout = httpx.Timeout(35.0, connect=60.0)
+        timeout = httpx.Timeout(35.0, connect=65.0)
         limits = httpx.Limits(max_connections=None)
 
         """
@@ -35,7 +35,7 @@ class HTTPXClientWrapper:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f'{value_error.__class__.__name__}:{value_error}')
         except Exception as eg:
             logging.error(f'{eg.__class__.__name__}:{eg.args}')
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f'An error occured while creating the client - {eg.__class__.__name__}:{eg.args}')
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f'An error occured while creating the client - {eg.args}')
 
 
     @staticmethod
@@ -52,6 +52,10 @@ class HTTPXClientWrapper:
                 if background_tasks:
                     background_tasks.add_task(db.set, key=token_key, value=response_json, expire=expire)
                 yield response_json
+            if response.status_code == 502:
+                logging.critical(f'Unable to connect to {url}')
+                yield None
+
             else:yield None
         else:
             """
@@ -85,7 +89,7 @@ class AsyncTaskManager:
     From my perspective, all those carrier schedules are independent from one antoher so we shouldnt let one/more failed task to cancel all other successful tasks"""
     def __init__(self):
         self.__tasks:set = set()
-        self.error:bool = False #Once this becomes true, we wont do any caching.vice versa
+        self.error:list #Once this becomes true, we wont do any caching.vice versa
     async def __aenter__(self):
         return self
     async def __aexit__(self, exc_type, exc, tb):
@@ -99,8 +103,9 @@ class AsyncTaskManager:
 
     async def results(self):
         results = await asyncio.gather(*self.__tasks, return_exceptions=True)
-        self.error = any(isinstance(result, httpx.ConnectError) for result in results)
-        if self.error:
-            logging.error('ConnectError: Some carrier connections attempts failed')
-            results = [result for result in results if not isinstance(result, httpx.ConnectError)]
+        self.error:list = [result for result in results if isinstance(result, Exception)]
+        if self.error != []:
+            for exc in self.error:
+                logging.critical(f'Carrier connectWions attempts failed:',exc_info=exc)
+            results = [result for result in results if not isinstance(result, Exception)]
         return results
