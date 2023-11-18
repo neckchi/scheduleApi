@@ -18,10 +18,8 @@ async def get_all_schedule(client,cma_list:set,url:str,headers:dict,params:dict,
             page: int = 50
             last_page: int = int((awaited_response.headers['content-range']).partition('/')[2])
             cma_code_header: str = awaited_response.headers['X-Shipping-Company-Routings']
-            extra_tasks: set = set()
-            for n in range(page, last_page, page):
-                r: str = f'{n}-{49 + n}'
-                extra_tasks.add((asyncio.create_task(anext(HTTPXClientWrapper.call_client(client=client, method='GET', url=url,params=updated_params(cma_internal_code=cma_code_header),headers=dict(headers, **{'range': r}))))))
+            extra_tasks: set = {asyncio.create_task(anext(HTTPXClientWrapper.call_client(client=client, method='GET', url=url,params=updated_params(cma_internal_code=cma_code_header),headers=dict(headers, **{'range': f'{num}-{49 + num}'}))))
+                                for num in range(page, last_page, page)}
             for extra_p2p in asyncio.as_completed(extra_tasks):
                 result = await extra_p2p
                 all_schedule.extend(result.json())
