@@ -14,15 +14,22 @@ class MongoDBsetting:
         setting = Settings()
         logging.info('Connecting To MongoDB')
         self.client = AsyncIOMotorClient(setting.mongo_url.get_secret_value(),connect=False,uuidRepresentation='standard')
-        try:
-            await self.client.server_info()
-            self.db = self.client['schedule']
-            self.collection = self.db['p2p']
-            # self.collection.create_index("productid", unique = True)
-            # self.collection.create_index("expiry",expireAfterSeconds = 0)
-            logging.info('Connected To MongoDB - P2P schedule collection')
-        except Exception as disconnect:
-            logging.error(f'Unable to connect to the MongoDB - {disconnect}')
+        retries:int = 5
+        while retries > 0:
+            try:
+                await self.client.server_info()
+                self.db = self.client['schedule']
+                self.collection = self.db['p2p']
+                # self.collection.create_index("productid", unique = True)
+                # self.collection.create_index("expiry",expireAfterSeconds = 0)
+                logging.info('Connected To MongoDB - P2P schedule collection')
+                break
+            except Exception as disconnect:
+                retries -= 1
+                if retries == 0:
+                    raise ConnectionError(f'Unable to connect to MongoDB after retries ')
+                else:logging.critical(f'Unable to connect to the MongoDB - {disconnect}.Retry again.')
+
 
     async def set(self, value: dict| list,expire = timedelta(hours = load_yaml()['backgroundTasks']['scheduleExpiry']),key:uuid.UUID|None = None):
         now_utc_timestamp = datetime.utcnow()
