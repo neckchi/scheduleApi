@@ -88,8 +88,9 @@ class AsyncTaskManager:
     """Currently there is no built in  python class and method that we can prevent it from cancelling all conroutine tasks if one of the tasks is cancelled e.g:timeout
     From my perspective, all those carrier schedules are independent from one antoher so we shouldnt let one/more failed task to cancel all other successful tasks"""
     def __init__(self):
-        self.__tasks:set = set()
+        self.__tasks:dict = dict()
         self.error:list #Once this becomes true, we wont do any caching.vice versa
+
     async def __aenter__(self):
         return self
     async def __aexit__(self, exc_type, exc, tb):
@@ -98,14 +99,15 @@ class AsyncTaskManager:
             # If an exception occurred within the context, you can handle it here
             return False  # Propagate the exception
         # When exiting the context, wait for all tasks to complete
-    def create_task(self, coro):
-        self.__tasks.add(asyncio.create_task(coro))
+    def create_task(self,carrier, coro):
+        self.__tasks.update({carrier: asyncio.create_task(coro)})
 
     async def results(self):
-        results = await asyncio.gather(*self.__tasks, return_exceptions=True)
-        self.error:list = [result for result in results if isinstance(result, Exception)]
+        results = await asyncio.gather(*self.__tasks.values(), return_exceptions=True)
+        task_names:list = list(self.__tasks.keys())
+        self.error:list[dict] = [{task_names[index]: result} for index,result in enumerate(results) if isinstance(result, Exception)]
         if self.error != []:
             for exc in self.error:
-                logging.critical(f'Carrier connectWions attempts failed:',exc_info=exc)
-            results = [result for result in results if not isinstance(result, Exception)]
+                logging.critical(f"{list(exc.keys())[0]} connection attempts failed due to {list(exc.values())}")
+            results:list = [result for result in results if not isinstance(result, Exception)]
         return results
