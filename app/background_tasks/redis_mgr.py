@@ -1,6 +1,6 @@
 from datetime import timedelta
 from redis.asyncio import BlockingConnectionPool, Redis
-from app.config import Settings
+from app.config import Settings,load_yaml
 import uuid
 import logging
 import orjson
@@ -15,17 +15,22 @@ class ClientSideCache:
     def __await__(self):
         return self.initialize_database().__await__()
     async def initialize_database(self):
-        try:
-            self._pool = await Redis(connection_pool=self.__pool)
-            await self._pool.ping()
-            logging.info(f'Connected To Redis - {self._pool.connection_pool}')
-            return self
-        except Exception as disconnect:
-            logging.error(f'Unable to connect to the Redis - {disconnect}')
+        retries: int = 5
+        while retries > 0:
+            try:
+                self._pool = await Redis(connection_pool=self.__pool)
+                await self._pool.ping()
+                logging.info(f'Connected To Redis - {self._pool.connection_pool}')
+                return self
+            except Exception as disconnect:
+                retries -= 1
+                if retries == 0:
+                    raise ConnectionError(f'Unable to connect to RedisDB after retries ')
+                else:logging.critical(f'Unable to connect to the RedisDB - {disconnect}')
 
-    async def set(self, key:uuid.UUID, result,expire:int = timedelta(hours = 4)):
+    async def set(self, key:uuid.UUID, value: dict| list,expire:int = timedelta(hours = load_yaml()['backgroundTasks']['scheduleExpiry'])):
         try:
-            await asyncio.gather(self._pool.set(key.urn, orjson.dumps(result)),self._pool.expire(key.urn, expire))
+            await asyncio.gather(self._pool.set(key.urn, orjson.dumps(value)),self._pool.expire(key.urn, expire))
             logging.info(f'Background Task:Cached data into schedule collection - {key}')
         except Exception as insert_db:
             logging.error(insert_db)

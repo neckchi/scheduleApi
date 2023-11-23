@@ -154,7 +154,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
             schedules=sorted_schedules).model_dump(exclude_none=True)
 
         background_tasks.add_task(db.set, value=data) if not task_group.error else ... # for MongoDB
-        # background_tasks.add_task(db.set,key=product_id,value=data) #for Redis
+        # background_tasks.add_task(db.set,key=product_id,value=data) if not task_group.error else ...#for Redis
 
         return data
 

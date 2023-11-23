@@ -6,7 +6,7 @@ import datetime
 
 
 async def get_zim_access_token(client,background_task, url: str, api_key: str, client_id: str, secret: str):
-    zim_token_key = uuid5(NAMESPACE_DNS, 'zim-token-uuid-kuehne-nagel')
+    zim_token_key = uuid5(NAMESPACE_DNS, 'zim-token-uuid-kuehne-nagel2')
     response_token = await db.get(key=zim_token_key)
     if response_token is None:
         headers: dict = {'Ocp-Apim-Subscription-Key': api_key,
@@ -49,7 +49,7 @@ async def get_zim_p2p(client, background_task,url: str, turl: str, pw: str, zim_
                 transportations ={'transportType':transport_type.get(leg['vesselName'], 'Vessel'),'transportName': None if (vessel_name:=leg['vesselName']) == 'TO BE NAMED' else vessel_name,
                 'referenceType': 'Call Sign' if (vessel_code:=leg.get('vesselCode')) and vessel_name != 'TO BE NAMED' else None,'reference': vessel_code if vessel_name != 'TO BE NAMED' else None},
                 services={'serviceCode': leg['line'] }if (voyage_num:=leg.get('voyage')) else None,
-                voyages={'internalVoyage':voyage_num + leg['leg'] }if voyage_num else None) for leg in task['routeLegs']]).model_dump(warnings=False)
+                voyages={'internalVoyage':voyage_num + leg['leg'],'externalVoyage':leg.get('consortSailingNumber')}if voyage_num else None) for leg in task['routeLegs']]).model_dump(warnings=False)
                 total_schedule_list.append(schedule_body)
         return total_schedule_list
 

@@ -52,7 +52,7 @@ class HTTPXClientWrapper:
                 if background_tasks:
                     background_tasks.add_task(db.set, key=token_key, value=response_json, expire=expire)
                 yield response_json
-            if response.status_code == 502:
+            if response.status_code in (502,500):
                 logging.critical(f'Unable to connect to {url}')
                 yield None
 
