@@ -131,9 +131,8 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                           eta =start_date if start_date_type is schema_request.StartDateType.arrival else None,
                                           direct_only=direct_only,
                                           vessel_flag = vessel_flag_code))
-
-        # 👇 Await ALL
-        p2p_schedules = await task_group.__aexit__()
+                # 👇 Await ALL
+                p2p_schedules = await task_group.__aexit__()
         final_schedules = HTTPXClientWrapper.get_all_valid_schedules(matrix=p2p_schedules,product_id=product_id,point_from=point_from,point_to=point_to,background_tasks=background_tasks,task_exception=task_group.error)
         return final_schedules
     else:
