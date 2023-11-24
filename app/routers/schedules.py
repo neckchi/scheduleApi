@@ -2,8 +2,6 @@ import datetime
 import httpx
 from uuid import uuid5,NAMESPACE_DNS,UUID
 from fastapi import APIRouter, Query, status, Depends, BackgroundTasks
-from fastapi.responses import JSONResponse
-from fastapi.encoders import jsonable_encoder
 from app.carrierp2p import cma, one, hmm, zim, maersk, msc, iqax,hlag
 from app.schemas import schema_response, schema_request
 from app.background_tasks import db
@@ -11,11 +9,13 @@ from app.config import Settings,get_settings,load_yaml
 from app.routers.router_config import HTTPXClientWrapper,AsyncTaskManager
 from app.routers.security import basic_auth
 
+
 router = APIRouter(prefix='/schedules', tags=["API Point To Point Schedules"])
 @router.get("/p2p", summary="Search Point To Point schedules from carriers", response_model=schema_response.Product,
             response_model_exclude_defaults=True,
             response_description='Return a list of carrier ocean products with multiple schedules',
             responses={status.HTTP_404_NOT_FOUND: {"model": schema_response.Error}})
+
 
 
 async def get_schedules(background_tasks: BackgroundTasks,
@@ -33,12 +33,9 @@ async def get_schedules(background_tasks: BackgroundTasks,
                         carrier_status = Depends(load_yaml),
                         credentials = Depends(basic_auth),
                         client: httpx.AsyncClient = Depends(HTTPXClientWrapper.get_client)):
-
     """
     Search P2P Schedules with all the information:
-
     - **pointFrom/pointTo** : Provide either Point or Port in UNECE format
-
     """
     product_id:UUID = uuid5(NAMESPACE_DNS,f'{scac}-p2p-api-{point_from}{point_to}{start_date_type}{start_date}{search_range}{tsp}{direct_only}{service}')
     ttl_schedule = await db.get(key=product_id)
@@ -136,27 +133,8 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                           vessel_flag = vessel_flag_code))
 
         # 👇 Await ALL
-        p2p_schedules = await task_group.results()
-        # 👇 Best built o(1) function to flatten_p2p the loops
-        flatten_p2p:list = HTTPXClientWrapper.flatten_list(p2p_schedules)
-        sorted_schedules = sorted(flatten_p2p, key=lambda tt: (tt['etd'][:10], tt['transitTime']))
-        count_schedules = len(sorted_schedules)
-
-        if count_schedules == 0:
-            failed_response = JSONResponse(status_code=status.HTTP_404_NOT_FOUND,content=jsonable_encoder(schema_response.Error(id=product_id,detail=f"{point_from}-{point_to} schedule not found")))
-            return failed_response
-
-
-        data = schema_response.Product(
-            productid=product_id,
-            origin=point_from,
-            destination=point_to, noofSchedule=count_schedules,
-            schedules=sorted_schedules).model_dump(exclude_none=True)
-
-        background_tasks.add_task(db.set, value=data) if not task_group.error else ... # for MongoDB
-        # background_tasks.add_task(db.set,key=product_id,value=data) if not task_group.error else ...#for Redis
-
-        return data
-
+        p2p_schedules = await task_group.__aexit__()
+        final_schedules = HTTPXClientWrapper.get_all_valid_schedules(matrix=p2p_schedules,product_id=product_id,point_from=point_from,point_to=point_to,background_tasks=background_tasks,task_exception=task_group.error)
+        return final_schedules
     else:
         return ttl_schedule

@@ -5,6 +5,7 @@ import uuid
 import logging
 import orjson
 import asyncio
+import time
 
 class ClientSideCache:
     def __init__(self):
@@ -26,7 +27,9 @@ class ClientSideCache:
                 retries -= 1
                 if retries == 0:
                     raise ConnectionError(f'Unable to connect to RedisDB after retries ')
-                else:logging.critical(f'Unable to connect to the RedisDB - {disconnect}')
+                else:
+                    time.sleep(3)
+                    logging.critical(f'Unable to connect to the RedisDB - {disconnect}')
 
     async def set(self, key:uuid.UUID, value: dict| list,expire:int = timedelta(hours = load_yaml()['backgroundTasks']['scheduleExpiry'])):
         try:
@@ -36,11 +39,18 @@ class ClientSideCache:
             logging.error(insert_db)
 
     async def get(self, key: uuid.UUID):
-        try:
-            logging.info(f'Background Task:Getting data from Redis - {key}')
-            get_result = await self._pool.get(key.urn)
-            if get_result:
-                return orjson.loads(get_result)
-            return None
-        except Exception as find_error:
-            logging.error(find_error)
+        retries:int = 3
+        while retries > 0:
+            try:
+                logging.info(f'Background Task:Getting data from Redis - {key}')
+                get_result = await self._pool.get(key.urn)
+                if get_result:
+                    return orjson.loads(get_result)
+                return None
+            except Exception as find_error:
+                retries -= 1
+                if retries == 0:
+                    raise ConnectionError(f'Unable to connect to RedisDB and retrieve cache from MongoDB')
+                else:
+                    logging.critical(f'Unable to retrieve cache from RedisDB due to {find_error}')
+                    await self.initialize_database()

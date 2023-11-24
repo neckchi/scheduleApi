@@ -1,13 +1,41 @@
 from app.background_tasks import db
+from app.schemas import schema_response
 from fastapi import status,HTTPException,BackgroundTasks
+from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 from starlette.background import BackgroundTask
 from starlette.responses import StreamingResponse
+from uuid import UUID
 from typing import Literal
 import httpx
 import logging
 import orjson
 import asyncio
 
+class AsyncTaskManager:
+    """Currently there is no built in  python class and method that we can prevent it from cancelling all conroutine tasks if one of the tasks is cancelled e.g:timeout
+    From my perspective, all those carrier schedules are independent from one antoher so we shouldnt let one/more failed task to cancel all other successful tasks"""
+    def __init__(self):
+        self.__tasks:dict = dict()
+        self.error:list #Once this becomes true, we wont do any caching.vice versa
+
+    async def __aenter__(self):
+        return self
+    async def __aexit__(self, exc_type = None, exc = None, tb= None):
+        if exc_type is not None:
+            logging.error(f'Exception occurred:: {exc_type} - {exc}')
+            # Wait for all tasks to complete and handle exceptions
+        results = await asyncio.gather(*self.__tasks.values(), return_exceptions=True)
+        task_names:list = list(self.__tasks.keys())
+        self.error:list[dict] = [{task_names[i]: result} for i, result in enumerate(results) if isinstance(result, Exception)]
+        if self.error != []:
+            for error in self.error:
+                task_name, exception = list(error.items())[0]
+                logging.critical(f"{task_name} connection attempts failed due to {exception}")
+                results:list = [result for result in results if not isinstance(result, Exception)]
+        return results
+    def create_task(self,carrier, coro):
+        self.__tasks.update({carrier: asyncio.create_task(coro)})
 
 class HTTPXClientWrapper:
     ##Creating new session for each request but this would probably incur performance overhead issue.
@@ -52,7 +80,7 @@ class HTTPXClientWrapper:
                 if background_tasks:
                     background_tasks.add_task(db.set, key=token_key, value=response_json, expire=expire)
                 yield response_json
-            if response.status_code in (502,500):
+            if response.status_code in (500,502):
                 logging.critical(f'Unable to connect to {url}')
                 yield None
 
@@ -73,41 +101,24 @@ class HTTPXClientWrapper:
             else:yield None
 
     @staticmethod
-    def flatten_list(matrix:list) -> list:
+    def get_all_valid_schedules(matrix:list,product_id:UUID,point_from:str,point_to:str,background_tasks:BackgroundTasks,task_exception:list):
         flat_list: list = []
         for row in matrix:
             if row is not None:
                 flat_list.extend(row)
-            else:
-                pass
-        return flat_list
+        sorted_schedules = sorted(flat_list, key=lambda tt: (tt['etd'][:10], tt['transitTime']))
+        count_schedules = len(sorted_schedules)
+        if count_schedules == 0:
+            final_result = JSONResponse(status_code=status.HTTP_404_NOT_FOUND,content=jsonable_encoder(schema_response.Error(id=product_id,detail=f"{point_from}-{point_to} schedule not found")))
+        else:
+            final_result = schema_response.Product(
+            productid=product_id,
+            origin=point_from,
+            destination=point_to, noofSchedule=count_schedules,
+            schedules=sorted_schedules).model_dump(exclude_none=True)
+            background_tasks.add_task(db.set, value=final_result) if not task_exception else ...  # for MongoDB
+            # background_tasks.add_task(db.set,key=product_id,value=data) if not task_group.error else ...#for Redis
+        return final_result
 
 
 
-class AsyncTaskManager:
-    """Currently there is no built in  python class and method that we can prevent it from cancelling all conroutine tasks if one of the tasks is cancelled e.g:timeout
-    From my perspective, all those carrier schedules are independent from one antoher so we shouldnt let one/more failed task to cancel all other successful tasks"""
-    def __init__(self):
-        self.__tasks:dict = dict()
-        self.error:list #Once this becomes true, we wont do any caching.vice versa
-
-    async def __aenter__(self):
-        return self
-    async def __aexit__(self, exc_type, exc, tb):
-        if exc:
-            logging.error(f'An error occured: {exc_type} - {exc}')
-            # If an exception occurred within the context, you can handle it here
-            return False  # Propagate the exception
-        # When exiting the context, wait for all tasks to complete
-    def create_task(self,carrier, coro):
-        self.__tasks.update({carrier: asyncio.create_task(coro)})
-
-    async def results(self):
-        results = await asyncio.gather(*self.__tasks.values(), return_exceptions=True)
-        task_names:list = list(self.__tasks.keys())
-        self.error:list[dict] = [{task_names[index]: result} for index,result in enumerate(results) if isinstance(result, Exception)]
-        if self.error != []:
-            for exc in self.error:
-                logging.critical(f"{list(exc.keys())[0]} connection attempts failed due to {list(exc.values())}")
-            results:list = [result for result in results if not isinstance(result, Exception)]
-        return results

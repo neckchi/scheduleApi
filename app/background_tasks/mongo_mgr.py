@@ -3,6 +3,7 @@ from app.config import Settings,load_yaml
 from datetime import datetime,timedelta
 import logging
 import uuid
+import time
 import pymongo.errors
 
 class MongoDBsetting:
@@ -13,10 +14,10 @@ class MongoDBsetting:
     async def initialize_database(self):
         setting = Settings()
         logging.info('Connecting To MongoDB')
-        self.client = AsyncIOMotorClient(setting.mongo_url.get_secret_value(),connect=False,uuidRepresentation='standard')
         retries:int = 5
         while retries > 0:
             try:
+                self.client = AsyncIOMotorClient(setting.mongo_url.get_secret_value(), connect=False,uuidRepresentation='standard')
                 await self.client.server_info()
                 self.db = self.client['schedule']
                 self.collection = self.db['p2p']
@@ -28,7 +29,9 @@ class MongoDBsetting:
                 retries -= 1
                 if retries == 0:
                     raise ConnectionError(f'Unable to connect to MongoDB after retries ')
-                else:logging.critical(f'Unable to connect to the MongoDB - {disconnect}.Retry again.')
+                else:
+                    time.sleep(3)
+                    logging.critical(f'Unable to connect to the MongoDB - {disconnect}.Retry again.')
 
 
     async def set(self, value: dict| list,expire = timedelta(hours = load_yaml()['backgroundTasks']['scheduleExpiry']),key:uuid.UUID|None = None):
@@ -44,13 +47,20 @@ class MongoDBsetting:
             logging.error(insert_db)
 
     async def get(self, key: uuid.UUID):
-        try:
-            logging.info(f'Background Task:Getting data from MongoDB P2P schedule collection - {key}')
-            get_result = await self.collection.find_one({"productid":key})
-            if get_result:
-                final_result = get_result.get('cache',get_result)
-                return final_result
-            return None
-        except Exception as find_error:
-            logging.error(find_error)
+        retries:int = 3
+        while retries > 0:
+            try:
+                logging.info(f'Background Task:Getting data from MongoDB P2P schedule collection - {key}')
+                get_result = await self.collection.find_one({"productid":key})
+                if get_result:
+                    final_result = get_result.get('cache',get_result)
+                    return final_result
+                return None
+            except Exception as find_error:
+                retries -= 1
+                if retries == 0:
+                    raise ConnectionError(f'Unable to connect to MongoDB and retrieve cache from MongoDB')
+                else:
+                    logging.critical(f'Unable to retrieve cache from MongoDB due to {find_error}')
+                    await self.initialize_database()
 
