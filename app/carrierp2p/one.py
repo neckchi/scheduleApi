@@ -73,7 +73,7 @@ async def get_one_p2p(client, background_task,url: str, turl: str, pw: str, auth
                             etd=first_etd,
                             eta=last_eta,
                             transitTime=transit_time,
-                            cutoffs={'cyCutoffDate': first_cy_cutoff,'siCutoffDate':first_doc_cutoff,'vgmCutoffDate':first_vgm_cutoff} if first_cy_cutoff or first_doc_cutoff or first_vgm_cutoff else None,
+                            cutoffs={'cyCutoffDate': first_cy_cutoff,'docCutoffDate':first_doc_cutoff,'vgmCutoffDate':first_vgm_cutoff} if first_cy_cutoff or first_doc_cutoff or first_vgm_cutoff else None,
                             transportations={'transportType': 'Vessel',
                                              'transportName': first_vessel_name,
                                              'referenceType': None if first_imo == 'UNKNOWN' else 'IMO',

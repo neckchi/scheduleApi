@@ -39,7 +39,13 @@ async def get_zim_p2p(client, background_task,url: str, turl: str, pw: str, zim_
                 last_point_to:str = task['arrivalPort']
                 first_etd:str = task['departureDate']
                 last_eta:str = task['arrivalDate']
-                schedule_body:dict = schema_response.Schedule.model_construct(scac=carrier_code,pointFrom=first_point_from,pointTo=last_point_to,etd=first_etd,eta=last_eta,transitTime=transit_time,transshipment=check_transshipment,
+                find_cutoff = lambda cutoff_type:next((leg.get(cutoff_type) for leg in task['routeLegs'] if leg.get(cutoff_type)), None)
+                first_cy_cutoff:str = find_cutoff('containerClosingDate')
+                first_doc_cutoff: str = find_cutoff('docClosingDate')
+                first_vgm_cutoff: str = find_cutoff('vgmClosingDate')
+                schedule_body:dict = schema_response.Schedule.model_construct(scac=carrier_code,pointFrom=first_point_from,pointTo=last_point_to,etd=first_etd,eta=last_eta,
+                                                                              cyCutOffDate=first_cy_cutoff,docCutOffDate=first_doc_cutoff,vgmCutOffDate=first_vgm_cutoff,
+                                                                              transitTime=transit_time,transshipment=check_transshipment,
                 legs=[schema_response.Leg.model_construct(
                 pointFrom=  {'locationName': leg['departurePortName'],'locationCode': leg['departurePort']},
                 pointTo={'locationName': leg['arrivalPortName'],'locationCode': leg['arrivalPort']},
@@ -47,8 +53,10 @@ async def get_zim_p2p(client, background_task,url: str, turl: str, pw: str, zim_
                 eta=(eta:=leg['arrivalDate']),
                 transitTime=int((datetime.datetime.fromisoformat(eta) - datetime.datetime.fromisoformat(etd)).days),
                 transportations ={'transportType':transport_type.get(leg['vesselName'], 'Vessel'),'transportName': None if (vessel_name:=leg['vesselName']) == 'TO BE NAMED' else vessel_name,
-                'referenceType': 'Call Sign' if (vessel_code:=leg.get('vesselCode')) and vessel_name != 'TO BE NAMED' else None,'reference': vessel_code if vessel_name != 'TO BE NAMED' else None},
+                'referenceType': 'IMO' if (vessel_code:=leg.get('lloydsCode')) and vessel_name != 'TO BE NAMED' else None,'reference': vessel_code if vessel_name != 'TO BE NAMED' else None},
                 services={'serviceCode': leg['line'] }if (voyage_num:=leg.get('voyage')) else None,
+                cutoffs={'cyCutoffDate': cyoff, 'docCutoffDate':leg.get('docClosingDate'),'vgmCutoffDate': leg.get('vgmClosingDate')} if (cyoff:=leg.get('containerClosingDate')) or leg.get('docClosingDate')
+                                                                                                              or  leg.get('vgmClosingDate') else None,
                 voyages={'internalVoyage':voyage_num + leg['leg'],'externalVoyage':leg.get('consortSailingNumber')}if voyage_num else None) for leg in task['routeLegs']]).model_dump(warnings=False)
                 total_schedule_list.append(schedule_body)
         return total_schedule_list

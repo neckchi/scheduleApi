@@ -73,7 +73,7 @@ async def get_cma_p2p(client, url: str, pw: str, pol: str, pod: str, search_rang
                                  'reference':vessel_imo},
                 services={'serviceCode': service_name} if (service_name := deepget(leg['transportation'], 'voyage', 'service', 'code')) else None,
                 voyages={'internalVoyage': voyage_num} if (voyage_num := deepget(leg['transportation'], 'voyage', 'voyageReference')) else None,
-                cutoffs={'siCutoffDate':deepget(leg['pointFrom']['cutOff'], 'shippingInstructionAcceptance','local'),
+                cutoffs={'docCutoffDate':deepget(leg['pointFrom']['cutOff'], 'shippingInstructionAcceptance','local'),
                          'cyCutoffDate':deepget(leg['pointFrom']['cutOff'], 'portCutoff', 'local'),
                          'vgmCutoffDate':deepget(leg['pointFrom']['cutOff'], 'vgm', 'local')} if leg['pointFrom'].get('cutOff') else None)for leg in task['routingDetails']]
 

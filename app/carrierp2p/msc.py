@@ -51,10 +51,10 @@ async def get_msc_p2p(client, background_task,url: str, oauth: str, aud: str, pw
                 last_point_to:str = task['Schedules'][-1]['Calls'][-1]['Code']
                 first_etd = next(ed['CallDateTime'] for ed in task['Schedules'][0]['Calls'][0]['CallDates'] if ed['Type'] == 'ETD')
                 last_eta = next(ed['CallDateTime'] for ed in task['Schedules'][-1]['Calls'][-1]['CallDates'] if ed['Type'] == 'ETA')
-                find_cutoff = lambda task, cutoff_type: next((led['CallDateTime'] for led in task['Schedules'][0]['Calls'][0]['CallDates'] if led['Type'] == cutoff_type and led.get('CallDateTime')), None)
-                first_cy_cutoff = find_cutoff(task, 'CYCUTOFF')
-                first_doc_cutoff = find_cutoff(task, 'SI')
-                first_vgm_cutoff = find_cutoff(task, 'VGM')
+                find_cutoff = lambda cutoff_type: next((led['CallDateTime'] for led in task['Schedules'][0]['Calls'][0]['CallDates'] if led['Type'] == cutoff_type and led.get('CallDateTime')), None)
+                first_cy_cutoff:str = find_cutoff('CYCUTOFF')
+                first_doc_cutoff:str = find_cutoff('SI')
+                first_vgm_cutoff:str = find_cutoff('VGM')
                 transit_time = int((datetime.fromisoformat(last_eta) - datetime.fromisoformat(first_etd)).days)
                 leg_list: list = [schema_response.Leg.model_construct(
                     pointFrom={'locationName':leg['Calls'][0]['Name'],'locationCode': leg['Calls'][0]['Code'],
@@ -64,7 +64,7 @@ async def get_msc_p2p(client, background_task,url: str, oauth: str, aud: str, pw
                     etd=(etd:=next(led['CallDateTime'] for led in leg['Calls'][0]['CallDates'] if led['Type'] == 'ETD')),
                     eta=(eta:=next(lea['CallDateTime'] for lea in leg['Calls'][-1]['CallDates'] if lea['Type']== 'ETA')),
                     transitTime=int((datetime.fromisoformat(eta) - datetime.fromisoformat(etd)).days),
-                    cutoffs={'siCutoffDate':si_cutoff,'cyCutoffDate': next((led['CallDateTime'] for led in leg['Calls'][0]['CallDates'] if cut_offs and led['Type'] == 'CYCUTOFF'), None),
+                    cutoffs={'docCutoffDate':si_cutoff,'cyCutoffDate': next((led['CallDateTime'] for led in leg['Calls'][0]['CallDates'] if cut_offs and led['Type'] == 'CYCUTOFF'), None),
                              'vgmCutoffDate': next((led['CallDateTime'] for led in leg['Calls'][0]['CallDates'] if cut_offs and led['Type'] == 'VGM'), None)}
                             if (si_cutoff:=next((led['CallDateTime'] for led in leg['Calls'][0]['CallDates'] if led['Type'] == 'SI' and (cut_offs:= led.get('CallDateTime'))), None)) else None,
                     transportations={'transportType': 'Vessel',
@@ -74,7 +74,7 @@ async def get_msc_p2p(client, background_task,url: str, oauth: str, aud: str, pw
                     services={'serviceName': leg['Service']['Description']} if leg.get('Service') else None,
                     voyages={'internalVoyage': leg['Voyages'][0]['Description']} if leg.get('Voyages') else None) for leg in task['Schedules']]
                 schedule_body: dict = schema_response.Schedule.model_construct(scac=carrier_code,pointFrom=first_point_from,pointTo=last_point_to, etd=first_etd,eta=last_eta,
-                                                                               cyCutOffDate=first_cy_cutoff,siCuttoffDate=first_doc_cutoff,vgmCutOffDate=first_vgm_cutoff,transitTime=transit_time,
+                                                                               cyCutOffDate=first_cy_cutoff,docCutOffDate=first_doc_cutoff,vgmCutOffDate=first_vgm_cutoff,transitTime=transit_time,
                                                                                transshipment=check_transshipment,legs=leg_list).model_dump(warnings=False)
                 total_schedule_list.append(schedule_body)
         return total_schedule_list

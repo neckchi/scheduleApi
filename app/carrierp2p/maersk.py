@@ -17,7 +17,7 @@ async def get_maersk_cutoff(client, url: str, headers: dict, country: str, pol: 
                 if cutoff.get('deadlineName') == 'Commercial Cargo Cutoff':
                     cut_off_body.update({'cyCutoffDate': cutoff.get('deadlineLocal')})
                 if cutoff.get('deadlineName') in ('Shipping Instructions Deadline','Shipping Instructions Deadline for Advance Manifest Cargo','Special Cargo Documentation Deadline'):
-                    cut_off_body.update({'siCutoffDate': cutoff.get('deadlineLocal')})
+                    cut_off_body.update({'docCutoffDate': cutoff.get('deadlineLocal')})
                 if cutoff.get('deadlineName') == 'Commercial Verified Gross Mass Deadline':
                     cut_off_body.update({'vgmCutoffDate': cutoff.get('deadlineLocal')})
             yield {lookup_key: cut_off_body}
