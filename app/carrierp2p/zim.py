@@ -55,8 +55,7 @@ async def get_zim_p2p(client, background_task,url: str, turl: str, pw: str, zim_
                 transportations ={'transportType':transport_type.get(leg['vesselName'], 'Vessel'),'transportName': None if (vessel_name:=leg['vesselName']) == 'TO BE NAMED' else vessel_name,
                 'referenceType': 'IMO' if (vessel_code:=leg.get('lloydsCode')) and vessel_name != 'TO BE NAMED' else None,'reference': vessel_code if vessel_name != 'TO BE NAMED' else None},
                 services={'serviceCode': leg['line'] }if (voyage_num:=leg.get('voyage')) else None,
-                cutoffs={'cyCutoffDate': cyoff, 'docCutoffDate':leg.get('docClosingDate'),'vgmCutoffDate': leg.get('vgmClosingDate')} if (cyoff:=leg.get('containerClosingDate')) or leg.get('docClosingDate')
-                                                                                                              or  leg.get('vgmClosingDate') else None,
+                cutoffs={'cyCutoffDate': cyoff, 'docCutoffDate':leg.get('docClosingDate'),'vgmCutoffDate': leg.get('vgmClosingDate')} if (cyoff:=leg.get('containerClosingDate')) or leg.get('docClosingDate') or  leg.get('vgmClosingDate') else None,
                 voyages={'internalVoyage':voyage_num + leg['leg'],'externalVoyage':leg.get('consortSailingNumber')}if voyage_num else None) for leg in task['routeLegs']]).model_dump(warnings=False)
                 total_schedule_list.append(schedule_body)
         return total_schedule_list

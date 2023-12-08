@@ -61,7 +61,7 @@ async def get_hmm_p2p(client, url: str, pw: str, pol: str, pod: str, search_rang
                                 etd=etd,
                                 eta=(eta:=legs.get('vesselArrivalDate')),
                                 transitTime=int((datetime.datetime.fromisoformat(eta) - datetime.datetime.fromisoformat(etd)).days),
-                                transportations={'transportType': 'Vessel' if (vessel_name:=legs.get('vesselName')) else 'Barge',
+                                transportations={'transportType': 'Vessel' if (vessel_name:=legs.get('vesselName')) else 'Feeder',
                                                  'transportName': vessel_name,
                                                  'referenceType': 'IMO' if (vessel_imo:=legs.get('lloydRegisterNo')) else None,
                                                  'reference': vessel_imo},
