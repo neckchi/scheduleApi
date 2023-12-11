@@ -1,0 +1,16 @@
+appVersion: v1
+kind: ConfigMap
+metadata:
+  name: configmap
+data:
+  backgroundTasks:
+    scheduleExpiry: 4
+  activeCarriers:
+    cma:  True
+    hlag: True
+    hmm: True
+    iqax: True
+    maersk: True
+    msc: True
+    one: True
+    zim: True

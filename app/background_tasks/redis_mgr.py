@@ -31,7 +31,7 @@ class ClientSideCache:
                     time.sleep(3)
                     logging.critical(f'Unable to connect to the RedisDB - {disconnect}')
 
-    async def set(self, key:uuid.UUID, value: dict| list,expire:int = timedelta(hours = load_yaml()['backgroundTasks']['scheduleExpiry'])):
+    async def set(self, key:uuid.UUID, value: dict| list,expire:int = timedelta(hours = load_yaml()['data']['backgroundTasks']['scheduleExpiry'])):
         try:
             await asyncio.gather(self._pool.set(key.urn, orjson.dumps(value)),self._pool.expire(key.urn, expire))
             logging.info(f'Background Task:Cached data into schedule collection - {key}')

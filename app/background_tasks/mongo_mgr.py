@@ -34,7 +34,7 @@ class MongoDBsetting:
                     logging.critical(f'Unable to connect to the MongoDB - {disconnect}.Retry again.')
 
 
-    async def set(self, value: dict| list,expire = timedelta(hours = load_yaml()['backgroundTasks']['scheduleExpiry']),key:uuid.UUID|None = None):
+    async def set(self, value: dict| list,expire = timedelta(hours = load_yaml()['data']['backgroundTasks']['scheduleExpiry']),key:uuid.UUID|None = None):
         now_utc_timestamp = datetime.utcnow()
         insert_cache = dict({'productid': key, 'cache': value} if key else value, **{'expiry': now_utc_timestamp + expire})
         try:

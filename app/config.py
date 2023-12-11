@@ -61,7 +61,7 @@ def get_settings():
 
 @cache
 def load_yaml() -> dict:
-    with open(file='./app/config.yaml',mode='r') as yml_file:
+    with open(file='./app/configmap.yaml',mode='r') as yml_file:
         config = yaml.load(yml_file,Loader=yaml.FullLoader)
     return config
 
