@@ -33,7 +33,7 @@ async def get_msc_token(client,background_task, oauth: str, aud: str, rsa: str, 
 async def get_msc_p2p(client, background_task,url: str, oauth: str, aud: str, pw: str, msc_client: str, msc_scope: str,
                       msc_thumbprint: str, pol: str, pod: str,
                       search_range: int, start_date_type: str,
-                      start_date: datetime.date, direct_only: bool |None, service: str | None = None, tsp: str | None = None):
+                      start_date: datetime.date, direct_only: bool |None, vessel_imo: str | None = None, service: str | None = None, tsp: str | None = None):
     params: dict = {'fromPortUNCode': pol, 'toPortUNCode': pod, 'fromDate': start_date,
                     'toDate': (start_date + timedelta(days=search_range)).strftime("%Y-%m-%d"), 'datesRelated': start_date_type}
     token = await anext(get_msc_token(client=client,background_task=background_task,oauth=oauth, aud=aud, rsa=pw, msc_client=msc_client, msc_scope=msc_scope,msc_thumbprint=msc_thumbprint))
@@ -45,7 +45,8 @@ async def get_msc_p2p(client, background_task,url: str, oauth: str, aud: str, pw
             check_service_code:bool = any(service_desc.get('Service') and service_desc['Service']['Description'] == service for service_desc in task['Schedules']) if service else True
             check_transshipment: bool = len(task.get('Schedules')) > 1
             transshipment_port = any(tsport['Calls'][0]['Code'] == tsp for tsport in task['Schedules'][1:]) if check_transshipment and tsp else False
-            if (transshipment_port or not tsp) and (direct_only is None or check_transshipment != direct_only) and check_service_code:
+            check_vessel_imo: bool = any(imo for imo in task['Schedules'] if imo.get('IMONumber') == vessel_imo) if vessel_imo else True
+            if (transshipment_port or not tsp) and (direct_only is None or check_transshipment != direct_only) and check_service_code and check_vessel_imo:
                 carrier_code:str = 'MSCU'
                 first_point_from:str = task['Schedules'][0]['Calls'][0]['Code']
                 last_point_to:str = task['Schedules'][-1]['Calls'][-1]['Code']
@@ -67,10 +68,8 @@ async def get_msc_p2p(client, background_task,url: str, oauth: str, aud: str, pw
                     cutoffs={'docCutoffDate':si_cutoff,'cyCutoffDate': next((led['CallDateTime'] for led in leg['Calls'][0]['CallDates'] if cut_offs and led['Type'] == 'CYCUTOFF'), None),
                              'vgmCutoffDate': next((led['CallDateTime'] for led in leg['Calls'][0]['CallDates'] if cut_offs and led['Type'] == 'VGM'), None)}
                             if (si_cutoff:=next((led['CallDateTime'] for led in leg['Calls'][0]['CallDates'] if led['Type'] == 'SI' and (cut_offs:= led.get('CallDateTime'))), None)) else None,
-                    transportations={'transportType': 'Vessel',
-                                     'transportName': leg.get('TransportationMeansName'),
-                                     'referenceType': 'IMO' if (vessel_imo := leg.get('IMONumber')) and vessel_imo != '' else None,
-                                     'reference': vessel_imo if vessel_imo != '' else None},
+                    transportations={'transportType': 'Vessel','transportName': leg.get('TransportationMeansName'),'referenceType': 'IMO' if (imo_code := leg.get('IMONumber')) and imo_code != '' else None,
+                                     'reference': imo_code if imo_code != '' else None},
                     services={'serviceName': leg['Service']['Description']} if leg.get('Service') else None,
                     voyages={'internalVoyage': leg['Voyages'][0]['Description']} if leg.get('Voyages') else None) for leg in task['Schedules']]
                 schedule_body: dict = schema_response.Schedule.model_construct(scac=carrier_code,pointFrom=first_point_from,pointTo=last_point_to, etd=first_etd,eta=last_eta,

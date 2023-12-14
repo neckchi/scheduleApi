@@ -43,7 +43,7 @@ async def retrieve_geo_locations(client, background_task, pol:str, pod:str, loca
 async def get_maersk_p2p(client,background_task,url: str, location_url: str, cutoff_url: str, pw: str, pw2: str, pol: str, pod: str,
                          search_range: str, direct_only: bool|None = None, tsp: str | None = None, scac: str | None = None,
                          start_date: datetime.date = None,
-                         date_type: str | None = None, service: str | None = None, vessel_flag: str | None = None):
+                         date_type: str | None = None, service: str | None = None, vessel_imo:str|None = None,vessel_flag: str | None = None):
     origin_geo_location, des_geo_location = await retrieve_geo_locations(client=client,background_task=background_task,pol=pol,pod=pod,location_url=location_url,pw=pw)
     if origin_geo_location and des_geo_location:
         params:dict= {'collectionOriginCountryCode': origin_geo_location[0]['countryCode'],'collectionOriginCityName': origin_geo_location[0]['cityName'],'collectionOriginUNLocationCode': origin_geo_location[0]['UNLocationCode'],
@@ -73,7 +73,8 @@ async def get_maersk_p2p(client,background_task,url: str, location_url: str, cut
                         check_service_name: bool = any(services['transport']['carrierServiceName'] == service for services in task['transportLegs'] if services['transport'].get('carrierServiceName') ) if service else True
                         check_transshipment: bool = len(task['transportLegs']) > 1
                         transshipment_port:bool = any(tsport['facilities']['startLocation']['UNLocationCode'] == tsp  for tsport in task['transportLegs'][1:]) if check_transshipment and tsp else False
-                        if (transshipment_port or not tsp) and (direct_only is None or check_transshipment != direct_only) and (check_service_code or check_service_name):
+                        check_vessel_imo: bool = any(imo for imo in task['transportLegs'] if deepget(imo['transport'], 'vessel','vesselIMONumber') == vessel_imo) if vessel_imo else True
+                        if (transshipment_port or not tsp) and (direct_only is None or check_transshipment != direct_only) and (check_service_code or check_service_name) and check_vessel_imo:
                             transit_time:int = round(int(task['transitTime']) / 1400)
                             first_point_from:str = task['facilities']['collectionOrigin']['UNLocationCode']
                             last_point_to:str = task['facilities']['deliveryDestination']['UNLocationCode']
@@ -91,11 +92,11 @@ async def get_maersk_p2p(client,background_task,url: str, location_url: str, cut
                                 transitTime=int((datetime.fromisoformat(eta) - datetime.fromisoformat(etd)).days),
                                 transportations={'transportType': transport_type.get(leg['transport']['transportMode']),
                                                  'transportName': deepget(leg['transport'], 'vessel', 'vesselName'),
-                                                 'referenceType':'IMO' if (vessel_imo := str(deepget(leg['transport'], 'vessel','vesselIMONumber'))) and vessel_imo not in ('9999999','None')  else None,
-                                                 'reference': vessel_imo if vessel_imo not in ('9999999','None') else None},
+                                                 'referenceType':'IMO' if (imo_code := str(deepget(leg['transport'], 'vessel','vesselIMONumber'))) and imo_code not in ('9999999','None')  else None,
+                                                 'reference': imo_code if imo_code not in ('9999999','None') else None},
                                 services={'serviceCode': service_name } if (service_name:=leg['transport'].get('carrierServiceName',leg['transport'].get('carrierServiceCode'))) else None,
                                 voyages={'internalVoyage':voyage_num} if (voyage_num:=leg['transport'].get('carrierDepartureVoyageNumber')) else None,
-                                cutoffs= merged_dict.get(hash(leg['facilities']['startLocation']['countryCode']+pol_name+vessel_imo+voyage_num)) if pol_name and vessel_imo and voyage_num else None).model_dump(warnings=False) for leg in task['transportLegs']]
+                                cutoffs= merged_dict.get(hash(leg['facilities']['startLocation']['countryCode']+pol_name+imo_code+voyage_num)) if pol_name and imo_code and voyage_num else None).model_dump(warnings=False) for leg in task['transportLegs']]
                             schedule_body: dict = schema_response.Schedule.model_construct(scac=carrier_code,pointFrom=first_point_from,pointTo=last_point_to,etd=first_etd, eta=last_eta,transitTime=transit_time,transshipment=check_transshipment,
                                                                                            legs=sorted(leg_list,key=lambda d: d['etd']) if check_transshipment else leg_list).model_dump(warnings=False)
                             total_schedule_list.append(schedule_body)

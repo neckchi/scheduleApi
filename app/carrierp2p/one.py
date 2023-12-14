@@ -18,10 +18,8 @@ async def get_one_access_token(client,background_task, url: str, auth: str, api_
 async def get_one_p2p(client, background_task,url: str, turl: str, pw: str, auth: str, pol: str, pod: str, search_range: int,
                       direct_only: bool|None,
                       start_date: datetime.date,
-                      date_type: str | None = None, service: str | None = None, tsp: str | None = None):
-    params: dict = {'originPort': pol, 'destinationPort': pod, 'searchDate': start_date,
-                    'searchDateType': date_type, 'weeksOut': search_range,
-                    'directOnly': 'TRUE' if direct_only is True else 'FALSE'}
+                      date_type: str | None = None, service: str | None = None,vessel_imo: str | None = None, tsp: str | None = None):
+    params: dict = {'originPort': pol, 'destinationPort': pod, 'searchDate': start_date,'searchDateType': date_type, 'weeksOut': search_range,'directOnly': 'TRUE' if direct_only is True else 'FALSE'}
     # weekout:1 ≤ value ≤ 14
     token = await anext(get_one_access_token(client=client,background_task=background_task, url=turl, auth=auth, api_key=pw))
     headers: dict = {'apikey': pw, 'Authorization': f'Bearer {token}', 'Accept': 'application/json'}
@@ -36,7 +34,8 @@ async def get_one_p2p(client, background_task,url: str, turl: str, pw: str, auth
                 check_service: bool = service_code == service or service_name == service if service else True
                 check_transshipment: bool = len(task['legs']) > 1
                 transshipment_port: bool = any(tsport['departureUnloc'] == tsp for tsport in task['legs'][1:]) if check_transshipment and tsp else False
-                if (transshipment_port or not tsp )and check_service:
+                check_vessel_imo: bool = (task['imoNumber'] == vessel_imo or any(imo for imo in task['legs'] if imo.get('transportID') == vessel_imo)) if vessel_imo else True
+                if (transshipment_port or not tsp )and check_service and check_vessel_imo:
                     carrier_code:str = task['scac']
                     transit_time:int = round(task['transitDurationHrsUtc'] / 24)
                     first_point_from:str = task['originUnloc']
@@ -60,9 +59,7 @@ async def get_one_p2p(client, background_task,url: str, turl: str, pw: str, auth
                             etd=leg['departureDateEstimated'],
                             eta=leg['arrivalDateEstimated'],
                             transitTime=round(leg['transitDurationHrsUtc'] / 24),
-                            transportations={'transportType': 'Vessel',
-                                             'transportName': leg['transportName'],
-                                             'referenceType': None if (transport_type:=leg.get('transportID')) == 'UNKNOWN' else 'IMO',
+                            transportations={'transportType': 'Vessel','transportName': leg['transportName'],'referenceType': None if (transport_type:=leg.get('transportID')) == 'UNKNOWN' else 'IMO',
                                              'reference': None if transport_type  == 'UNKNOWN' else transport_type},
                             services={'serviceCode': service_code,'serviceName':leg['serviceName']} if (service_code:=leg['serviceCode']) or leg['serviceName'] else None,
                             voyages={'internalVoyage': voyage_num} if (voyage_num:=leg['conveyanceNumber']) else None) for leg in task['legs']]
@@ -74,13 +71,10 @@ async def get_one_p2p(client, background_task,url: str, turl: str, pw: str, auth
                             eta=last_eta,
                             transitTime=transit_time,
                             cutoffs={'cyCutoffDate': first_cy_cutoff,'docCutoffDate':first_doc_cutoff,'vgmCutoffDate':first_vgm_cutoff} if first_cy_cutoff or first_doc_cutoff or first_vgm_cutoff else None,
-                            transportations={'transportType': 'Vessel',
-                                             'transportName': first_vessel_name,
-                                             'referenceType': None if first_imo == 'UNKNOWN' else 'IMO',
+                            transportations={'transportType': 'Vessel','transportName': first_vessel_name,'referenceType': None if first_imo == 'UNKNOWN' else 'IMO',
                                              'reference': None if first_imo == 'UNKNOWN' else first_imo},
                             services={'serviceCode': first_service_code,'serviceName':first_service_name} if first_service_code or first_service_name else None,
                             voyages={'internalVoyage': first_voyage} if first_voyage else None)]
-
                     schedule_body:dict = schema_response.Schedule.model_construct(scac=carrier_code,pointFrom=first_point_from,pointTo=last_point_to,etd=first_etd,eta=last_eta,
                                                                                   cyCutOffDate=first_cy_cutoff,docCutOffDate=first_doc_cutoff,vgmCutOffDate=first_vgm_cutoff,
                                                                                   transitTime=transit_time,transshipment=check_transshipment,

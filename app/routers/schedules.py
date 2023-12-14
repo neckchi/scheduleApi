@@ -27,8 +27,9 @@ async def get_schedules(background_tasks: BackgroundTasks,
                         scac: set[schema_request.CarrierCode | None] = Query(default={None},description='Prefer to search p2p schedule by scac.Empty means searching for all API schedules'),
                         direct_only: bool | None = Query(alias='directOnly', default=None,description='Direct means only show direct schedule Else show both(direct/transshipment)type of schedule'),
                         tsp: str | None = Query(default=None, alias='transhipmentPort', max_length=5,regex=r"[A-Z]{2}[A-Z0-9]{3}",description="Filter By Transshipment Port"),
+                        vessel_imo:str|None = Query(alias='vesselIMO', default=None,description='Restricts the search to a particular vessel IMO lloyds code on port of loading', max_length=7),
                         vessel_flag_code: str | None = Query(alias='vesselFlagCode', default=None, max_length=2,regex=r"[A-Z]{2}"),
-                        service: str | None = Query(default=None,description='Search by either service code or service name'),
+                        service: str | None = Query(default=None,description='Search by either service code or service name',max_length=7),
                         settings: Settings = Depends(get_settings),
                         carrier_status = Depends(load_yaml),
                         credentials = Depends(basic_auth),
@@ -37,7 +38,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
     Search P2P Schedules with all the information:
     - **pointFrom/pointTo** : Provide either Point or Port in UNECE format
     """
-    product_id:UUID = uuid5(NAMESPACE_DNS,f'{scac}-p2p-api-{point_from}{point_to}{start_date_type}{start_date}{search_range}{tsp}{direct_only}{service}')
+    product_id:UUID = uuid5(NAMESPACE_DNS,f'{scac}-p2p-api-{point_from}{point_to}{start_date_type}{start_date}{search_range}{tsp}{direct_only}{vessel_imo}{service}')
     ttl_schedule = await db.get(key=product_id)
 
     if not ttl_schedule:
@@ -49,7 +50,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                         pod=point_to,
                                         departure_date=start_date if start_date_type is schema_request.StartDateType.departure else None,
                                         arrival_date=start_date if start_date_type is schema_request.StartDateType.arrival else None,
-                                        search_range=search_range.duration, direct_only=direct_only,
+                                        search_range=search_range.duration, direct_only=direct_only,vessel_imo = vessel_imo,
                                         tsp=tsp,
                                         service=service, pw=settings.cma_token.get_secret_value()))
                 #No more shipment will be booked with HamburgSud from Nov 2023 onward
@@ -66,7 +67,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
                     task_group.create_task(carrier='ONE_task',coro=one.get_one_p2p(client=client,background_task = background_tasks, url=settings.oney_url, turl=settings.oney_turl,
                                         pol=point_from, pod=point_to, start_date=start_date,
                                         direct_only=direct_only,
-                                        search_range=int(search_range.value), tsp=tsp,
+                                        search_range=int(search_range.value), tsp=tsp,vessel_imo = vessel_imo,
                                         date_type='BY_DEPARTURE_DATE' if start_date_type is schema_request.StartDateType.departure else 'BY_ARRIVAL_DATE',
                                         service=service, auth=settings.oney_auth.get_secret_value(),
                                         pw=settings.oney_token.get_secret_value()))
@@ -74,7 +75,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
                 # Missing Location Code from HDMU response
                 if carrier_status['data']['activeCarriers']['hmm'] and (carriers == 'HDMU' or carriers is None):
                     task_group.create_task(carrier='HMM_task',coro=hmm.get_hmm_p2p(client=client, url=settings.hmm_url, pol=point_from, pod=point_to,
-                                        start_date=start_date, service=service, direct_only=direct_only,
+                                        start_date=start_date, service=service, direct_only=direct_only,vessel_imo=vessel_imo,
                                         tsp=tsp, pw=settings.hmm_token.get_secret_value(),
                                         search_range=str(search_range.value)))
 
@@ -83,7 +84,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
                     task_group.create_task(carrier='ZIM_task',coro=zim.get_zim_p2p(client=client,background_task = background_tasks, url=settings.zim_url, turl=settings.zim_turl,
                                         pol=point_from, pod=point_to, start_date=start_date,
                                         direct_only=direct_only, tsp=tsp,
-                                        search_range=search_range.duration, service=service,
+                                        search_range=search_range.duration, service=service,vessel_imo=vessel_imo,
                                         pw=settings.zim_token.get_secret_value(),
                                         zim_client=settings.zim_client.get_secret_value(),
                                         zim_secret=settings.zim_secret.get_secret_value()))
@@ -95,7 +96,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                               pol=point_from, pod=point_to, start_date=start_date,
                                               search_range=search_range.value, scac=carriers,
                                               direct_only=direct_only, tsp=tsp,
-                                              vessel_flag=vessel_flag_code,
+                                              vessel_flag=vessel_flag_code,vessel_imo=vessel_imo,
                                               date_type='D' if start_date_type is schema_request.StartDateType.departure else 'A',
                                               service=service, pw=settings.maeu_token.get_secret_value(),
                                               pw2=settings.maeu_token2.get_secret_value()))
@@ -106,7 +107,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                         start_date=start_date, search_range=search_range.duration,
                                         direct_only=direct_only,
                                         start_date_type='POL' if start_date_type is schema_request.StartDateType.departure else 'POD',
-                                        service=service, tsp=tsp,
+                                        service=service, tsp=tsp,vessel_imo=vessel_imo,
                                         pw=settings.mscu_rsa_key.get_secret_value(),
                                         msc_client=settings.mscu_client.get_secret_value(),
                                         msc_scope=settings.mscu_scope.get_secret_value(),
@@ -118,7 +119,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                           departure_date=start_date if start_date_type is schema_request.StartDateType.departure else None,
                                           arrival_date=start_date if start_date_type is schema_request.StartDateType.arrival else None,
                                           search_range=search_range.value, direct_only=direct_only,
-                                          tsp=tsp,
+                                          tsp=tsp,vessel_imo=vessel_imo,
                                           scac=carriers, service=service,
                                           pw=settings.iqax_token.get_secret_value()))
 

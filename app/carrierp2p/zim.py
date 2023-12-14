@@ -18,7 +18,7 @@ async def get_zim_access_token(client,background_task, url: str, api_key: str, c
 
 async def get_zim_p2p(client, background_task,url: str, turl: str, pw: str, zim_client: str, zim_secret: str, pol: str, pod: str,
                       search_range: int,
-                      start_date: datetime.datetime.date, direct_only: bool |None, service: str | None = None, tsp: str | None = None):
+                      start_date: datetime.datetime.date, direct_only: bool |None,vessel_imo:str|None = None, service: str | None = None, tsp: str | None = None):
     params: dict = {'originCode': pol, 'destCode': pod, 'fromDate': start_date,'toDate': (start_date + datetime.timedelta(days=search_range)).strftime("%Y-%m-%d"), 'sortByDepartureOrArrival': 'Departure'}
 
     token = await anext(get_zim_access_token(client=client,background_task=background_task, url=turl, api_key=pw, client_id=zim_client, secret=zim_secret))
@@ -31,8 +31,9 @@ async def get_zim_p2p(client, background_task,url: str, turl: str, pw: str, zim_
             # Additional check on service code/name in order to fullfill business requirment(query the result by service code)
             check_service_code:bool = any(service == services['line'] for services in task['routeLegs'] if services.get('voyage')) if service else True
             check_transshipment: bool = task['routeLegCount'] > 1
+            check_vessel_imo: bool = any(imo for imo in task['routeLegs'] if imo.get('lloydsCode') == vessel_imo) if vessel_imo else True
             transshipment_port:bool = any(tsport['departurePort'] == tsp for tsport in task['routeLegs'][1:]) if check_transshipment and tsp else False
-            if (transshipment_port or not tsp) and (direct_only is None or direct_only != check_transshipment )and (check_service_code or not service):
+            if (transshipment_port or not tsp) and (direct_only is None or direct_only != check_transshipment ) and (check_service_code or not service) and check_vessel_imo:
                 carrier_code:str = 'ZIMU'
                 transit_time:int = task['transitTime']
                 first_point_from:str = task['departurePort']

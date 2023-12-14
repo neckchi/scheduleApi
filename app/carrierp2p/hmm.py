@@ -4,7 +4,7 @@ from app.schemas import schema_response
 
 async def get_hmm_p2p(client, url: str, pw: str, pol: str, pod: str, search_range: str, direct_only: bool|None,
                       start_date: datetime,
-                      tsp: str | None = None, service: str | None = None):
+                      tsp: str | None = None,vessel_imo:str | None = None, service: str | None = None):
 
     params: dict = {'fromLocationCode': pol, 'receiveTermCode': 'CY', 'toLocationCode': pod, 'deliveryTermCode': 'CY',
                     'periodDate': start_date.strftime("%Y%m%d"),
@@ -16,9 +16,10 @@ async def get_hmm_p2p(client, url: str, pw: str, pol: str, pod: str, search_rang
         total_schedule_list: list = []
         for task in response_json['resultData']:
             check_service_code:bool=  any(services['vesselLoop'] == service for services in task['vessel'] if services.get('vesselDepartureDate') ) if service else True
+            check_vessel_imo:bool = any(imo for imo in task['vessel'] if imo.get('lloydRegisterNo') == vessel_imo) if vessel_imo else True
             check_transshipment: bool = bool(task.get('transshipPortCode'))
             first_pot_code:str = task.get('transshipPortCode')
-            if ((check_transshipment and tsp and first_pot_code) or not tsp) and check_service_code:
+            if ((check_transshipment and tsp and first_pot_code) or not tsp) and check_service_code and check_vessel_imo:
                 carrier_code:str = 'HDMU'
                 transit_time:int = task.get('totalTransitDay')
                 first_point_from:str = task.get('loadingPortCode')
@@ -63,8 +64,8 @@ async def get_hmm_p2p(client, url: str, pw: str, pol: str, pod: str, search_rang
                                 transitTime=int((datetime.datetime.fromisoformat(eta) - datetime.datetime.fromisoformat(etd)).days),
                                 transportations={'transportType': 'Vessel' if (vessel_name:=legs.get('vesselName')) else 'Feeder',
                                                  'transportName': vessel_name,
-                                                 'referenceType': 'IMO' if (vessel_imo:=legs.get('lloydRegisterNo')) else None,
-                                                 'reference': vessel_imo},
+                                                 'referenceType': 'IMO' if (imo_code:=legs.get('lloydRegisterNo')) else None,
+                                                 'reference': imo_code},
                                 services={'serviceCode': check_service} if (check_service:=legs.get('vesselLoop')) else None,
                                 voyages={'internalVoyage': internal_voy} if (internal_voy:= legs.get('voyageNumber')) else None) for legs in task['vessel'] if (etd:=legs.get('vesselDepartureDate'))]
                 # inbound
