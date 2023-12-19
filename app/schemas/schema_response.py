@@ -40,7 +40,7 @@ class Transportation(BaseModel):
 
     @model_validator(mode = 'after')
     def add_reference(self)-> 'Transportation':
-        reference_mapping:dict = {'Vessel':'1', 'Barge':'9', 'Feeder':'9', 'Truck':'3', 'Rail':'11','Truck / Rail':'11', 'Intermodal':'1'}
+        reference_mapping:dict = {'Vessel':'1', 'Barge':'9', 'Feeder':'9', 'Truck':'3', 'Rail':'11','Truck / Rail':'11', 'Intermodal':'5'}
         if self.referenceType is None and self.reference is None and self.transportType is not None:
             self.transportName = 'TBN' if self.transportName is None else self.transportName
             self.referenceType = 'IMO'

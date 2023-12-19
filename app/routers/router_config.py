@@ -53,7 +53,7 @@ class HTTPXClientWrapper:
         FastAPI dependancy injection allows us to use generator functions as dependenacy
         """
         try:
-            async with httpx.AsyncClient(proxies="http://zscaler.proxy.int.kn:80",verify=False, timeout=timeout, limits=limits) as client:
+            async with httpx.AsyncClient(proxies ="http://zscaler.proxy.int.kn:80",verify=False, timeout=timeout, limits=limits) as client:
                 # yield the client to the endpoint function
                 logging.info(f'Client Session Started')
                 yield client
