@@ -1,5 +1,5 @@
 cryptography==41.0.1
-fastapi==0.103.2
+fastapi==0.106.0
 httpx==0.25.2
 motor==3.2.0
 orjson==3.9.7

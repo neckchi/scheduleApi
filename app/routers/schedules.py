@@ -40,7 +40,6 @@ async def get_schedules(background_tasks: BackgroundTasks,
     """
     product_id:UUID = uuid5(NAMESPACE_DNS,f'{scac}-p2p-api-{point_from}{point_to}{start_date_type}{start_date}{search_range}{tsp}{direct_only}{vessel_imo}{service}')
     ttl_schedule = await db.get(key=product_id)
-
     if not ttl_schedule:
         # 👇 Having this allows for waiting for all our tasks with strong safety guarantees,logic around cancellation for failures,coroutine-safe and grouping of exceptions.
         async with AsyncTaskManager() as task_group:
@@ -48,8 +47,8 @@ async def get_schedules(background_tasks: BackgroundTasks,
                 if carrier_status['data']['activeCarriers']['cma'] and (carriers in {'CMDU', 'ANNU', 'APLU', 'CHNL', 'CSFU'} or carriers is None):
                     task_group.create_task(carrier='CMA_task',coro=cma.get_cma_p2p(client=client, url=settings.cma_url, scac=carriers, pol=point_from,
                                         pod=point_to,
-                                        departure_date=start_date if start_date_type is schema_request.StartDateType.departure else None,
-                                        arrival_date=start_date if start_date_type is schema_request.StartDateType.arrival else None,
+                                        departure_date=start_date if start_date_type == 'Departure' else None,
+                                        arrival_date=start_date if start_date_type == 'Arrival'else None,
                                         search_range=search_range.duration, direct_only=direct_only,vessel_imo = vessel_imo,
                                         tsp=tsp,
                                         service=service, pw=settings.cma_token.get_secret_value()))
@@ -68,7 +67,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                         pol=point_from, pod=point_to, start_date=start_date,
                                         direct_only=direct_only,
                                         search_range=int(search_range.value), tsp=tsp,vessel_imo = vessel_imo,
-                                        date_type='BY_DEPARTURE_DATE' if start_date_type is schema_request.StartDateType.departure else 'BY_ARRIVAL_DATE',
+                                        date_type='BY_DEPARTURE_DATE' if start_date_type == 'Departure' else 'BY_ARRIVAL_DATE',
                                         service=service, auth=settings.oney_auth.get_secret_value(),
                                         pw=settings.oney_token.get_secret_value()))
 
@@ -97,7 +96,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                               search_range=search_range.value, scac=carriers,
                                               direct_only=direct_only, tsp=tsp,
                                               vessel_flag=vessel_flag_code,vessel_imo=vessel_imo,
-                                              date_type='D' if start_date_type is schema_request.StartDateType.departure else 'A',
+                                              date_type='D' if start_date_type == 'Departure' else 'A',
                                               service=service, pw=settings.maeu_token.get_secret_value(),
                                               pw2=settings.maeu_token2.get_secret_value()))
 
@@ -106,7 +105,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                         aud=settings.mscu_aud, pol=point_from, pod=point_to,
                                         start_date=start_date, search_range=search_range.duration,
                                         direct_only=direct_only,
-                                        start_date_type='POL' if start_date_type is schema_request.StartDateType.departure else 'POD',
+                                        start_date_type='POL' if start_date_type == 'Departure' else 'POD',
                                         service=service, tsp=tsp,vessel_imo=vessel_imo,
                                         pw=settings.mscu_rsa_key.get_secret_value(),
                                         msc_client=settings.mscu_client.get_secret_value(),
@@ -116,8 +115,8 @@ async def get_schedules(background_tasks: BackgroundTasks,
                 if carrier_status['data']['activeCarriers']['iqax'] and (carriers in {'OOLU', 'COSU'} or carriers is None):
                     task_group.create_task(carrier='COSCO_task',coro=iqax.get_iqax_p2p(client=client, url=settings.iqax_url, pol=point_from,
                                           pod=point_to,
-                                          departure_date=start_date if start_date_type is schema_request.StartDateType.departure else None,
-                                          arrival_date=start_date if start_date_type is schema_request.StartDateType.arrival else None,
+                                          departure_date=start_date if start_date_type == 'Departure' else None,
+                                          arrival_date=start_date if start_date_type == 'Arrival' else None,
                                           search_range=search_range.value, direct_only=direct_only,
                                           tsp=tsp,vessel_imo=vessel_imo,
                                           scac=carriers, service=service,
@@ -128,8 +127,8 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                           client_id= settings.hlcu_client_id.get_secret_value(),client_secret=settings.hlcu_client_secret.get_secret_value(),
                                           user= settings.hlcu_user_id.get_secret_value(),pw= settings.hlcu_password.get_secret_value(),
                                           pol=point_from,pod=point_to,search_range= search_range.duration,
-                                          etd= start_date if start_date_type is schema_request.StartDateType.departure else None ,
-                                          eta =start_date if start_date_type is schema_request.StartDateType.arrival else None,
+                                          etd= start_date if start_date_type == 'Departure' else None ,
+                                          eta =start_date if start_date_type == 'Arrival' else None,
                                           direct_only=direct_only,
                                           vessel_flag = vessel_flag_code))
                 # 👇 Await ALL

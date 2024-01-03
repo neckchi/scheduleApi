@@ -50,8 +50,8 @@ async def get_msc_p2p(client, background_task,url: str, oauth: str, aud: str, pw
                 carrier_code:str = 'MSCU'
                 first_point_from:str = task['Schedules'][0]['Calls'][0]['Code']
                 last_point_to:str = task['Schedules'][-1]['Calls'][-1]['Code']
-                first_etd = next(ed['CallDateTime'] for ed in task['Schedules'][0]['Calls'][0]['CallDates'] if ed['Type'] == 'ETD')
-                last_eta = next(ed['CallDateTime'] for ed in task['Schedules'][-1]['Calls'][-1]['CallDates'] if ed['Type'] == 'ETA')
+                first_etd:str = next(ed['CallDateTime'] for ed in task['Schedules'][0]['Calls'][0]['CallDates'] if ed['Type'] == 'ETD')
+                last_eta:str = next(ed['CallDateTime'] for ed in task['Schedules'][-1]['Calls'][-1]['CallDates'] if ed['Type'] == 'ETA')
                 find_cutoff = lambda cutoff_type: next((led['CallDateTime'] for led in task['Schedules'][0]['Calls'][0]['CallDates'] if led['Type'] == cutoff_type and led.get('CallDateTime')), None)
                 first_cy_cutoff:str = find_cutoff('CYCUTOFF')
                 first_doc_cutoff:str = find_cutoff('SI')

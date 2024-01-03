@@ -2,7 +2,7 @@
 
 Facade which aggregates the P2P Schedules APIs of the following Carriers:
 
-ANNU, ANRM, APLU, CHNL, CMDU, COSU, CSFU, HDMU, MAEI, MAEU, MCPU, MSCU, ONEY, OOLU, SEAU, SEJJ, SUDU, ZIMU,HLCU
+ANNU, ANRM, APLU, CHNL, CMDU, COSU, CSFU, HDMU, MAEI, MAEU, MCPU, MSCU, ONEY, OOLU, SEAU, SEJJ, ZIMU,HLCU
 
 Other Carriers currently do not offer such an API.
 

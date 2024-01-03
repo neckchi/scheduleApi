@@ -4,6 +4,7 @@ metadata:
   name: configmap
 data:
   backgroundTasks:
+    cacheDB:  Redis
     scheduleExpiry: 4
   activeCarriers:
     cma:  True

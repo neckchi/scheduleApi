@@ -1,5 +1,6 @@
 from app.background_tasks import db
 from app.schemas import schema_response
+from app.config import load_yaml
 from fastapi import status,HTTPException,BackgroundTasks
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
@@ -15,9 +16,10 @@ import asyncio
 class AsyncTaskManager:
     """Currently there is no built in  python class and method that we can prevent it from cancelling all conroutine tasks if one of the tasks is cancelled e.g:timeout
     From my perspective, all those carrier schedules are independent from one antoher so we shouldnt let one/more failed task to cancel all other successful tasks"""
-    def __init__(self):
+    def __init__(self,default_timeout=20):
         self.__tasks:dict = dict()
         self.error:list #Once this becomes true, we wont do any caching.vice versa
+        self.default_timeout = default_timeout
 
     async def __aenter__(self):
         return self
@@ -26,23 +28,34 @@ class AsyncTaskManager:
             logging.error(f'Exception occurred:: {exc_type} - {exc}')
             # Wait for all tasks to complete and handle exceptions
         results = await asyncio.gather(*self.__tasks.values(), return_exceptions=True)
+
         task_names:list = list(self.__tasks.keys())
         self.error:list[dict] = [{task_names[i]: result} for i, result in enumerate(results) if isinstance(result, Exception)]
         if self.error != []:
             for error in self.error:
                 task_name, exception = list(error.items())[0]
-                logging.critical(f"{task_name} connection attempts failed due to {exception}")
+
+                logging.critical(f"{task_name} connection attempts failed:{exception}")
                 results:list = [result for result in results if not isinstance(result, Exception)]
         return results
+
+    async def _timeout_wrapper(self, coro, task_name):
+        """Wrap a coroutine with a timeout.Even though the task is timeout, it will still proceed with the remaining tasks"""
+        try:
+            return await asyncio.wait_for(asyncio.shield(coro), timeout=self.default_timeout)
+        except asyncio.TimeoutError:
+            logging.error(f"{task_name} Task timed out after {self.default_timeout} seconds")
+            return await coro
     def create_task(self,carrier, coro):
-        self.__tasks.update({carrier: asyncio.create_task(coro)})
+        self.__tasks[carrier] = asyncio.create_task(self._timeout_wrapper(coro=coro,task_name=carrier))
+
 
 class HTTPXClientWrapper:
     ##Creating new session for each request but this would probably incur performance overhead issue.
     ##even so it also has its own advantage like fault islation, increased flexibility to each request and avoid concurrency issues.
     @staticmethod
     async def get_client():
-        timeout = httpx.Timeout(35.0, connect=65.0)
+        timeout = httpx.Timeout(30.0, connect=65.0)
         limits = httpx.Limits(max_connections=None)
 
         """
@@ -52,19 +65,23 @@ class HTTPXClientWrapper:
 
         FastAPI dependancy injection allows us to use generator functions as dependenacy
         """
+        client = httpx.AsyncClient(proxies ="http://zscaler.proxy.int.kn:80",verify=False, timeout=timeout, limits=limits)
         try:
-            async with httpx.AsyncClient(proxies ="http://zscaler.proxy.int.kn:80",verify=False, timeout=timeout, limits=limits) as client:
-                # yield the client to the endpoint function
-                logging.info(f'Client Session Started')
-                yield client
-                logging.info(f'Client Session Closed')
-                # close the client when the request is done
+            # async with httpx.AsyncClient(proxies ="http://zscaler.proxy.int.kn:80",verify=False, timeout=timeout, limits=limits) as client:
+            # yield the client to the endpoint function
+            logging.info(f'Client Session Started')
+            yield client
+            logging.info(f'Client Session Closed')
+            # close the client when the request is done
+        except ConnectionError as connect_error: ## Catch Connection error
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail=f'{connect_error.__class__.__name__}:{connect_error}')
         except ValueError as value_error: ## Catch validation error
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f'{value_error.__class__.__name__}:{value_error}')
         except Exception as eg:
             logging.error(f'{eg.__class__.__name__}:{eg.args}')
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f'An error occured while creating the client - {eg.args}')
-
+        finally:
+            await client.aclose()
 
     @staticmethod
     async def call_client(client: httpx.AsyncClient, url: str, method: str = Literal['GET', 'POST'],
@@ -116,8 +133,11 @@ class HTTPXClientWrapper:
             origin=point_from,
             destination=point_to, noofSchedule=count_schedules,
             schedules=sorted_schedules).model_dump(exclude_none=True)
-            background_tasks.add_task(db.set, value=final_result) if not task_exception else ...  # for MongoDB
-            # background_tasks.add_task(db.set,key=product_id,value=data) if not task_group.error else ...#for Redis
+            # background_tasks.add_task(db.set, value=final_result) if not task_exception else ...  # for MongoDB
+            if not task_exception:
+                if load_yaml()['data']['backgroundTasks']['cacheDB'] == 'Redis':
+                    background_tasks.add_task(db.set,key=product_id,value=final_result)
+                else: background_tasks.add_task(db.set, value=final_result)
         return final_result
 
 

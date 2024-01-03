@@ -16,7 +16,7 @@ class ClientSideCache:
     def __await__(self):
         return self.initialize_database().__await__()
     async def initialize_database(self):
-        retries: int = 5
+        retries: int = 2
         while retries > 0:
             try:
                 self._pool = await Redis(connection_pool=self.__pool)
@@ -29,14 +29,19 @@ class ClientSideCache:
                     raise ConnectionError(f'Unable to connect to RedisDB after retries ')
                 else:
                     time.sleep(3)
-                    logging.critical(f'Unable to connect to the RedisDB - {disconnect}')
+                    logging.critical(f'Retry - Unable to connect to the RedisDB - {disconnect}')
 
     async def set(self, key:uuid.UUID, value: dict| list,expire:int = timedelta(hours = load_yaml()['data']['backgroundTasks']['scheduleExpiry'])):
         try:
-            await asyncio.gather(self._pool.set(key.urn, orjson.dumps(value)),self._pool.expire(key.urn, expire))
-            logging.info(f'Background Task:Cached data into schedule collection - {key}')
+            redis_set = self._pool.set(name=key.urn, value=orjson.dumps(value),nx=True)
+            if redis_set is None:
+                logging.info(f'Key:{key} already exists')
+            else:
+                await asyncio.gather(redis_set,self._pool.expire(name = key.urn,time = expire))
+                logging.info(f'Background Task:Cached data into schedule collection - {key}')
         except Exception as insert_db:
             logging.error(insert_db)
+            pass
 
     async def get(self, key: uuid.UUID):
         retries:int = 3
