@@ -32,16 +32,20 @@ class ClientSideCache:
                     logging.critical(f'Retry - Unable to connect to the RedisDB - {disconnect}')
 
     async def set(self, key:uuid.UUID, value: dict| list,expire:int = timedelta(hours = load_yaml()['data']['backgroundTasks']['scheduleExpiry'])):
-        try:
-            redis_set = self._pool.set(name=key.urn, value=orjson.dumps(value),nx=True)
-            if redis_set is None:
-                logging.info(f'Key:{key} already exists')
-            else:
-                await asyncio.gather(redis_set,self._pool.expire(name = key.urn,time = expire))
-                logging.info(f'Background Task:Cached data into schedule collection - {key}')
-        except Exception as insert_db:
-            logging.error(insert_db)
-            pass
+        async with self._pool.pipeline(transaction=True) as pipe:
+            try:
+                await pipe.watch(key.urn) #tells Redis to monitor the 'KEY'. If this key is modified by another client before the transaction is executed, the transaction will be aborted.
+                pipe.multi() # puts the pipeline back into buffered mode. Commands issued after this point are queued up and will be executed atomically.
+                redis_set = pipe.set(name=key.urn, value=orjson.dumps(value),ex=expire,nx=True)
+                if redis_set is None:
+                    await pipe.discard() #Flushes all previously queued commands in a transaction and restores the connection state to normal
+                    logging.info(f'Key:{key} already exists')
+                else:
+                    await pipe.execute()
+                    logging.info(f'Background Task:Cached data into schedule collection - {key}')
+            except Exception as insert_db:
+                logging.error(insert_db)
+                pass
 
     async def get(self, key: uuid.UUID):
         retries:int = 3
