@@ -1,10 +1,9 @@
 from datetime import timedelta
-from redis.asyncio import BlockingConnectionPool, Redis
+from redis.asyncio import BlockingConnectionPool, Redis,WatchError
 from app.config import Settings,load_yaml
 import uuid
 import logging
 import orjson
-import asyncio
 import time
 
 class ClientSideCache:
@@ -34,15 +33,18 @@ class ClientSideCache:
     async def set(self, key:uuid.UUID, value: dict| list,expire:int = timedelta(hours = load_yaml()['data']['backgroundTasks']['scheduleExpiry'])):
         async with self._pool.pipeline(transaction=True) as pipe:
             try:
-                await pipe.watch(key.urn) #tells Redis to monitor the 'KEY'. If this key is modified by another client before the transaction is executed, the transaction will be aborted.
+                await pipe.watch(key.urn) #tells Redis to monitor this key. If this key is modified by any other client before the transaction is executed, the transaction will be aborted.
                 pipe.multi() # puts the pipeline back into buffered mode. Commands issued after this point are queued up and will be executed atomically.
-                redis_set = pipe.set(name=key.urn, value=orjson.dumps(value),ex=expire,nx=True)
+                redis_set = pipe.set(name=key.urn, value=orjson.dumps(value),ex=expire,nx=True) #Using nx = True to make sure the record doesnt exist and prevent us from overwriting the original record
                 if redis_set is None:
-                    await pipe.discard() #Flushes all previously queued commands in a transaction and restores the connection state to normal
+                    await pipe.discard() #Flush all previously queued commands in a transaction and restores the connection state to normal
                     logging.info(f'Key:{key} already exists')
                 else:
                     await pipe.execute()
                     logging.info(f'Background Task:Cached data into schedule collection - {key}')
+            except WatchError as watch_error:
+                logging.error(watch_error) # FIFO so we wont do anything as we only need the first entry to be taken if any other client is going to change the same key
+                pass
             except Exception as insert_db:
                 logging.error(insert_db)
                 pass
