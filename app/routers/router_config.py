@@ -65,14 +65,11 @@ class HTTPXClientWrapper:
 
         FastAPI dependancy injection allows us to use generator functions as dependenacy
         """
-        client = httpx.AsyncClient(proxies ="http://zscaler.proxy.int.kn:80",verify=False, timeout=timeout, limits=limits)
+        client = httpx.AsyncClient(proxies ="http://zscaler.proxy.int.kn:80",verify=False, timeout=timeout, limits=limits) #Using async connection pooling
         try:
-            # async with httpx.AsyncClient(proxies ="http://zscaler.proxy.int.kn:80",verify=False, timeout=timeout, limits=limits) as client:
             # yield the client to the endpoint function
             logging.info(f'Client Session Started')
             yield client
-            logging.info(f'Client Session Closed')
-            # close the client when the request is done
         except ConnectionError as connect_error: ## Catch Connection error
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail=f'{connect_error.__class__.__name__}:{connect_error}')
         except ValueError as value_error: ## Catch validation error
@@ -81,6 +78,8 @@ class HTTPXClientWrapper:
             logging.error(f'{eg.__class__.__name__}:{eg.args}')
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f'An error occured while creating the client - {eg.args}')
         finally:
+            # close the client when the request is done
+            logging.info(f'Client Session Closed')
             await client.aclose()
 
     @staticmethod

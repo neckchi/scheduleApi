@@ -22,7 +22,7 @@ async def get_hmm_p2p(client, url: str, pw: str, pol: str, pod: str, search_rang
             if ((check_transshipment and tsp and first_pot_code) or not tsp) and check_service_code and check_vessel_imo:
                 carrier_code:str = 'HDMU'
                 transit_time:int = task.get('totalTransitDay')
-                first_point_from:str = task.get('loadingPortCode')
+                first_point_from:str = task['outboundInland']['fromUnLocationCode'] if task.get('outboundInland') else task.get('loadingPortCode')
                 first_pot_code:str = task.get('transshipPortCode')
                 first_pol_terminal_name:str = task.get('loadingTerminalName')
                 first_pol_terminal_code:str = task.get('loadingTerminalCode')
@@ -30,7 +30,7 @@ async def get_hmm_p2p(client, url: str, pw: str, pol: str, pod: str, search_rang
                 first_pot_terminal_code:str = task.get('transshipTerminalCode')
                 last_pod_terminal_name:str = task.get('dischargeTerminalName')
                 last_pod_terminal_code:str = task.get('dischargeTerminalCode')
-                last_point_to:str = task.get('dischargePortCode')
+                last_point_to:str =  task['inboundInland']['fromUnLocationCode'] if task.get('inboundInland') else task.get('dischargePortCode')
                 first_etd:str = task.get('departureDate')
                 last_eta:str = task.get('arrivalDate')
                 first_cy_cutoff:str = task.get('cargoCutOffTime')
@@ -38,7 +38,7 @@ async def get_hmm_p2p(client, url: str, pw: str, pol: str, pod: str, search_rang
                 #outbound
                 leg_list:list = [schema_response.Leg.model_construct(
                     pointFrom={'locationName': task['outboundInland']['fromLocationName'],
-                               'locationCode': task['outboundInland']['fromUnLocationCode'],
+                               'locationCode': first_point_from,
                                'terminalName': task['porFacilityName'],
                                'terminalCode': task['porFacilityCode']},
                     pointTo={'locationName': task['outboundInland']['toLocationName'],
@@ -71,7 +71,7 @@ async def get_hmm_p2p(client, url: str, pw: str, pol: str, pod: str, search_rang
                 # inbound
                 leg_list += [schema_response.Leg.model_construct(
                     pointFrom={'locationName': task['inboundInland']['fromLocationName'],
-                               'locationCode': task['inboundInland']['fromUnLocationCode'],
+                               'locationCode': last_point_to,
                                'terminalName': last_pod_terminal_name,
                                'terminalCode': last_pod_terminal_code},
                     pointTo={'locationName': task['inboundInland']['toLocationName'],

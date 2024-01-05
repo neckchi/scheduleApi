@@ -1,6 +1,5 @@
 from functools import lru_cache
 import csv
-import time
 
 def deepget(dct: dict, *keys):
     """
