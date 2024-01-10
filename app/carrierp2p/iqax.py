@@ -5,13 +5,13 @@ from app.schemas import schema_response
 from datetime import datetime,timedelta
 
 
-async def get_iqax_p2p(client, url: str, pw: str, pol: str, pod: str, search_range: int, direct_only: bool |None ,
+async def get_iqax_p2p(client:HTTPXClientWrapper, url: str, pw: str, pol: str, pod: str, search_range: int, direct_only: bool |None ,
                        tsp: str | None = None, departure_date:datetime.date = None, arrival_date: datetime.date = None,vessel_imo:str|None = None,
                        scac: str | None = None, service: str | None = None):
     params: dict = {'appKey': pw, 'porID': pol, 'fndID': pod, 'departureFrom': departure_date,
                     'arrivalFrom': arrival_date, 'searchDuration': search_range}
     iqax_list: set = {'OOLU', 'COSU'} if scac is None else {scac}
-    p2p_resp_tasks: set = {asyncio.create_task(anext(HTTPXClientWrapper.call_client(client=client, method='GET', url=url.format(iqax),params=dict(params, **{'vesselOperatorCarrierCode': iqax})))) for iqax in iqax_list}
+    p2p_resp_tasks: set = {asyncio.create_task(anext(client.parse(method='GET', url=url.format(iqax),params=dict(params, **{'vesselOperatorCarrierCode': iqax})))) for iqax in iqax_list}
     total_schedule_list: list = []
     for response in asyncio.as_completed(p2p_resp_tasks):
         response_json = await response

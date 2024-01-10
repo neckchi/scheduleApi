@@ -3,7 +3,7 @@ from app.schemas import schema_response
 from app.background_tasks import db
 from datetime import datetime,timedelta
 from uuid import uuid5,NAMESPACE_DNS
-async def get_hlag_access_token(client,background_task, url: str,pw:str,user:str, client_id: str,client_secret:str):
+async def get_hlag_access_token(client:HTTPXClientWrapper,background_task, url: str,pw:str,user:str, client_id: str,client_secret:str):
     hlcu_token_key = uuid5(NAMESPACE_DNS, 'hlcu-token-uuid-kuehne-nagel')
     response_token = await db.get(key=hlcu_token_key)
     if response_token is None:
@@ -11,10 +11,10 @@ async def get_hlag_access_token(client,background_task, url: str,pw:str,user:str
                          'X-IBM-Client-Secret': client_secret,
                          'Accept': 'application/json'}
         body:dict = {'mode': "raw",'userId': user,'password': pw,'orgUnit': "HLAG"}
-        response_token = await anext(HTTPXClientWrapper.call_client(method='POST',background_tasks =background_task,client=client,url=url, headers=headers,json=body,token_key=hlcu_token_key,expire=timedelta(minutes=10)))
+        response_token = await anext(client.parse(method='POST',background_tasks =background_task,url=url, headers=headers,json=body,token_key=hlcu_token_key,expire=timedelta(minutes=10)))
     yield response_token['token']
 
-async def get_hlag_p2p(client,background_task, url: str, turl: str,user:str, pw: str, client_id: str,client_secret:str,pol: str, pod: str,search_range: int,
+async def get_hlag_p2p(client:HTTPXClientWrapper,background_task, url: str, turl: str,user:str, pw: str, client_id: str,client_secret:str,pol: str, pod: str,search_range: int,
                        etd: datetime.date = None, eta: datetime.date = None, direct_only: bool|None = None,vessel_flag:str|None = None,service: str | None = None, tsp: str | None = None):
     start_day:str = etd.strftime("%Y-%m-%dT%H:%M:%S.%SZ") if etd else eta.strftime("%Y-%m-%dT%H:%M:%S.%SZ")
     end_day:str = (etd+ timedelta(days=search_range)).strftime("%Y-%m-%dT%H:%M:%S.%SZ") if etd else (eta + timedelta(days=search_range)).strftime("%Y-%m-%dT%H:%M:%S.%SZ")
@@ -24,7 +24,7 @@ async def get_hlag_p2p(client,background_task, url: str, turl: str,user:str, pw:
     params.update({'vesselFlag': vessel_flag}) if vessel_flag is not None else ...
     token = await anext(get_hlag_access_token(client=client,background_task=background_task, url=turl,user=user, pw=pw, client_id= client_id,client_secret = client_secret))
     headers: dict = {'X-IBM-Client-Id': client_id,'X-IBM-Client-Secret': client_secret, 'Authorization': f'Bearer {token}', 'Accept': 'application/json'}
-    response_json = await anext(HTTPXClientWrapper.call_client(client=client, method='GET', url=url, params=params,headers=headers))
+    response_json = await anext(client.parse(method='GET', url=url, params=params,headers=headers))
     if response_json:
         total_schedule_list:list = []
         for task in response_json:

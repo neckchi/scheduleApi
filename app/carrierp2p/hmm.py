@@ -2,7 +2,7 @@ import datetime
 from app.routers.router_config import HTTPXClientWrapper
 from app.schemas import schema_response
 
-async def get_hmm_p2p(client, url: str, pw: str, pol: str, pod: str, search_range: str, direct_only: bool|None,
+async def get_hmm_p2p(client:HTTPXClientWrapper, url: str, pw: str, pol: str, pod: str, search_range: str, direct_only: bool|None,
                       start_date: datetime,
                       tsp: str | None = None,vessel_imo:str | None = None, service: str | None = None):
 
@@ -11,7 +11,7 @@ async def get_hmm_p2p(client, url: str, pw: str, pol: str, pod: str, search_rang
                     'weekTerm': search_range, 'webSort': 'D',
                     'webPriority':'D' if direct_only is True else 'T' if direct_only is False else 'A'}
     headers: dict = {'x-Gateway-APIKey': pw}
-    response_json = await anext(HTTPXClientWrapper.call_client(client=client, method='POST', url=url, headers=headers,json=params))
+    response_json = await anext(client.parse(method='POST', url=url, headers=headers,json=params))
     if response_json and response_json.get('resultMessage') == 'Success':
         total_schedule_list: list = []
         for task in response_json['resultData']:

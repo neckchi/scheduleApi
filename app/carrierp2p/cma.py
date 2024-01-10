@@ -6,9 +6,9 @@ from datetime import datetime
 
 # Check API status
 # https://cma-status-prod.checklyhq.com/
-async def get_all_schedule(client,cma_list:set,url:str,headers:dict,params:dict,extra_condition:bool):
+async def get_all_schedule(client:HTTPXClientWrapper,cma_list:set,url:str,headers:dict,params:dict,extra_condition:bool):
     updated_params = lambda cma_internal_code: dict(params,**{'shippingCompany': cma_internal_code,'specificRoutings': 'USGovernment' if cma_internal_code == '0015' and extra_condition else 'Commercial'})
-    p2p_resp_tasks: list = [asyncio.create_task(anext(HTTPXClientWrapper.call_client(client=client, method='GET', url=url,params= updated_params(cma_internal_code=cma_code),headers=headers))) for cma_code in cma_list]
+    p2p_resp_tasks: list = [asyncio.create_task(anext(client.parse(method='GET', url=url,params= updated_params(cma_internal_code=cma_code),headers=headers))) for cma_code in cma_list]
     all_schedule:list = []
     for response in asyncio.as_completed(p2p_resp_tasks):
         awaited_response = await response
@@ -18,14 +18,14 @@ async def get_all_schedule(client,cma_list:set,url:str,headers:dict,params:dict,
             page: int = 50
             last_page: int = int((awaited_response.headers['content-range']).partition('/')[2])
             cma_code_header: str = awaited_response.headers['X-Shipping-Company-Routings']
-            extra_tasks: list = [asyncio.create_task(anext(HTTPXClientWrapper.call_client(client=client, method='GET', url=url,params=updated_params(cma_internal_code=cma_code_header),headers=dict(headers, **{'range': f'{num}-{49 + num}'}))))
+            extra_tasks: list = [asyncio.create_task(anext(client.parse(method='GET', url=url,params=updated_params(cma_internal_code=cma_code_header),headers=dict(headers, **{'range': f'{num}-{49 + num}'}))))
                                 for num in range(page, last_page, page)]
             for extra_p2p in asyncio.as_completed(extra_tasks):
                 result = await extra_p2p
                 all_schedule.extend(result.json())
     return all_schedule
 
-async def get_cma_p2p(client, url: str, pw: str, pol: str, pod: str, search_range: int, direct_only: bool | None,tsp: str | None = None,vessel_imo:str | None = None,
+async def get_cma_p2p(client:HTTPXClientWrapper, url: str, pw: str, pol: str, pod: str, search_range: int, direct_only: bool | None,tsp: str | None = None,vessel_imo:str | None = None,
                           departure_date: datetime.date = None,
                           arrival_date: datetime.date = None, scac: str | None = None, service: str | None = None):
     default_etd_eta = datetime.now().astimezone().replace(microsecond=0).isoformat()

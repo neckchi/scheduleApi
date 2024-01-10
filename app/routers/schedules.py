@@ -1,5 +1,4 @@
 import datetime
-import httpx
 from uuid import uuid5,NAMESPACE_DNS,UUID
 from fastapi import APIRouter, Query, status, Depends, BackgroundTasks
 from app.carrierp2p import cma, one, hmm, zim, maersk, msc, iqax,hlag
@@ -11,12 +10,11 @@ from app.routers.security import basic_auth
 
 
 router = APIRouter(prefix='/schedules', tags=["API Point To Point Schedules"])
+
 @router.get("/p2p", summary="Search Point To Point schedules from carriers", response_model=schema_response.Product,
             response_model_exclude_defaults=True,
             response_description='Return a list of carrier ocean products with multiple schedules',
             responses={status.HTTP_404_NOT_FOUND: {"model": schema_response.Error}})
-
-
 
 async def get_schedules(background_tasks: BackgroundTasks,
                         point_from: str = Query(alias='pointFrom', default=..., max_length=5,regex=r"[A-Z]{2}[A-Z0-9]{3}",example='HKHKG',description='Search by either port or point of origin'),
@@ -33,13 +31,15 @@ async def get_schedules(background_tasks: BackgroundTasks,
                         settings: Settings = Depends(get_settings),
                         carrier_status = Depends(load_yaml),
                         credentials = Depends(basic_auth),
-                        client: httpx.AsyncClient = Depends(HTTPXClientWrapper.get_client)):
+                        client:HTTPXClientWrapper = Depends(HTTPXClientWrapper())):
+
     """
     Search P2P Schedules with all the information:
     - **pointFrom/pointTo** : Provide either Point or Port in UNECE format
     """
     product_id:UUID = uuid5(NAMESPACE_DNS,f'{scac}-p2p-api-{point_from}{point_to}{start_date_type}{start_date}{search_range}{tsp}{direct_only}{vessel_imo}{service}')
     ttl_schedule = await db.get(key=product_id)
+
     if not ttl_schedule:
         # 👇 Having this allows for waiting for all our tasks with strong safety guarantees,logic around cancellation for failures,coroutine-safe and grouping of exceptions.
         async with AsyncTaskManager() as task_group:
@@ -52,16 +52,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                         search_range=search_range.duration, direct_only=direct_only,vessel_imo = vessel_imo,
                                         tsp=tsp,
                                         service=service, pw=settings.cma_token.get_secret_value()))
-                #No more shipment will be booked with HamburgSud from Nov 2023 onward
-                # if carriers in {'SUDU', 'ANRM'} or carriers is None:
-                #     yield asyncio.create_task(
-                #         hamburgsud.get_sudu_p2p(client=client, url=settings.sudu_url, scac=carriers,
-                #                                 pol=point_from,
-                #                                 pod=point_to,
-                #                                 start_date=start_date, direct_only=direct_only, tsp=tsp,
-                #                                 date_type='earliestDeparture' if start_date_type is schema_request.StartDateType.departure else 'latestArrival',
-                #                                 pw=settings.sudu_token.get_secret_value()))
-                #
+
                 if carrier_status['data']['activeCarriers']['one'] and (carriers == 'ONEY' or carriers is None):
                     task_group.create_task(carrier='ONE_task',coro=one.get_one_p2p(client=client,background_task = background_tasks, url=settings.oney_url, turl=settings.oney_turl,
                                         pol=point_from, pod=point_to, start_date=start_date,
@@ -133,7 +124,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                           vessel_flag = vessel_flag_code))
                 # 👇 Await ALL
             p2p_schedules = await task_group.__aexit__()
-            final_schedules = HTTPXClientWrapper.get_all_valid_schedules(matrix=p2p_schedules,product_id=product_id,point_from=point_from,point_to=point_to,background_tasks=background_tasks,task_exception=task_group.error)
+            final_schedules = client.gen_all_valid_schedules(matrix=p2p_schedules,product_id=product_id,point_from=point_from,point_to=point_to,background_tasks=background_tasks,task_exception=task_group.error)
         return final_schedules
     else:
         return ttl_schedule

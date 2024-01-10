@@ -5,7 +5,7 @@ from uuid import uuid5,NAMESPACE_DNS
 import datetime
 
 
-async def get_zim_access_token(client,background_task, url: str, api_key: str, client_id: str, secret: str):
+async def get_zim_access_token(client:HTTPXClientWrapper,background_task, url: str, api_key: str, client_id: str, secret: str):
     zim_token_key = uuid5(NAMESPACE_DNS, 'zim-token-uuid-kuehne-nagel2')
     response_token = await db.get(key=zim_token_key)
     if response_token is None:
@@ -13,17 +13,17 @@ async def get_zim_access_token(client,background_task, url: str, api_key: str, c
                          }
         params: dict = {'grant_type': 'client_credentials', 'client_id': client_id,
                         'client_secret': secret, 'scope': 'Vessel Schedule'}
-        response_token = await anext(HTTPXClientWrapper.call_client(client=client,background_tasks=background_task,method='POST',url=url, headers=headers, data=params,token_key=zim_token_key,expire=datetime.timedelta(minutes=40)))
+        response_token = await anext(client.parse(background_tasks=background_task,method='POST',url=url, headers=headers, data=params,token_key=zim_token_key,expire=datetime.timedelta(minutes=40)))
     yield response_token['access_token']
 
-async def get_zim_p2p(client, background_task,url: str, turl: str, pw: str, zim_client: str, zim_secret: str, pol: str, pod: str,
+async def get_zim_p2p(client:HTTPXClientWrapper, background_task,url: str, turl: str, pw: str, zim_client: str, zim_secret: str, pol: str, pod: str,
                       search_range: int,
                       start_date: datetime.datetime.date, direct_only: bool |None,vessel_imo:str|None = None, service: str | None = None, tsp: str | None = None):
     params: dict = {'originCode': pol, 'destCode': pod, 'fromDate': start_date,'toDate': (start_date + datetime.timedelta(days=search_range)).strftime("%Y-%m-%d"), 'sortByDepartureOrArrival': 'Departure'}
 
     token = await anext(get_zim_access_token(client=client,background_task=background_task, url=turl, api_key=pw, client_id=zim_client, secret=zim_secret))
     headers: dict = {'Ocp-Apim-Subscription-Key': pw, 'Authorization': f'Bearer {token}','Accept': 'application/json'}
-    response_json = await anext(HTTPXClientWrapper.call_client(client=client, method='GET', url=url, params=params,headers=headers))
+    response_json = await anext(client.parse(method='GET', url=url, params=params,headers=headers))
     if response_json:
         total_schedule_list:list = []
         transport_type:dict = {'Land Trans': 'Truck', 'Feeder': 'Feeder', 'TO BE NAMED': 'Vessel'}

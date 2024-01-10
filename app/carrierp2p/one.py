@@ -4,7 +4,7 @@ from app.schemas import schema_response
 from uuid import uuid5,NAMESPACE_DNS
 from datetime import timedelta,datetime
 
-async def get_one_access_token(client,background_task, url: str, auth: str, api_key: str):
+async def get_one_access_token(client:HTTPXClientWrapper,background_task, url: str, auth: str, api_key: str):
     one_token_key = uuid5(NAMESPACE_DNS, 'one-token-uuid-kuehne-nagel')
     response_token = await db.get(key=one_token_key)
     if response_token is None:
@@ -12,10 +12,10 @@ async def get_one_access_token(client,background_task, url: str, auth: str, api_
                          'Authorization': auth,
                          'Accept': 'application/json'
                          }
-        response_token = await anext(HTTPXClientWrapper.call_client(method='POST',background_tasks=background_task,client=client,url=url, headers=headers,token_key=one_token_key,expire=timedelta(minutes=40)))
+        response_token = await anext(client.parse(method='POST',background_tasks=background_task,url=url, headers=headers,token_key=one_token_key,expire=timedelta(minutes=40)))
     yield response_token['access_token']
 
-async def get_one_p2p(client, background_task,url: str, turl: str, pw: str, auth: str, pol: str, pod: str, search_range: int,
+async def get_one_p2p(client:HTTPXClientWrapper, background_task,url: str, turl: str, pw: str, auth: str, pol: str, pod: str, search_range: int,
                       direct_only: bool|None,
                       start_date: datetime.date,
                       date_type: str | None = None, service: str | None = None,vessel_imo: str | None = None, tsp: str | None = None):
@@ -23,7 +23,7 @@ async def get_one_p2p(client, background_task,url: str, turl: str, pw: str, auth
     # weekout:1 ≤ value ≤ 14
     token = await anext(get_one_access_token(client=client,background_task=background_task, url=turl, auth=auth, api_key=pw))
     headers: dict = {'apikey': pw, 'Authorization': f'Bearer {token}', 'Accept': 'application/json'}
-    response_json = await anext(HTTPXClientWrapper.call_client(client=client, method='GET', url=url, params=params,headers=headers))
+    response_json = await anext(client.parse(method='GET', url=url, params=params,headers=headers))
     if response_json and response_json.get('errorMessages') is None:
         total_schedule_list: list = []
         for schedule_type in response_json:
