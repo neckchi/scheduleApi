@@ -6,8 +6,8 @@ from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from starlette.background import BackgroundTask
 from starlette.responses import StreamingResponse
-from uuid import UUID
-from typing import Literal
+from uuid import UUID,uuid4
+from typing import Literal,Generator
 import httpx
 import logging
 import orjson
@@ -31,9 +31,9 @@ class AsyncTaskManager:
         task_names:list = list(self.__tasks.keys())
         self.error:list[dict] = [{task_names[i]: result} for i, result in enumerate(results) if isinstance(result, Exception)]
         if self.error != []:
-            # for error in self.error:
-            #     task_name, exception = list(error.items())[0]
-            #     logging.critical(f"{task_name} connection attempts failed:{exception}")
+            for error in self.error:
+                task_name, exception = list(error.items())[0]
+                logging.critical(f"{task_name} connection attempts failed:{exception}")
             results:list = [result for result in results if not isinstance(result, Exception)]
         return results
 
@@ -50,27 +50,30 @@ class AsyncTaskManager:
 
 
 
-class HTTPXClientWrapper:
-    def __init__(self,timeout= httpx.Timeout(30.0, connect=65.0),limits= httpx.Limits(max_connections=None), proxies = "http://zscaler.proxy.int.kn:80"):
-        self.timeout = timeout
-        self.limits = limits
-        self.proxies = proxies
+class HTTPXClientWrapper():
+    def __init__(self):
+        self.session_id: str = str(uuid4())
+        self.client:httpx.AsyncClient = httpx.AsyncClient(proxies="http://zscaler.proxy.int.kn:80", verify=False, timeout=httpx.Timeout(30.0, connect=65.0), limits=httpx.Limits(max_connections=None))
+        logging.info(f'Client Session Started - {self.session_id}')
 
-    async def __call__(self):
-        self.client = httpx.AsyncClient(proxies=self.proxies, verify=False, timeout=self.timeout, limits=self.limits)
+    async def close(self):
+        logging.info(f'Client Session Closed - {self.session_id}')
+        await self.client.aclose()
+
+    @staticmethod
+    async def get_httpx_client_wrapper() -> Generator:
+        wrapper = HTTPXClientWrapper()
         try:
-            logging.info('Client Session Started')
-            yield self  # Yielding the wrapper instance itself
+            yield wrapper
         except ConnectionError as connect_error:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f'{connect_error.__class__.__name__}:{connect_error}')
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail=f'{connect_error.__class__.__name__}:{connect_error}')
         except ValueError as value_error:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f'{value_error.__class__.__name__}:{value_error}')
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,detail=f'{value_error.__class__.__name__}:{value_error}')
         except Exception as eg:
             logging.error(f'{eg.__class__.__name__}:{eg.args}')
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f'An error occurred while creating the client - {eg.args}')
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f'An error occurred while creating the client - {eg.args}')
         finally:
-            logging.info('Client Session Closed')
-            await self.client.aclose()
+            await wrapper.close()
 
 
     async def parse(self,url: str, method: str = Literal['GET', 'POST'],params: dict = None, headers: dict = None, json: dict = None, token_key=None,
@@ -104,7 +107,8 @@ class HTTPXClientWrapper:
             else:yield None
 
 
-    def gen_all_valid_schedules(self,matrix:list,product_id:UUID,point_from:str,point_to:str,background_tasks:BackgroundTasks,task_exception:list):
+    # def gen_all_valid_schedules(self,matrix:list,product_id:UUID,point_from:str,point_to:str,background_tasks:BackgroundTasks,task_exception:list):
+    def gen_all_valid_schedules(self, matrix: list, product_id: UUID, point_from: str, point_to: str):
         flat_list: list = []
         for row in matrix:
             if row is not None:
@@ -120,10 +124,10 @@ class HTTPXClientWrapper:
             destination=point_to, noofSchedule=count_schedules,
             schedules=sorted_schedules).model_dump(exclude_none=True)
             # background_tasks.add_task(db.set, value=final_result) if not task_exception else ...  # for MongoDB
-            if not task_exception:
-                if load_yaml()['data']['backgroundTasks']['cacheDB'] == 'Redis':
-                    background_tasks.add_task(db.set,key=product_id,value=final_result)
-                else: background_tasks.add_task(db.set, value=final_result)
+            # if not task_exception:
+            #     if load_yaml()['data']['backgroundTasks']['cacheDB'] == 'Redis':
+            #         background_tasks.add_task(db.set,key=product_id,value=final_result)
+            #     else: background_tasks.add_task(db.set, value=final_result)
         return final_result
 
 

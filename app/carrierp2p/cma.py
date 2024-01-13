@@ -7,7 +7,7 @@ from datetime import datetime
 # Check API status
 # https://cma-status-prod.checklyhq.com/
 async def get_all_schedule(client:HTTPXClientWrapper,cma_list:set,url:str,headers:dict,params:dict,extra_condition:bool):
-    updated_params = lambda cma_internal_code: dict(params,**{'shippingCompany': cma_internal_code,'specificRoutings': 'USGovernment' if cma_internal_code == '0015' and extra_condition else 'Commercial'})
+    updated_params = lambda cma_internal_code: dict(params,**{'shippingCompany': cma_internal_code ,'specificRoutings': 'USGovernment' if cma_internal_code == '0015' and extra_condition else 'Commercial'})
     p2p_resp_tasks: list = [asyncio.create_task(anext(client.parse(method='GET', url=url,params= updated_params(cma_internal_code=cma_code),headers=headers))) for cma_code in cma_list]
     all_schedule:list = []
     for response in asyncio.as_completed(p2p_resp_tasks):
@@ -17,9 +17,10 @@ async def get_all_schedule(client:HTTPXClientWrapper,cma_list:set,url:str,header
         if check_extension: # Each json response might have more than 49 results.if true, CMA will return http:206 and ask us to loop over the pages in order to get all the results from them
             page: int = 50
             last_page: int = int((awaited_response.headers['content-range']).partition('/')[2])
-            cma_code_header: str = awaited_response.headers['X-Shipping-Company-Routings']
-            extra_tasks: list = [asyncio.create_task(anext(client.parse(method='GET', url=url,params=updated_params(cma_internal_code=cma_code_header),headers=dict(headers, **{'range': f'{num}-{49 + num}'}))))
-                                for num in range(page, last_page, page)]
+            cma_code_header = awaited_response.headers['X-Shipping-Company-Routings']
+            check_if_header:bool = len(set(cma_code_header)) > 1  # if it contains mutiple value, we should it 'shippingCompany' blank  so that we can return all schedules from CMA
+            extra_tasks: list = [asyncio.create_task(anext(client.parse(method='GET', url=url,params=updated_params(cma_internal_code=cma_code_header) if not check_if_header else  dict(params,**{'specificRoutings':'Commercial'}),
+                                                                        headers=dict(headers, **{'range': f'{num}-{49 + num}'})))) for num in range(page, last_page, page)]
             for extra_p2p in asyncio.as_completed(extra_tasks):
                 result = await extra_p2p
                 all_schedule.extend(result.json())

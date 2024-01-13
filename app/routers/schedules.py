@@ -31,7 +31,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
                         settings: Settings = Depends(get_settings),
                         carrier_status = Depends(load_yaml),
                         credentials = Depends(basic_auth),
-                        client:HTTPXClientWrapper = Depends(HTTPXClientWrapper())):
+                        client:HTTPXClientWrapper = Depends(HTTPXClientWrapper.get_httpx_client_wrapper)):
 
     """
     Search P2P Schedules with all the information:
@@ -124,7 +124,9 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                           vessel_flag = vessel_flag_code))
                 # 👇 Await ALL
             p2p_schedules = await task_group.__aexit__()
-            final_schedules = client.gen_all_valid_schedules(matrix=p2p_schedules,product_id=product_id,point_from=point_from,point_to=point_to,background_tasks=background_tasks,task_exception=task_group.error)
+            # final_schedules = client.gen_all_valid_schedules(matrix=p2p_schedules,product_id=product_id,point_from=point_from,point_to=point_to,background_tasks=background_tasks,task_exception=task_group.error)
+            final_schedules = client.gen_all_valid_schedules(matrix=p2p_schedules, product_id=product_id,
+                                                             point_from=point_from, point_to=point_to)
         return final_schedules
     else:
         return ttl_schedule
