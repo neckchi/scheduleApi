@@ -16,7 +16,7 @@ import asyncio
 class AsyncTaskManager:
     """Currently there is no built in  python class and method that we can prevent it from cancelling all conroutine tasks if one of the tasks is cancelled e.g:timeout
     From my perspective, all those carrier schedules are independent from one antoher so we shouldnt let one/more failed task to cancel all other successful tasks"""
-    def __init__(self,default_timeout=25):
+    def __init__(self,default_timeout=5):
         self.__tasks:dict = dict()
         self.error:list[dict] #Once this becomes true, we wont do any caching.vice versa
         self.default_timeout = default_timeout
@@ -43,8 +43,7 @@ class AsyncTaskManager:
             return await asyncio.wait_for(asyncio.shield(coro), timeout=self.default_timeout)
         except asyncio.TimeoutError:
             logging.error(f"{task_name}  timed out after {self.default_timeout} seconds")
-            coro.cancel() # BU decided to cancel the coroutine task if timeout
-            # return await coro
+            return await coro
     def create_task(self,carrier, coro):
         self.__tasks[carrier] = asyncio.create_task(self._timeout_wrapper(coro=coro,task_name=carrier))
 
@@ -107,8 +106,7 @@ class HTTPXClientWrapper():
             else:yield None
 
 
-    # def gen_all_valid_schedules(self,matrix:list,product_id:UUID,point_from:str,point_to:str,background_tasks:BackgroundTasks,task_exception:list):
-    def gen_all_valid_schedules(self, matrix: list, product_id: UUID, point_from: str, point_to: str):
+    def gen_all_valid_schedules(self,matrix:list,product_id:UUID,point_from:str,point_to:str,background_tasks:BackgroundTasks,task_exception:list):
         flat_list: list = []
         for row in matrix:
             if row is not None:
@@ -123,11 +121,11 @@ class HTTPXClientWrapper():
             origin=point_from,
             destination=point_to, noofSchedule=count_schedules,
             schedules=sorted_schedules).model_dump(exclude_none=True)
-            # background_tasks.add_task(db.set, value=final_result) if not task_exception else ...  # for MongoDB
-            # if not task_exception:
-            #     if load_yaml()['data']['backgroundTasks']['cacheDB'] == 'Redis':
-            #         background_tasks.add_task(db.set,key=product_id,value=final_result)
-            #     else: background_tasks.add_task(db.set, value=final_result)
+            background_tasks.add_task(db.set, value=final_result) if not task_exception else ...  # for MongoDB
+            if not task_exception:
+                if load_yaml()['data']['backgroundTasks']['cacheDB'] == 'Redis':
+                    background_tasks.add_task(db.set,key=product_id,value=final_result)
+                else: background_tasks.add_task(db.set, value=final_result)
         return final_result
 
 
