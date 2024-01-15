@@ -17,8 +17,8 @@ async def get_all_schedule(client:HTTPXClientWrapper,cma_list:set,url:str,header
         if check_extension: # Each json response might have more than 49 results.if true, CMA will return http:206 and ask us to loop over the pages in order to get all the results from them
             page: int = 50
             last_page: int = int((awaited_response.headers['content-range']).partition('/')[2])
-            cma_code_header = awaited_response.headers['X-Shipping-Company-Routings']
-            check_if_header:bool = len(set(cma_code_header)) > 1  # if it contains mutiple value, we should it 'shippingCompany' blank  so that we can return all schedules from CMA
+            cma_code_header:str = awaited_response.headers['X-Shipping-Company-Routings']
+            check_if_header:bool = len(cma_code_header.split(',')) > 1  # if it contains mutiple value, we should it 'shippingCompany' blank  so that we can return all schedules from CMA
             extra_tasks: list = [asyncio.create_task(anext(client.parse(method='GET', url=url,params=updated_params(cma_internal_code=cma_code_header) if not check_if_header else  dict(params,**{'specificRoutings':'Commercial'}),
                                                                         headers=dict(headers, **{'range': f'{num}-{49 + num}'})))) for num in range(page, last_page, page)]
             for extra_p2p in asyncio.as_completed(extra_tasks):
