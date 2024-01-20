@@ -5,7 +5,8 @@ from app.background_tasks import db
 from app.schemas import schema_response
 from uuid import uuid5,NAMESPACE_DNS
 from datetime import timedelta,datetime
-
+from fastapi import BackgroundTasks
+from itertools import chain
 
 async def get_maersk_cutoff(client:HTTPXClientWrapper, url: str, headers: dict, country: str, pol: str, imo: str, voyage: str):
     params: dict = {'ISOCountryCode': country, 'portOfLoad': pol, 'vesselIMONumber': imo, 'voyage': voyage}
@@ -23,7 +24,7 @@ async def get_maersk_cutoff(client:HTTPXClientWrapper, url: str, headers: dict, 
             yield {lookup_key: cut_off_body}
         yield None
 
-async def retrieve_geo_locations(client:HTTPXClientWrapper, background_task, pol:str, pod:str, location_url:str, pw:str):
+async def retrieve_geo_locations(client:HTTPXClientWrapper, background_task:BackgroundTasks, pol:str, pod:str, location_url:str, pw:str):
     maersk_uuid = lambda port: uuid5(NAMESPACE_DNS, f'maersk-loc-uuid-kuehne-nagel-{port}')
     port_uuid:list = [maersk_uuid(port=port) for port in [pol, pod]]
     [origingeolocation, destinationgeolocation] = await asyncio.gather(*(db.get(key=port_id) for port_id in port_uuid))
@@ -40,7 +41,7 @@ async def retrieve_geo_locations(client:HTTPXClientWrapper, background_task, pol
     return origingeolocation, destinationgeolocation
 
 
-async def get_maersk_p2p(client:HTTPXClientWrapper,background_task,url: str, location_url: str, cutoff_url: str, pw: str, pw2: str, pol: str, pod: str,
+async def get_maersk_p2p(client:HTTPXClientWrapper,background_task:BackgroundTasks,url: str, location_url: str, cutoff_url: str, pw: str, pw2: str, pol: str, pod: str,
                          search_range: str, direct_only: bool|None = None, tsp: str | None = None, scac: str | None = None,
                          start_date: datetime.date = None,
                          date_type: str | None = None, service: str | None = None, vessel_imo:str|None = None,vessel_flag: str | None = None):
@@ -50,10 +51,17 @@ async def get_maersk_p2p(client:HTTPXClientWrapper,background_task,url: str, loc
                         'deliveryDestinationCountryCode': des_geo_location[0]['countryCode'],'deliveryDestinationCityName': des_geo_location[0]['cityName'],'deliveryDestinationUNLocationCode': des_geo_location[0]['UNLocationCode'],
                         'dateRange': f'P{search_range}W', 'startDateType': date_type, 'startDate': start_date}
         params.update({'vesselFlagCode': vessel_flag}) if vessel_flag else ...
-        maersk_list: set = {'MAEU', 'SEAU', 'SEJJ', 'MCPU', 'MAEI'} if scac is None else {scac}
-        p2p_resp_tasks:list = [asyncio.create_task(anext(client.parse(stream = True, method='GET', url=url,params= dict(params, **{'vesselOperatorCarrierCode': mseries}),headers={'Consumer-Key': pw2}))) for mseries in maersk_list]
-        for response in asyncio.as_completed(p2p_resp_tasks):
-            response_json = await response
+        maersk_list: list = ['MAEU', 'SEAU', 'SEJJ', 'MCPU', 'MAEI'] if scac is None else [scac]
+        maersk_response_uuid = lambda scac: uuid5(NAMESPACE_DNS,f'{str(params) + str(direct_only) + str(vessel_imo) + str(service) + str(tsp) + str(scac)}')
+        response_cache = await asyncio.gather(*(db.get(key=maersk_response_uuid(scac=sub_maersk)) for sub_maersk in maersk_list))
+        check_cache:bool = any(item is None for item in response_cache)
+        p2p_resp_tasks:list = [asyncio.create_task(anext(client.parse(background_tasks =background_task,token_key=maersk_response_uuid(scac=mseries),
+                                                                      stream = True, method='GET', url=url,params= dict(params, **{'vesselOperatorCarrierCode': mseries}),
+                                                                      headers={'Consumer-Key': pw2})))for mseries,cache in zip(maersk_list,response_cache) if cache is None] if check_cache else...
+
+
+        for response in (chain(asyncio.as_completed(p2p_resp_tasks),[item for item in response_cache if item is not None]) if check_cache else response_cache):
+            response_json:dict = await response if check_cache and not isinstance(response, dict) else response
             check_oceanProducts = response_json.get('oceanProducts') if response_json else None
             if check_oceanProducts:
                 total_schedule_list: list = []

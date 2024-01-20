@@ -8,6 +8,7 @@ from starlette.background import BackgroundTask
 from starlette.responses import StreamingResponse
 from uuid import UUID,uuid4
 from typing import Literal,Generator
+from datetime import timedelta
 import httpx
 import logging
 import orjson
@@ -76,7 +77,7 @@ class HTTPXClientWrapper():
 
 
     async def parse(self,url: str, method: str = Literal['GET', 'POST'],params: dict = None, headers: dict = None, json: dict = None, token_key=None,
-                          data: dict = None, background_tasks: BackgroundTasks = None, expire=None,stream: bool = False):
+                          data: dict = None, background_tasks: BackgroundTasks = None, expire=timedelta(hours = load_yaml()['data']['backgroundTasks']['scheduleExpiry']),stream: bool = False):
         if not stream:
             response = await self.client.request(method=method, url=url, params=params, headers=headers, json=json,data=data)
             if response.status_code == 206: #only CMA returns 206 if the number of schedule is more than 49. That means we shouldnt deserialize the json response at the beginning coz there are more responses need to be fetched based on the header range.
@@ -121,7 +122,7 @@ class HTTPXClientWrapper():
             origin=point_from,
             destination=point_to, noofSchedule=count_schedules,
             schedules=sorted_schedules).model_dump(exclude_none=True)
-            background_tasks.add_task(db.set, value=final_result) if not task_exception else ...  # for MongoDB
+            # background_tasks.add_task(db.set, value=final_result) if not task_exception else ...  # for MongoDB
             if not task_exception:
                 if load_yaml()['data']['backgroundTasks']['cacheDB'] == 'Redis':
                     background_tasks.add_task(db.set,key=product_id,value=final_result)

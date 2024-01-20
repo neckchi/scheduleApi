@@ -4,9 +4,8 @@ from app.routers.router_config import HTTPXClientWrapper
 from app.schemas import schema_response
 from datetime import datetime
 
-# Check API status
-# https://cma-status-prod.checklyhq.com/
-async def get_all_schedule(client:HTTPXClientWrapper,cma_list:set,url:str,headers:dict,params:dict,extra_condition:bool):
+
+async def get_all_schedule(client:HTTPXClientWrapper,cma_list:list,url:str,headers:dict,params:dict,extra_condition:bool):
     updated_params = lambda cma_internal_code: dict(params,**{'shippingCompany': cma_internal_code ,'specificRoutings': 'USGovernment' if cma_internal_code == '0015' and extra_condition else 'Commercial'})
     p2p_resp_tasks: list = [asyncio.create_task(anext(client.parse(method='GET', url=url,params= updated_params(cma_internal_code=cma_code),headers=headers))) for cma_code in cma_list]
     all_schedule:list = []
@@ -26,7 +25,7 @@ async def get_all_schedule(client:HTTPXClientWrapper,cma_list:set,url:str,header
                 all_schedule.extend(result.json())
     return all_schedule
 
-async def get_cma_p2p(client:HTTPXClientWrapper, url: str, pw: str, pol: str, pod: str, search_range: int, direct_only: bool | None,tsp: str | None = None,vessel_imo:str | None = None,
+async def get_cma_p2p(client:HTTPXClientWrapper,url: str, pw: str, pol: str, pod: str, search_range: int, direct_only: bool | None,tsp: str | None = None,vessel_imo:str | None = None,
                           departure_date: datetime.date = None,
                           arrival_date: datetime.date = None, scac: str | None = None, service: str | None = None):
     default_etd_eta = datetime.now().astimezone().replace(microsecond=0).isoformat()
@@ -35,9 +34,8 @@ async def get_cma_p2p(client:HTTPXClientWrapper, url: str, pw: str, pol: str, po
     headers: dict = {'keyID': pw}
     params: dict = {'placeOfLoading': pol, 'placeOfDischarge': pod,'departureDate': departure_date,'arrivalDate': arrival_date, 'searchRange': search_range,
                     'maxTs': 3 if direct_only in (False,None) else 0,'polVesselIMO':vessel_imo,'polServiceCode': service, 'tsPortCode': tsp}
-    cma_list:set = {None, '0015'} if api_carrier_code is None else {api_carrier_code}
     extra_condition: bool = True if pol.startswith('US') and pod.startswith('US') else False
-
+    cma_list:list = [None, '0015'] if api_carrier_code is None else [api_carrier_code]
     """
     Shippingcompany 0015 (APL) is excluded and works as a separate entity. Usually, customers asking for APL route only wants APL.
     It is the reason why we search for APL schedule, commercial routes of other carriers are not suggested.

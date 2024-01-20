@@ -3,20 +3,28 @@ from app.carrierp2p.helpers import deepget
 from app.routers.router_config import HTTPXClientWrapper
 from app.schemas import schema_response
 from datetime import datetime,timedelta
+from fastapi import BackgroundTasks
+from uuid import uuid5,NAMESPACE_DNS
+from app.background_tasks import db
+from itertools import chain
 
 
-async def get_iqax_p2p(client:HTTPXClientWrapper, url: str, pw: str, pol: str, pod: str, search_range: int, direct_only: bool |None ,
+async def get_iqax_p2p(client:HTTPXClientWrapper,background_task:BackgroundTasks, url: str, pw: str, pol: str, pod: str, search_range: int, direct_only: bool |None ,
                        tsp: str | None = None, departure_date:datetime.date = None, arrival_date: datetime.date = None,vessel_imo:str|None = None,
                        scac: str | None = None, service: str | None = None):
     params: dict = {'appKey': pw, 'porID': pol, 'fndID': pod, 'departureFrom': departure_date,
                     'arrivalFrom': arrival_date, 'searchDuration': search_range}
-    iqax_list: set = {'OOLU', 'COSU'} if scac is None else {scac}
-    p2p_resp_tasks: set = {asyncio.create_task(anext(client.parse(method='GET', url=url.format(iqax),params=dict(params, **{'vesselOperatorCarrierCode': iqax})))) for iqax in iqax_list}
+    iqax_list: list = ['OOLU', 'COSU'] if scac is None else [scac]
+    iqax_response_uuid = lambda scac: uuid5(NAMESPACE_DNS,f'{str(params) + str(direct_only) + str(vessel_imo) + str(service) + str(tsp) + str(scac)}')
+    response_cache:list = await asyncio.gather(*(db.get(key=iqax_response_uuid(scac=sub_iqax)) for sub_iqax in iqax_list))
+    check_cache: bool = any(item is None for item in response_cache)
+    p2p_resp_tasks: set = {asyncio.create_task(anext(client.parse(background_tasks =background_task,token_key=iqax_response_uuid(scac=iqax),
+                                                                  method='GET', url=url.format(iqax),params=dict(params, **{'vesselOperatorCarrierCode': iqax})))) for iqax,cache in zip(iqax_list,response_cache) if cache is None } if check_cache else...
     total_schedule_list: list = []
-    for response in asyncio.as_completed(p2p_resp_tasks):
-        response_json = await response
+    for response in (chain(asyncio.as_completed(p2p_resp_tasks),[item for item in response_cache if item is not None]) if check_cache else response_cache):
+        response_json:dict = await response if check_cache and not isinstance(response, dict) else response
         if response_json:
-            for schedule_list in response_json['routeGroupsList']:
+            for schedule_list in response_json.get('routeGroupsList'):
                 for task in schedule_list['route']:
                     check_service_code:bool = any(service == leg_service['service']['code'] for leg_service in task['leg']) if service else True
                     check_transshipment: bool = not task['direct']

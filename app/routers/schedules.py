@@ -39,7 +39,6 @@ async def get_schedules(background_tasks: BackgroundTasks,
     """
     product_id:UUID = uuid5(NAMESPACE_DNS,f'{scac}-p2p-api-{point_from}{point_to}{start_date_type}{start_date}{search_range}{tsp}{direct_only}{vessel_imo}{service}')
     ttl_schedule = await db.get(key=product_id)
-
     if not ttl_schedule:
         # 👇 Having this allows for waiting for all our tasks with strong safety guarantees,logic around cancellation for failures,coroutine-safe and grouping of exceptions.
         async with AsyncTaskManager() as task_group:
@@ -64,7 +63,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
 
                 # Missing Location Code from HDMU response
                 if carrier_status['data']['activeCarriers']['hmm'] and (carriers == 'HDMU' or carriers is None):
-                    task_group.create_task(carrier='HMM_task',coro=hmm.get_hmm_p2p(client=client, url=settings.hmm_url, pol=point_from, pod=point_to,
+                    task_group.create_task(carrier='HMM_task',coro=hmm.get_hmm_p2p(client=client, url=settings.hmm_url,background_task = background_tasks, pol=point_from, pod=point_to,
                                         start_date=start_date, service=service, direct_only=direct_only,vessel_imo=vessel_imo,
                                         tsp=tsp, pw=settings.hmm_token.get_secret_value(),
                                         search_range=str(search_range.value)))
@@ -104,7 +103,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                         msc_thumbprint=settings.mscu_thumbprint.get_secret_value()))
 
                 if carrier_status['data']['activeCarriers']['iqax'] and (carriers in {'OOLU', 'COSU'} or carriers is None):
-                    task_group.create_task(carrier='COSCO_task',coro=iqax.get_iqax_p2p(client=client, url=settings.iqax_url, pol=point_from,
+                    task_group.create_task(carrier='COSCO_task',coro=iqax.get_iqax_p2p(client=client, background_task = background_tasks,url=settings.iqax_url, pol=point_from,
                                           pod=point_to,
                                           departure_date=start_date if start_date_type == 'Departure' else None,
                                           arrival_date=start_date if start_date_type == 'Arrival' else None,
