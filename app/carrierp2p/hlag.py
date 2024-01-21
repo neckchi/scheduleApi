@@ -7,7 +7,7 @@ from fastapi import BackgroundTasks
 
 
 
-def process_response_data(background_task:BackgroundTasks,response_data: dict,  service: str, tsp: str,uuid:UUID) -> list:
+def process_response_data(response_data: dict,  service: str, tsp: str) -> list:
     total_schedule_list: list = []
     for task in response_data:
         first_point_from: str = task['placeOfReceipt']
@@ -43,7 +43,6 @@ def process_response_data(background_task:BackgroundTasks,response_data: dict,  
                                                                        transshipment=check_transshipment,
                                                                        legs=leg_list).model_dump(warnings=False)
         total_schedule_list.append(schedule_body)
-    background_task.add_task(db.set, key=uuid, value=total_schedule_list) if total_schedule_list else ...
     return total_schedule_list
 async def get_hlag_access_token(client:HTTPXClientWrapper,background_task, url: str,pw:str,user:str, client_id: str,client_secret:str):
     hlcu_token_key:UUID = uuid5(NAMESPACE_DNS, 'hlcu-token-uuid-kuehne-nagel')
@@ -55,7 +54,7 @@ async def get_hlag_access_token(client:HTTPXClientWrapper,background_task, url: 
         body:dict = {'mode': "raw",'userId': user,'password': pw,'orgUnit': "HLAG"}
         response_token:dict  = await anext(client.parse(method='POST',background_tasks =background_task,url=url, headers=headers,json=body,token_key=hlcu_token_key,expire=timedelta(minutes=10)))
     yield response_token['token']
-async def get_hlag_p2p(client:HTTPXClientWrapper,background_task:BackgroundTasks, url: str, turl: str,user:str, pw: str, client_id: str,client_secret:str,pol: str, pod: str,search_range: int,
+async def get_hlag_p2p(client:HTTPXClientWrapper,background_task:BackgroundTasks,url: str, turl: str,user:str, pw: str, client_id: str,client_secret:str,pol: str, pod: str,search_range: int,
                        etd: datetime.date = None, eta: datetime.date = None, direct_only: bool|None = None,vessel_flag:str|None = None,service: str | None = None, tsp: str | None = None):
     start_day:str = etd.strftime("%Y-%m-%dT%H:%M:%S.%SZ") if etd else eta.strftime("%Y-%m-%dT%H:%M:%S.%SZ")
     end_day:str = (etd+ timedelta(days=search_range)).strftime("%Y-%m-%dT%H:%M:%S.%SZ") if etd else (eta + timedelta(days=search_range)).strftime("%Y-%m-%dT%H:%M:%S.%SZ")
@@ -63,15 +62,11 @@ async def get_hlag_p2p(client:HTTPXClientWrapper,background_task:BackgroundTasks
     params.update({'earliestDepartureDateTime': start_day,'latestDepartureDateTime':end_day}) if etd else params.update({'earliestArrivalDateTime': start_day,'arrivalEndDateTime':end_day})
     params.update({'routingTypeCode': direct_only}) if direct_only is not None else...
     params.update({'vesselFlag': vessel_flag}) if vessel_flag is not None else ...
-    hlag_response_uuid:UUID = uuid5(NAMESPACE_DNS,str(params)+str(service)+str(tsp))
-    response_cache = await db.get(key=hlag_response_uuid)
-    if response_cache is not None:
-        return response_cache
     token = await anext(get_hlag_access_token(client=client,background_task=background_task, url=turl,user=user, pw=pw, client_id= client_id,client_secret = client_secret))
     headers: dict = {'X-IBM-Client-Id': client_id,'X-IBM-Client-Secret': client_secret, 'Authorization': f'Bearer {token}', 'Accept': 'application/json'}
     response_json = await anext(client.parse(method='GET', url=url, params=params,headers=headers))
     if response_json:
-        p2p_schedule: list = process_response_data(background_task=background_task, response_data=response_json, service=service,tsp=tsp, uuid=hlag_response_uuid)
+        p2p_schedule: list = process_response_data(response_data=response_json, service=service,tsp=tsp)
         return p2p_schedule
 
 

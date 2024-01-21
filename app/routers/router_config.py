@@ -46,7 +46,7 @@ class AsyncTaskManager:
             logging.error(f"{task_name}  timed out after {self.default_timeout} seconds")
             return await coro
     def create_task(self,carrier, coro):
-        self.__tasks[carrier] = asyncio.create_task(self._timeout_wrapper(coro=coro,task_name=carrier))
+            self.__tasks[carrier] = asyncio.create_task(self._timeout_wrapper(coro=coro,task_name=carrier))
 
 
 
@@ -122,7 +122,6 @@ class HTTPXClientWrapper():
             origin=point_from,
             destination=point_to, noofSchedule=count_schedules,
             schedules=sorted_schedules).model_dump(exclude_none=True)
-            # background_tasks.add_task(db.set, value=final_result) if not task_exception else ...  # for MongoDB
             if not task_exception:
                 if load_yaml()['data']['backgroundTasks']['cacheDB'] == 'Redis':
                     background_tasks.add_task(db.set,key=product_id,value=final_result)

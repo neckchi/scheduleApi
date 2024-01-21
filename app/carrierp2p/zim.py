@@ -6,7 +6,7 @@ from fastapi import BackgroundTasks
 import datetime
 
 
-def process_response_data(background_task:BackgroundTasks,response_data: dict, direct_only:bool |None,vessel_imo: str, service: str, tsp: str,uuid:UUID) -> list:
+def process_response_data(response_data: dict, direct_only:bool |None,vessel_imo: str, service: str, tsp: str) -> list:
     total_schedule_list: list = []
     transport_type: dict = {'Land Trans': 'Truck', 'Feeder': 'Feeder', 'TO BE NAMED': 'Vessel'}
     for task in response_data['response']['routes']:
@@ -33,7 +33,7 @@ def process_response_data(background_task:BackgroundTasks,response_data: dict, d
                vgmCutOffDate=first_vgm_cutoff,
                transitTime=transit_time,
                transshipment=check_transshipment,
-               legs=[schema_response.Leg.model_construct(pointFrom={'locationName': leg['departurePortName'],
+               legs = [schema_response.Leg.model_construct(pointFrom={'locationName': leg['departurePortName'],
                                                                     'locationCode': leg['departurePort']},
                                                          pointTo={'locationName': leg['arrivalPortName'],
                                                                   'locationCode': leg['arrivalPort']},
@@ -49,7 +49,6 @@ def process_response_data(background_task:BackgroundTasks,response_data: dict, d
                                                                   'vgmCutoffDate': leg.get('vgmClosingDate')} if (cyoff := leg.get('containerClosingDate')) or leg.get('docClosingDate') or leg.get('vgmClosingDate') else None,
                                                          voyages={'internalVoyage': voyage_num + leg['leg'],'externalVoyage': leg.get('consortSailingNumber')} if voyage_num else None) for leg in task['routeLegs']]).model_dump(warnings=False)
             total_schedule_list.append(schedule_body)
-    background_task.add_task(db.set, key=uuid,value=total_schedule_list) if total_schedule_list else ...
     return total_schedule_list
 
 
@@ -65,14 +64,10 @@ async def get_zim_access_token(client:HTTPXClientWrapper,background_task:Backgro
 async def get_zim_p2p(client:HTTPXClientWrapper, background_task:BackgroundTasks,url: str, turl: str, pw: str, zim_client: str, zim_secret: str, pol: str, pod: str,
                       search_range: int,start_date: datetime.datetime.date, direct_only: bool |None,vessel_imo:str|None = None, service: str | None = None, tsp: str | None = None):
     params: dict = {'originCode': pol, 'destCode': pod, 'fromDate': start_date,'toDate': (start_date + datetime.timedelta(days=search_range)).strftime("%Y-%m-%d"), 'sortByDepartureOrArrival': 'Departure'}
-    zim_response_uuid:UUID = uuid5(NAMESPACE_DNS,str(params)+str(direct_only)+str(vessel_imo)+str(service)+str(tsp))
-    response_cache = await db.get(key=zim_response_uuid)
-    if response_cache is not None:
-        return response_cache
     token:str = await anext(get_zim_access_token(client=client,background_task=background_task, url=turl, api_key=pw, client_id=zim_client, secret=zim_secret))
     headers: dict = {'Ocp-Apim-Subscription-Key': pw, 'Authorization': f'Bearer {token}','Accept': 'application/json'}
     response_json = await anext(client.parse(method='GET', url=url, params=params,headers=headers))
     if response_json:
-        p2p_schedule: list = process_response_data(background_task=background_task, response_data=response_json,direct_only=direct_only,vessel_imo=vessel_imo, service=service, tsp=tsp, uuid=zim_response_uuid)
+        p2p_schedule: list = process_response_data( response_data=response_json,direct_only=direct_only,vessel_imo=vessel_imo, service=service, tsp=tsp)
         return p2p_schedule
 

@@ -1,11 +1,9 @@
 import datetime
 from app.routers.router_config import HTTPXClientWrapper
 from app.schemas import schema_response
-from fastapi import BackgroundTasks
-from app.background_tasks import db
-from uuid import uuid5,NAMESPACE_DNS,UUID
 
-def process_response_data(background_task:BackgroundTasks,response_data: dict, vessel_imo: str, service: str, tsp: str,uuid:UUID) -> list:
+
+def process_response_data(response_data: dict, vessel_imo: str, service: str, tsp: str) -> list:
     total_schedule_list: list = []
     for task in response_data['resultData']:
         check_service_code: bool = any(services['vesselLoop'] == service for services in task['vessel'] if services.get('vesselDepartureDate')) if service else True
@@ -87,22 +85,17 @@ def process_response_data(background_task:BackgroundTasks,response_data: dict, v
                                                                            transshipment=check_transshipment,
                                                                            legs=leg_list).model_dump(warnings=False)
             total_schedule_list.append(schedule_body)
-    background_task.add_task(db.set, key=uuid,value=total_schedule_list) if total_schedule_list else ...
     return total_schedule_list
 
-async def get_hmm_p2p(client:HTTPXClientWrapper,background_task:BackgroundTasks, url: str, pw: str, pol: str, pod: str, search_range: str, direct_only: bool|None,
+async def get_hmm_p2p(client:HTTPXClientWrapper, url: str, pw: str, pol: str, pod: str, search_range: str, direct_only: bool|None,
                       start_date: datetime,tsp: str | None = None,vessel_imo:str | None = None, service: str | None = None):
 
     params: dict = {'fromLocationCode': pol, 'receiveTermCode': 'CY', 'toLocationCode': pod, 'deliveryTermCode': 'CY',
                     'periodDate': start_date.strftime("%Y%m%d"),'weekTerm': search_range, 'webSort': 'D','webPriority':'D' if direct_only is True else 'T' if direct_only is False else 'A'}
     headers: dict = {'x-Gateway-APIKey': pw}
-    hmm_response_uuid:UUID = uuid5(NAMESPACE_DNS,str(params)+str(vessel_imo)+str(service)+str(tsp))
-    response_cache = await db.get(key=hmm_response_uuid)
-    if response_cache is not None:
-        return response_cache
     response_json = await anext(client.parse(method='POST', url=url, headers=headers,json=params))
     if response_json and response_json.get('resultMessage') == 'Success':
-        p2p_schedule:list = process_response_data(background_task=background_task,response_data=response_json,vessel_imo=vessel_imo,service=service,tsp=tsp,uuid=hmm_response_uuid)
+        p2p_schedule:list = process_response_data(response_data=response_json,vessel_imo=vessel_imo,service=service,tsp=tsp)
         return p2p_schedule
 
 

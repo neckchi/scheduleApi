@@ -4,6 +4,7 @@ from app.routers.router_config import HTTPXClientWrapper
 from app.schemas import schema_response
 from datetime import datetime
 
+
 def process_response_data(response_data: list,carrier_list:dict) -> list:
     default_etd_eta = datetime.now().astimezone().replace(microsecond=0).isoformat()
     total_schedule_list: list = []
@@ -53,7 +54,7 @@ async def get_all_schedule(client:HTTPXClientWrapper,cma_list:list,url:str,heade
     all_schedule:list = []
     for response in asyncio.as_completed(p2p_resp_tasks):
         awaited_response = await response
-        check_extension:bool = awaited_response is not None and type(awaited_response) != list and awaited_response.status_code == 206
+        check_extension:bool = awaited_response is not None and not isinstance(awaited_response,list) and awaited_response.status_code == 206
         all_schedule.extend(awaited_response.json() if check_extension else awaited_response) if awaited_response else...
         if check_extension: # Each json response might have more than 49 results.if true, CMA will return http:206 and ask us to loop over the pages in order to get all the results from them
             page: int = 50
@@ -83,6 +84,7 @@ async def get_cma_p2p(client:HTTPXClientWrapper,url: str, pw: str, pol: str, pod
     If commercial routes are not defined for a shipping company, you will get solutions of the other shipping companies (except for APL)
     """
     response_json = await get_all_schedule(client=client,url=url,headers=headers,params=params,cma_list=cma_list,extra_condition=extra_condition)
+
     if response_json:
         p2p_schedule: list = process_response_data(response_data=response_json,carrier_list = carrier_code)
         return p2p_schedule

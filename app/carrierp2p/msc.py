@@ -9,7 +9,7 @@ from app.schemas import schema_response
 from uuid import uuid5,NAMESPACE_DNS,UUID
 from fastapi import BackgroundTasks
 
-def process_response_data(background_task:BackgroundTasks,response_data: dict, direct_only:bool |None,vessel_imo: str, service: str, tsp: str,uuid:UUID) -> list:
+def process_response_data(background_task:BackgroundTasks,response_data: dict, direct_only:bool |None,vessel_imo: str, service: str, tsp: str) -> list:
     total_schedule_list: list = []
     for task in response_data['MSCSchedule']['Transactions']:
         check_service_code: bool = any(service_desc.get('Service') and service_desc['Service']['Description'] == service for service_desc in task['Schedules']) if service else True
@@ -57,7 +57,6 @@ def process_response_data(background_task:BackgroundTasks,response_data: dict, d
                                                                            transshipment=check_transshipment,
                                                                            legs=leg_list).model_dump(warnings=False)
             total_schedule_list.append(schedule_body)
-    background_task.add_task(db.set, key=uuid, value=total_schedule_list) if total_schedule_list else ...
     return total_schedule_list
 
 async def get_msc_token(client:HTTPXClientWrapper,background_task:BackgroundTasks, oauth: str, aud: str, rsa: str, msc_client: str, msc_scope: str, msc_thumbprint: str):
@@ -77,14 +76,10 @@ async def get_msc_token(client:HTTPXClientWrapper,background_task:BackgroundTask
 async def get_msc_p2p(client:HTTPXClientWrapper, background_task:BackgroundTasks,url: str, oauth: str, aud: str, pw: str, msc_client: str, msc_scope: str,msc_thumbprint: str, pol: str, pod: str,
                       search_range: int, start_date_type: str,start_date: datetime.date, direct_only: bool |None, vessel_imo: str | None = None, service: str | None = None, tsp: str | None = None):
     params: dict = {'fromPortUNCode': pol, 'toPortUNCode': pod, 'fromDate': start_date,'toDate': (start_date + timedelta(days=search_range)).strftime("%Y-%m-%d"), 'datesRelated': start_date_type}
-    msc_response_uuid:UUID = uuid5(NAMESPACE_DNS,str(params)+str(direct_only)+str(vessel_imo)+str(service)+str(tsp))
-    response_cache = await db.get(key=msc_response_uuid)
-    if response_cache is not None:
-        return response_cache
     token = await anext(get_msc_token(client=client,background_task=background_task,oauth=oauth, aud=aud, rsa=pw, msc_client=msc_client, msc_scope=msc_scope,msc_thumbprint=msc_thumbprint))
     headers: dict = {'Authorization': f'Bearer {token}'}
     response_json = await anext(client.parse(method='GET', url=url, params=params, headers=headers))
     if response_json:
-        p2p_schedule: list = process_response_data(background_task=background_task, response_data=response_json,direct_only=direct_only,vessel_imo=vessel_imo, service=service, tsp=tsp, uuid=msc_response_uuid)
+        p2p_schedule: list = process_response_data(background_task=background_task, response_data=response_json,direct_only=direct_only,vessel_imo=vessel_imo, service=service, tsp=tsp)
         return p2p_schedule
 

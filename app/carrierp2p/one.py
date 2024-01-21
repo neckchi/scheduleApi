@@ -5,7 +5,7 @@ from uuid import uuid5,NAMESPACE_DNS,UUID
 from datetime import timedelta,datetime
 from fastapi import BackgroundTasks
 
-def process_response_data(background_task:BackgroundTasks,response_data: dict,vessel_imo: str, service: str, tsp: str,uuid:UUID) -> list:
+def process_response_data(response_data: dict,vessel_imo: str, service: str, tsp: str) -> list:
     total_schedule_list: list = []
     for schedule_type in response_data:
         for task in response_data[schedule_type]:
@@ -71,7 +71,6 @@ def process_response_data(background_task:BackgroundTasks,response_data: dict,ve
                                                                                transshipment=check_transshipment,
                                                                                legs=leg_list).model_dump(warnings=False)
                 total_schedule_list.append(schedule_body)
-    background_task.add_task(db.set, key=uuid, value=total_schedule_list) if total_schedule_list else ...
     return total_schedule_list
 
 async def get_one_access_token(client:HTTPXClientWrapper,background_task:BackgroundTasks, url: str, auth: str, api_key: str):
@@ -85,15 +84,11 @@ async def get_one_access_token(client:HTTPXClientWrapper,background_task:Backgro
 async def get_one_p2p(client:HTTPXClientWrapper, background_task:BackgroundTasks,url: str, turl: str, pw: str, auth: str, pol: str, pod: str, search_range: int,
                       direct_only: bool|None,start_date: datetime.date,date_type: str | None = None, service: str | None = None,vessel_imo: str | None = None, tsp: str | None = None):
     params: dict = {'originPort': pol, 'destinationPort': pod, 'searchDate': start_date,'searchDateType': date_type, 'weeksOut': search_range,'directOnly': 'TRUE' if direct_only is True else 'FALSE'}
-    one_response_uuid:UUID = uuid5(NAMESPACE_DNS,str(params)+str(vessel_imo)+str(service)+str(tsp))
-    response_cache = await db.get(key=one_response_uuid)
     # weekout:1 ≤ value ≤ 14
-    if response_cache is not None:
-        return response_cache
     token:str = await anext(get_one_access_token(client=client,background_task=background_task, url=turl, auth=auth, api_key=pw))
     headers: dict = {'apikey': pw, 'Authorization': f'Bearer {token}', 'Accept': 'application/json'}
     response_json = await anext(client.parse(method='GET', url=url, params=params,headers=headers))
     if response_json and response_json.get('errorMessages') is None:
-        p2p_schedule: list = process_response_data(background_task=background_task, response_data=response_json, vessel_imo=vessel_imo, service=service,tsp=tsp, uuid=one_response_uuid)
+        p2p_schedule: list = process_response_data(response_data=response_json, vessel_imo=vessel_imo, service=service,tsp=tsp)
         return p2p_schedule
 
