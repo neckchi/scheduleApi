@@ -86,7 +86,7 @@ async def get_cma_p2p(client:HTTPXClientWrapper,url: str, pw: str, pol: str, pod
     response_json = await get_all_schedule(client=client,url=url,headers=headers,params=params,cma_list=cma_list,extra_condition=extra_condition)
 
     if response_json:
-        p2p_schedule: list = process_response_data(response_data=response_json,carrier_list = carrier_code)
+        p2p_schedule: list = await asyncio.to_thread(process_response_data,response_data=response_json,carrier_list = carrier_code)
         return p2p_schedule
 
 

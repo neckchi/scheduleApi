@@ -1,5 +1,6 @@
 import jwt
 import base64
+import asyncio
 from datetime import datetime, timedelta, timezone
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
@@ -80,6 +81,6 @@ async def get_msc_p2p(client:HTTPXClientWrapper, background_task:BackgroundTasks
     headers: dict = {'Authorization': f'Bearer {token}'}
     response_json = await anext(client.parse(method='GET', url=url, params=params, headers=headers))
     if response_json:
-        p2p_schedule: list = process_response_data(background_task=background_task, response_data=response_json,direct_only=direct_only,vessel_imo=vessel_imo, service=service, tsp=tsp)
+        p2p_schedule: list = await asyncio.to_thread(process_response_data,background_task=background_task, response_data=response_json,direct_only=direct_only,vessel_imo=vessel_imo, service=service, tsp=tsp)
         return p2p_schedule
 

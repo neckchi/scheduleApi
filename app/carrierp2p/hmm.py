@@ -1,4 +1,5 @@
 import datetime
+import asyncio
 from app.routers.router_config import HTTPXClientWrapper
 from app.schemas import schema_response
 
@@ -95,7 +96,7 @@ async def get_hmm_p2p(client:HTTPXClientWrapper, url: str, pw: str, pol: str, po
     headers: dict = {'x-Gateway-APIKey': pw}
     response_json = await anext(client.parse(method='POST', url=url, headers=headers,json=params))
     if response_json and response_json.get('resultMessage') == 'Success':
-        p2p_schedule:list = process_response_data(response_data=response_json,vessel_imo=vessel_imo,service=service,tsp=tsp)
+        p2p_schedule:list = await asyncio.to_thread(process_response_data,response_data=response_json,vessel_imo=vessel_imo,service=service,tsp=tsp)
         return p2p_schedule
 
 

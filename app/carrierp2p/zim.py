@@ -1,9 +1,11 @@
+import asyncio
+import datetime
 from app.routers.router_config import HTTPXClientWrapper
 from app.background_tasks import db
 from app.schemas import schema_response
 from uuid import uuid5,NAMESPACE_DNS,UUID
 from fastapi import BackgroundTasks
-import datetime
+
 
 
 def process_response_data(response_data: dict, direct_only:bool |None,vessel_imo: str, service: str, tsp: str) -> list:
@@ -68,6 +70,6 @@ async def get_zim_p2p(client:HTTPXClientWrapper, background_task:BackgroundTasks
     headers: dict = {'Ocp-Apim-Subscription-Key': pw, 'Authorization': f'Bearer {token}','Accept': 'application/json'}
     response_json = await anext(client.parse(method='GET', url=url, params=params,headers=headers))
     if response_json:
-        p2p_schedule: list = process_response_data( response_data=response_json,direct_only=direct_only,vessel_imo=vessel_imo, service=service, tsp=tsp)
+        p2p_schedule: list = await asyncio.to_thread(process_response_data,response_data=response_json,direct_only=direct_only,vessel_imo=vessel_imo, service=service, tsp=tsp)
         return p2p_schedule
 

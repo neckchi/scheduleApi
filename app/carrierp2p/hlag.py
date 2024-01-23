@@ -4,6 +4,7 @@ from app.background_tasks import db
 from datetime import datetime,timedelta
 from uuid import uuid5,NAMESPACE_DNS,UUID
 from fastapi import BackgroundTasks
+import asyncio
 
 
 
@@ -66,7 +67,7 @@ async def get_hlag_p2p(client:HTTPXClientWrapper,background_task:BackgroundTasks
     headers: dict = {'X-IBM-Client-Id': client_id,'X-IBM-Client-Secret': client_secret, 'Authorization': f'Bearer {token}', 'Accept': 'application/json'}
     response_json = await anext(client.parse(method='GET', url=url, params=params,headers=headers))
     if response_json:
-        p2p_schedule: list = process_response_data(response_data=response_json, service=service,tsp=tsp)
+        p2p_schedule: list = await asyncio.to_thread(process_response_data,response_data=response_json, service=service,tsp=tsp)
         return p2p_schedule
 
 

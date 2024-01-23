@@ -67,6 +67,6 @@ async def get_iqax_p2p(client:HTTPXClientWrapper,background_task:BackgroundTasks
     for response in (chain(asyncio.as_completed(p2p_resp_tasks),[item for item in response_cache if item is not None]) if check_cache else response_cache):
         response_json:dict = await response if check_cache and not isinstance(response, dict) else response
         if response_json:
-            p2p_schedule: list = process_response_data(response_data=response_json,direct_only=direct_only, vessel_imo=vessel_imo, service=service,tsp=tsp)
+            p2p_schedule: list = await asyncio.to_thread(process_response_data,response_data=response_json,direct_only=direct_only, vessel_imo=vessel_imo, service=service,tsp=tsp)
             return p2p_schedule
 
