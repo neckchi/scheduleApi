@@ -94,7 +94,7 @@ async def get_hmm_p2p(client:HTTPXClientWrapper, url: str, pw: str, pol: str, po
     params: dict = {'fromLocationCode': pol, 'receiveTermCode': 'CY', 'toLocationCode': pod, 'deliveryTermCode': 'CY',
                     'periodDate': start_date.strftime("%Y%m%d"),'weekTerm': search_range, 'webSort': 'D','webPriority':'D' if direct_only is True else 'T' if direct_only is False else 'A'}
     headers: dict = {'x-Gateway-APIKey': pw}
-    response_json = await anext(client.parse(method='POST', url=url, headers=headers,json=params))
+    response_json:dict = await anext(client.parse(method='POST', url=url, headers=headers,json=params))
     if response_json and response_json.get('resultMessage') == 'Success':
         p2p_schedule:list = await asyncio.to_thread(process_response_data,response_data=response_json,vessel_imo=vessel_imo,service=service,tsp=tsp)
         return p2p_schedule

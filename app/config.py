@@ -1,7 +1,11 @@
 import yaml
+import queue
+import logging.config
 from pydantic import SecretStr
 from functools import cache
+from os import path
 from pydantic_settings import BaseSettings,SettingsConfigDict
+from logging.handlers import QueueHandler, QueueListener
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file='./app/.env', env_file_encoding='utf-8')
@@ -65,3 +69,13 @@ def load_yaml() -> dict:
         config = yaml.load(yml_file,Loader=yaml.FullLoader)
     return config
 
+
+def log_queue_listener() -> QueueListener:
+    log_file_path = path.join(path.dirname(path.abspath(__file__)), 'logging.ini')
+    logging.config.fileConfig(log_file_path, disable_existing_loggers=False)
+    log_que = queue.Queue(-1)
+    queue_handler = QueueHandler(log_que)
+    listener = QueueListener(log_que, *logging.getLogger().handlers, respect_handler_level=True)
+    logger = logging.getLogger(__name__)
+    logger.addHandler(queue_handler)
+    return listener

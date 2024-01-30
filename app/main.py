@@ -5,27 +5,25 @@ from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from fastapi.middleware.gzip import GZipMiddleware
 from app.routers import schedules
 from app.background_tasks import db
-from os import path
+from app.config import log_queue_listener
 import uvicorn
-import logging.config
+import atexit
 
 
-# setup loggers
-log_file_path = path.join(path.dirname(path.abspath(__file__)), 'logging.cfg')
-logging.config.fileConfig(log_file_path, disable_existing_loggers=False)
-
-# get root logger
-logger = logging.getLogger(__name__)
-
+queue_lister = log_queue_listener()
 app = FastAPI(docs_url=None, redoc_url=None)
 app.include_router(schedules.router)
 app.add_middleware(GZipMiddleware, minimum_size=4000)
 
-# # 👇 Initalize the MongoDB before starting the application
+# #👇 Initalize the MongoDB/Redis and Logging.Queue before starting the application
 @app.on_event('startup')
 async def startup():
+    queue_lister.start()
     await db.initialize_database()
 
+@app.on_event("shutdown")
+def shutdown_event():
+    atexit.register(queue_lister.stop)
 
 @app.get("/docs", include_in_schema=False)
 def overridden_swagger():
