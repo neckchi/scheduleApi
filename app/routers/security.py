@@ -1,3 +1,4 @@
+import logging
 import secrets
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
@@ -16,6 +17,7 @@ def basic_auth(credentials: HTTPBasicCredentials = Depends(security)):
         current_password_bytes, correct_password_bytes
     )
     if not (is_correct_username and is_correct_password):
+        logging.error('User cant access to API hub due to wrong user id and password')
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",

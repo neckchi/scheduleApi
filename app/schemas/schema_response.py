@@ -25,7 +25,7 @@ class Cutoff(BaseModel):
 
 class Transportation(BaseModel):
     transportType: str = Field(description='e.g:Vessel,Barge,Feeder,Truck,Rail,Truck / Rail,Intermodal', example='Vessel')
-    transportName: str | None = Field(title='Vehicle Type', description='e.g:VesselName', example='ISEACO WISDOM',default=None)
+    transportName: str | None = Field(title='Vehicle Type',max_length=40, description='e.g:VesselName', example='ISEACO WISDOM',default=None)
     referenceType: str | None = Field(title='Reference Type', description='e.g:IMO', example='IMO',default=None)
     reference: int | str | None = Field(title='Reference Value', description='e.g:Vessel IMO Code', example='9172301',default=None)
 
@@ -56,13 +56,13 @@ class Transportation(BaseModel):
 
 
 class Voyage(BaseModel):
-    internalVoyage: str | None = Field(default=None, example='012W')
-    externalVoyage: str | None = Field(default=None, example='126W')
+    internalVoyage: str | None = Field(default=None,max_length=10, example='012W')
+    externalVoyage: str | None = Field(default=None,max_length=10, example='126W')
 
 
 class Service(BaseModel):
-    serviceCode: str | None = Field(default=None, example='NVS')
-    serviceName: str | None = Field(default=None, example='EAST ASIA TRADE')
+    serviceCode: str | None = Field(default=None,max_length=20, example='NVS')
+    serviceName: str | None = Field(default=None,max_length=80, example='EAST ASIA TRADE')
 
 
 class Leg(BaseModel):
@@ -129,7 +129,7 @@ class Product(BaseModel):
     destination: str = Field(max_length=5, title="Origin ",
                              description="This is the origin of country presented in UNECE standard ", example="DEHAM",
                              pattern =r"[A-Z]{2}[A-Z0-9]{3}")
-    noofSchedule: PositiveInt = Field(title='Number Of Schedule', example=1)
+    noofSchedule: PositiveInt = Field(ge=0,title='Number Of Schedule', example=1)
     schedules: list[Schedule] | None = Field(default=None, title='Number Of Schedules',
                                              description="The number of p2p schedule offered by carrier")
 

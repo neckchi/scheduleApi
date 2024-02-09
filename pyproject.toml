@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "api-hub"
+version = "0.1.0"
+description = "external p2p schedule api hub"
+authors = ["neckchi <neck.chi@kuehne-nagel.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "3.11.2"
+cryptography = "41.0.1"
+fastapi = "0.108.0"
+httpx = "0.25.2"
+motor = "3.2.0"
+orjson = "3.9.10"
+pydantic = "2.5.3"
+pydantic-settings = "2.1.0"
+pyjwt = "2.8.0"
+pymongo = "4.4.0"
+pyyaml = "6.0.1"
+redis = "5.0.1"
+starlette = "0.32.0"
+uvicorn = "0.23.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

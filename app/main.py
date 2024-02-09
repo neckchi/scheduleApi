@@ -13,7 +13,8 @@ import atexit
 queue_lister = log_queue_listener()
 app = FastAPI(docs_url=None, redoc_url=None)
 app.include_router(schedules.router)
-app.add_middleware(GZipMiddleware, minimum_size=4000)
+
+
 
 # #👇 Initalize the MongoDB/Redis and Logging.Queue before starting the application
 @app.on_event('startup')
@@ -55,11 +56,10 @@ def custom_openapi():
     return app.openapi_schema
 
 
-origins = ["*"]
-
+app.add_middleware(GZipMiddleware, minimum_size=4000)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=['GET'],
     allow_headers=["*"],

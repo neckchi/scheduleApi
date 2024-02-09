@@ -19,7 +19,7 @@ class AsyncTaskManager:
     From my perspective, all those carrier schedules are independent from one antoher so we shouldnt let one/more failed task to cancel all other successful tasks"""
     def __init__(self,default_timeout=25):
         self.__tasks:dict = dict()
-        self.error:list[dict] #Once this becomes true, we wont do any caching.vice versa
+        self.error:list[dict] #This is mainly used to catch the error in case asyncio future task is failed
         self.default_timeout = default_timeout
 
     async def __aenter__(self):
@@ -53,7 +53,7 @@ class AsyncTaskManager:
 class HTTPXClientWrapper():
     def __init__(self):
         self.session_id: str = str(uuid4())
-        self.client:httpx.AsyncClient = httpx.AsyncClient(proxies="http://zscaler.proxy.int.kn:80", verify=False, timeout=httpx.Timeout(30.0, connect=65.0), limits=httpx.Limits(max_connections=None))
+        self.client:httpx.AsyncClient = httpx.AsyncClient(proxies="http://zscaler.proxy.int.kn:80", verify=False, timeout=httpx.Timeout(30.0, connect=65.0), limits=httpx.Limits(max_connections=50,max_keepalive_connections=0))
         logging.info(f'Client Session Started - {self.session_id}')
 
     async def close(self):
@@ -62,9 +62,10 @@ class HTTPXClientWrapper():
 
     @staticmethod
     async def get_httpx_client_wrapper() -> Generator:
-        wrapper = HTTPXClientWrapper()
+        standalone_client = HTTPXClientWrapper() ## standalone client session
         try:
-            yield wrapper
+            yield standalone_client
+            # yield global_wrapper
         except ConnectionError as connect_error:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail=f'{connect_error.__class__.__name__}:{connect_error}')
         except ValueError as value_error:
@@ -73,7 +74,8 @@ class HTTPXClientWrapper():
             logging.error(f'{eg.__class__.__name__}:{eg.args}')
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f'An error occurred while creating the client - {eg.args}')
         finally:
-            await wrapper.close()
+            # await global_wrapper.close()
+            await standalone_client.close()
 
 
     async def parse(self,url: str, method: str = Literal['GET', 'POST'],params: dict = None, headers: dict = None, json: dict = None, token_key=None,

@@ -1,4 +1,3 @@
-from functools import lru_cache
 import csv
 
 def deepget(dct: dict, *keys):
@@ -13,14 +12,3 @@ def deepget(dct: dict, *keys):
     return dct
 
 
-@lru_cache(maxsize=None)
-def check_loop(file_path,scac:str,loop_code:str = None,loop_name:str = None):
-    """
-    Check if the loop code/loop name exists in SCT for testing purpose only
-    """
-    with open(file_path, mode="r") as loop:
-        reader = csv.reader(loop)
-        for row in reader:
-            if (loop_code and scac == row[0] and loop_code == row[1]) or (loop_name and scac == row[0] and loop_name == row[2]):
-                return True
-    return False

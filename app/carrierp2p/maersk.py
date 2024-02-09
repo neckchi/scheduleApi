@@ -48,7 +48,7 @@ async def process_response_data(client:HTTPXClientWrapper,cut_off_url:str,cut_of
                     transportations={'transportType': transport_type.get(leg['transport']['transportMode']),
                                      'transportName': deepget(leg['transport'], 'vessel', 'vesselName'),
                                      'referenceType': 'IMO' if (imo_code := str(deepget(leg['transport'], 'vessel', 'vesselIMONumber'))) and imo_code not in ('9999999', 'None') else None,
-                                     'reference': imo_code if imo_code not in ('9999999', 'None') else None},
+                                     'reference': imo_code if imo_code not in ('9999999', 'None', '') else None},
                     services={'serviceCode': service_name} if (
                         service_name := leg['transport'].get('carrierServiceName',
                                                              leg['transport'].get('carrierServiceCode'))) else None,

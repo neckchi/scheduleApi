@@ -10,7 +10,7 @@ from app.schemas import schema_response
 from uuid import uuid5,NAMESPACE_DNS,UUID
 from fastapi import BackgroundTasks
 
-def process_response_data(background_task:BackgroundTasks,response_data: dict, direct_only:bool |None,vessel_imo: str, service: str, tsp: str) -> list:
+def process_response_data(response_data: dict, direct_only:bool |None,vessel_imo: str, service: str, tsp: str) -> list:
     total_schedule_list: list = []
     for task in response_data['MSCSchedule']['Transactions']:
         check_service_code: bool = any(service_desc.get('Service') and service_desc['Service']['Description'] == service for service_desc in task['Schedules']) if service else True
@@ -81,6 +81,6 @@ async def get_msc_p2p(client:HTTPXClientWrapper, background_task:BackgroundTasks
     headers: dict = {'Authorization': f'Bearer {token}'}
     response_json = await anext(client.parse(method='GET', url=url, params=params, headers=headers))
     if response_json:
-        p2p_schedule: list = await asyncio.to_thread(process_response_data,background_task=background_task, response_data=response_json,direct_only=direct_only,vessel_imo=vessel_imo, service=service, tsp=tsp)
+        p2p_schedule: list = await asyncio.to_thread(process_response_data,response_data=response_json,direct_only=direct_only,vessel_imo=vessel_imo, service=service, tsp=tsp)
         return p2p_schedule
 
