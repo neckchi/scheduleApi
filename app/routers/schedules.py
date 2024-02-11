@@ -13,8 +13,7 @@ router = APIRouter(prefix='/schedules', tags=["API Point To Point Schedules"])
 
 @router.get("/p2p", summary="Search Point To Point schedules from carriers", response_model=schema_response.Product,
             response_model_exclude_defaults=True,
-            response_description='Return a list of carrier ocean products with multiple schedules',
-            responses={status.HTTP_404_NOT_FOUND: {"model": schema_response.Error}})
+            response_description='Return a list of carrier ocean products with multiple schedules')
 
 async def get_schedules(background_tasks: BackgroundTasks,
                         point_from: str = Query(alias='pointFrom', default=..., max_length=5,regex=r"[A-Z]{2}[A-Z0-9]{3}",example='HKHKG',description='Search by either port or point of origin'),
