@@ -18,7 +18,7 @@ import asyncio
 class AsyncTaskManager:
     """Currently there is no built in  python class and method that we can prevent it from cancelling all conroutine tasks if one of the tasks is cancelled e.g:timeout
     From my perspective, all those carrier schedules are independent from one antoher so we shouldnt let one/more failed task to cancel all other successful tasks"""
-    def __init__(self,default_timeout=10,max_retries=3):
+    def __init__(self,default_timeout=20,max_retries=3):
         self.__tasks:dict = dict()
         self.error:list[dict] #This is mainly used to catch the error in case asyncio future task is failed
         self.default_timeout = default_timeout
