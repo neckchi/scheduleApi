@@ -7,20 +7,22 @@ from fastapi.encoders import jsonable_encoder
 from starlette.background import BackgroundTask
 from starlette.responses import StreamingResponse
 from uuid import UUID,uuid4
-from typing import Literal,Generator
+from typing import Literal,Generator,Callable
 from datetime import timedelta
 import httpx
 import logging
 import orjson
 import asyncio
 
+
 class AsyncTaskManager:
     """Currently there is no built in  python class and method that we can prevent it from cancelling all conroutine tasks if one of the tasks is cancelled e.g:timeout
     From my perspective, all those carrier schedules are independent from one antoher so we shouldnt let one/more failed task to cancel all other successful tasks"""
-    def __init__(self,default_timeout=25):
+    def __init__(self,default_timeout=20,max_retries=3):
         self.__tasks:dict = dict()
         self.error:list[dict] #This is mainly used to catch the error in case asyncio future task is failed
         self.default_timeout = default_timeout
+        self.max_retries = max_retries
 
     async def __aenter__(self):
         return self
@@ -38,15 +40,24 @@ class AsyncTaskManager:
             results:list = [result for result in results if not isinstance(result, Exception)]
         return results
 
-    async def _timeout_wrapper(self, coro:asyncio.Task, task_name):
-        """Wrap a coroutine with a timeout.Even though the task is timeout, it will still proceed with the remaining tasks"""
-        try:
-            return await asyncio.wait_for(asyncio.shield(coro), timeout=self.default_timeout)
-        except asyncio.TimeoutError:
-            logging.error(f"{task_name}  timed out after {self.default_timeout} seconds")
-            return await coro
-    def create_task(self,carrier, coro):
-            self.__tasks[carrier] = asyncio.create_task(self._timeout_wrapper(coro=coro,task_name=carrier))
+    async def _timeout_wrapper(self, coro:Callable, task_name:str):
+        """Wrap a coroutine with a timeout and retry logic."""
+        retries:int = 0
+        while retries < self.max_retries:
+            try:
+                return await asyncio.wait_for(coro(), timeout=self.default_timeout)
+            except asyncio.TimeoutError:
+                logging.error(f"{task_name} timed out after {self.default_timeout} seconds. Retrying {retries + 1}/{self.max_retries}...")
+                retries += 1
+                if retries < self.max_retries:
+                    self.default_timeout += 5
+                    await asyncio.sleep(1)  # Wait for 1 sec before the next retry
+            except asyncio.CancelledError :
+                logging.error(f'{task_name}  is cancelled')
+        logging.error(f"{task_name} reached maximum retries.")
+        return coro()
+    def create_task(self, carrier:str,coro:Callable):
+        self.__tasks[carrier] = asyncio.create_task(self._timeout_wrapper(coro=coro,task_name=carrier))
 
 
 
