@@ -21,16 +21,16 @@ def process_response_data(response_data: dict, direct_only:bool |None,vessel_imo
                 last_eta:str = task['fnd']['eta']
                 leg_list:list =[]
                 for index, legs in enumerate(task['leg'], start=1):
-                    imo_code: str | None = str(legs['vessel'].get('IMO')) if legs.get('vessel') else None
+                    imo_code: str  = str(legs['vessel'].get('IMO')) if legs.get('vessel') else None
                     vessel_name:str |None  = deepget(legs,'vessel','name')
                     check_service = legs.get('service')
                     leg_tt:int = legs.get('transitTime')
                     if index == 1:
                         final_etd: str = legs['fromPoint'].get('etd', first_etd)
-                        final_eta: str = legs['toPoint'].get('eta',(datetime.strptime(final_etd, "%Y-%m-%dT%H:%M:%S.000Z") + timedelta(days=leg_tt)).strftime("%Y-%m-%dT%H:%M:%S.000Z"))
+                        final_eta: str = legs['toPoint'].get('eta',(datetime.strptime(final_etd, "%Y-%m-%dT%H:%M:%S.000Z") + timedelta(days=leg_tt if leg_tt else 0.5)).strftime("%Y-%m-%dT%H:%M:%S.000Z"))
                     else:
                         final_eta: str = legs['toPoint'].get('eta', last_eta)
-                        final_etd: str = legs['toPoint'].get('etd', (datetime.strptime(final_eta,"%Y-%m-%dT%H:%M:%S.000Z") + timedelta(days=-(leg_tt))).strftime("%Y-%m-%dT%H:%M:%S.000Z"))
+                        final_etd: str = legs['fromPoint'].get('etd', (datetime.strptime(final_eta,"%Y-%m-%dT%H:%M:%S.000Z") + timedelta(days=-(leg_tt if leg_tt else 0.5))).strftime("%Y-%m-%dT%H:%M:%S.000Z"))
                     leg_transit_time:int = leg_tt if leg_tt else ((datetime.fromisoformat(final_eta[:10]) - datetime.fromisoformat(final_etd[:10])).days)
                     leg_list.append(schema_response.Leg.model_construct(
                         pointFrom={'locationName': legs['fromPoint']['location']['name'],'locationCode': legs['fromPoint']['location']['unlocode'],
@@ -42,8 +42,8 @@ def process_response_data(response_data: dict, direct_only:bool |None,vessel_imo
                         etd=final_etd,
                         eta=final_eta,
                         transitTime=legs.get('transitTime',leg_transit_time),
-                        transportations={'transportType': str(legs['transportMode']).title(),'transportName': legs['vessel']['name'] if imo_code and vessel_name != '---' else None,
-                                         'referenceType': 'IMO' if imo_code and imo_code not in (9999999,'None') else None,'reference': None if imo_code in (9999999,'None') else imo_code},
+                        transportations={'transportType': str(legs['transportMode']).title(),'transportName': legs['vessel']['name'] if imo_code and  vessel_name != '---' else None,
+                                         'referenceType': 'IMO' if imo_code and imo_code not in (9999999,'None') else None,'reference': None if imo_code and imo_code in (9999999,'None') else imo_code},
                         services={'serviceCode': legs['service']['code'],'serviceName':legs['service']['name']} if check_service else None,
                         voyages={'internalVoyage': internal_voy,'externalVoyage':legs.get('externalVoyageNumber')} if (internal_voy:=legs.get('internalVoyageNumber')) else None,
                         cutoffs={'cyCutoffDate':cy_cutoff} if (cy_cutoff:=legs['fromPoint'].get('defaultCutoff')) else None))
@@ -61,9 +61,7 @@ async def get_iqax_p2p(client:HTTPXClientWrapper,background_task:BackgroundTasks
     iqax_response_uuid = lambda scac: uuid5(NAMESPACE_DNS,f'{str(params) + str(direct_only) + str(vessel_imo) + str(service) + str(tsp) + str(scac)}')
     response_cache:list = await asyncio.gather(*(db.get(key=iqax_response_uuid(scac=sub_iqax)) for sub_iqax in iqax_list))
     check_cache: bool = any(item is None for item in response_cache)
-    p2p_resp_tasks: set = {asyncio.create_task(
-        anext(client.parse(background_tasks =background_task,token_key=iqax_response_uuid(scac=iqax),method='GET', url=url.format(iqax),params=dict(params, **{'vesselOperatorCarrierCode': iqax}))))
-        for iqax,cache in zip(iqax_list,response_cache) if cache is None } if check_cache else...
+    p2p_resp_tasks: set = {asyncio.create_task(anext(client.parse(background_tasks =background_task,token_key=iqax_response_uuid(scac=iqax),method='GET', url=url.format(iqax),params=dict(params, **{'vesselOperatorCarrierCode': iqax})))) for iqax,cache in zip(iqax_list,response_cache) if cache is None } if check_cache else...
     for response in (chain(asyncio.as_completed(p2p_resp_tasks),[item for item in response_cache if item is not None]) if check_cache else response_cache):
         response_json:dict = await response if check_cache and not isinstance(response, dict) else response
         if response_json:
