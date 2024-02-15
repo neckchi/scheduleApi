@@ -27,7 +27,7 @@ def process_response_data(response_data: dict, direct_only:bool |None,vessel_imo
             first_cy_cutoff: str = find_cutoff('CYCUTOFF')
             first_doc_cutoff: str = find_cutoff('SI')
             first_vgm_cutoff: str = find_cutoff('VGM')
-            transit_time = int((datetime.fromisoformat(last_eta) - datetime.fromisoformat(first_etd)).days)
+            transit_time:int = int((datetime.fromisoformat(last_eta) - datetime.fromisoformat(first_etd)).days)
             leg_list: list = [schema_response.Leg.model_construct(
                 pointFrom={'locationName': leg['Calls'][0]['Name'], 'locationCode': leg['Calls'][0]['Code'],
                            'terminalName': leg['Calls'][0]['EHF']['Description'],

@@ -4,6 +4,7 @@ from app.config import load_yaml
 from fastapi import status,HTTPException,BackgroundTasks
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError,ResponseValidationError
 from starlette.background import BackgroundTask
 from starlette.responses import StreamingResponse
 from uuid import UUID,uuid4
@@ -17,8 +18,8 @@ import asyncio
 
 class AsyncTaskManager:
     """Currently there is no built in  python class and method that we can prevent it from cancelling all conroutine tasks if one of the tasks is cancelled e.g:timeout
-    From my perspective, all those carrier schedules are independent from one antoher so we shouldnt let one/more failed task to cancel all other successful tasks"""
-    def __init__(self,default_timeout=20,max_retries=3):
+    From BU perspective, all those carrier schedules are independent from one antoher so we shouldnt let one/more failed task to cancel all other successful tasks"""
+    def __init__(self,default_timeout=15,max_retries=3):
         self.__tasks:dict = dict()
         self.error:list[dict] #This is mainly used to catch the error in case asyncio future task is failed
         self.default_timeout = default_timeout
@@ -48,6 +49,7 @@ class AsyncTaskManager:
             try:
                 return await asyncio.wait_for(coro(), timeout=self.default_timeout)
             except asyncio.TimeoutError:
+                """Due to timeout, the coroutine task is cancelled. Once its cancelled, we retry it 3 times"""
                 logging.error(f"{task_name} timed out after {self.default_timeout} seconds. Retrying {retries + 1}/{self.max_retries}...")
                 retries += 1
                 adjusted_timeout += 5
@@ -56,7 +58,7 @@ class AsyncTaskManager:
                 logging.error(f'{task_name}  is cancelled')
                 break
         logging.error(f"{task_name} reached maximum retries.")
-        return None
+        return coro()
     def create_task(self, carrier:str,coro:Callable):
         self.__tasks[carrier] = asyncio.create_task(self._timeout_wrapper(coro=coro,task_name=carrier))
 
@@ -65,7 +67,7 @@ class AsyncTaskManager:
 class HTTPXClientWrapper():
     def __init__(self):
         self.session_id: str = str(uuid4())
-        self.client:httpx.AsyncClient = httpx.AsyncClient(proxies="http://zscaler.proxy.int.kn:80", verify=False, timeout=httpx.Timeout(30.0, connect=65.0), limits=httpx.Limits(max_connections=50,max_keepalive_connections=0))
+        self.client:httpx.AsyncClient = httpx.AsyncClient(proxies="http://zscaler.proxy.int.kn:80", verify=False, timeout=httpx.Timeout(30.0, connect=65.0), limits=httpx.Limits(max_connections=100,max_keepalive_connections=5))
         logging.info(f'Client Session Started - {self.session_id}')
 
     async def close(self):
@@ -82,6 +84,10 @@ class HTTPXClientWrapper():
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail=f'{connect_error.__class__.__name__}:{connect_error}')
         except ValueError as value_error:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,detail=f'{value_error.__class__.__name__}:{value_error}')
+        except RequestValidationError as request_error:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail=f'{request_error.__class__.__name__}:{request_error}')
+        except ResponseValidationError as response_error:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,detail=f'{response_error.__class__.__name__}:{response_error}')
         except Exception as eg:
             logging.error(f'{eg.__class__.__name__}:{eg.args}')
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f'An error occurred while creating the client - {eg.args}')

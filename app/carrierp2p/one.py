@@ -79,7 +79,7 @@ async def get_one_access_token(client:HTTPXClientWrapper,background_task:Backgro
     response_token:dict = await db.get(key=one_token_key)
     if response_token is None:
         headers: dict = {'apikey': api_key,'Authorization': auth,'Accept': 'application/json'}
-        response_token:dict = await anext(client.parse(method='POST',background_tasks=background_task,url=url, headers=headers,token_key=one_token_key,expire=timedelta(minutes=40)))
+        response_token:dict = await anext(client.parse(method='POST',background_tasks=background_task,url=url, headers=headers,token_key=one_token_key,expire=timedelta(minutes=55)))
     yield response_token['access_token']
 
 async def get_one_p2p(client:HTTPXClientWrapper, background_task:BackgroundTasks,url: str, turl: str, pw: str, auth: str, pol: str, pod: str, search_range: int,

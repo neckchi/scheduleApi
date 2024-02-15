@@ -1,6 +1,6 @@
 import datetime
 from uuid import uuid5,NAMESPACE_DNS,UUID
-from fastapi import APIRouter, Query, status, Depends, BackgroundTasks
+from fastapi import APIRouter, Query, Depends, BackgroundTasks
 from app.carrierp2p import cma, one, hmm, zim, maersk, msc, iqax,hlag
 from app.schemas import schema_response, schema_request
 from app.background_tasks import db
@@ -10,7 +10,6 @@ from app.routers.security import basic_auth
 
 
 router = APIRouter(prefix='/schedules', tags=["API Point To Point Schedules"])
-
 @router.get("/p2p", summary="Search Point To Point schedules from carriers", response_model=schema_response.Product,
             response_model_exclude_defaults=True,
             response_description='Return a list of carrier ocean products with multiple schedules')
@@ -126,3 +125,4 @@ async def get_schedules(background_tasks: BackgroundTasks,
         return final_schedules
     else:
         return ttl_schedule
+#

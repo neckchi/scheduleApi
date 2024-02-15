@@ -60,7 +60,7 @@ async def get_zim_access_token(client:HTTPXClientWrapper,background_task:Backgro
     if response_token is None:
         headers: dict = {'Ocp-Apim-Subscription-Key': api_key}
         params: dict = {'grant_type': 'client_credentials', 'client_id': client_id,'client_secret': secret, 'scope': 'Vessel Schedule'}
-        response_token:dict = await anext(client.parse(background_tasks=background_task,method='POST',url=url, headers=headers, data=params,token_key=zim_token_key,expire=datetime.timedelta(minutes=40)))
+        response_token:dict = await anext(client.parse(background_tasks=background_task,method='POST',url=url, headers=headers, data=params,token_key=zim_token_key,expire=datetime.timedelta(minutes=55)))
     yield response_token['access_token']
 
 async def get_zim_p2p(client:HTTPXClientWrapper, background_task:BackgroundTasks,url: str, turl: str, pw: str, zim_client: str, zim_secret: str, pol: str, pod: str,

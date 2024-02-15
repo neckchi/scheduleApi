@@ -5,7 +5,7 @@ metadata:
 data:
   backgroundTasks:
     cacheDB:  MongoDB
-    scheduleExpiry: 4
+    scheduleExpiry: 6
   activeCarriers:
     cma:  True
     hlag: True
