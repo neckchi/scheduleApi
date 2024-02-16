@@ -1,7 +1,8 @@
 import logging
 from uuid import UUID
 from datetime import datetime
-from pydantic import BaseModel, Field, PositiveInt,field_validator,model_validator
+from enum import StrEnum
+from pydantic import BaseModel, Field, PositiveInt,model_validator
 from .schema_request import CarrierCode
 
 def convert_datetime_to_iso_8601(dt: datetime) -> str:
@@ -23,8 +24,18 @@ class Cutoff(BaseModel):
             datetime: convert_datetime_to_iso_8601
         }
 
+class TransportType(StrEnum):
+    Vessel = 'Vessel'
+    Barge = 'Barge'
+    Feeder = 'Feeder'
+    Truck =  'Truck'
+    Rail = 'Rail'
+    TruckRail = 'Truck / Rail'
+    Intermodal = 'Intermodal'
+
+
 class Transportation(BaseModel):
-    transportType: str = Field(description='e.g:Vessel,Barge,Feeder,Truck,Rail,Truck / Rail,Intermodal', example='Vessel')
+    transportType: TransportType = Field(description='e.g:Vessel,Barge,Feeder,Truck,Rail,Truck / Rail,Intermodal', example='Vessel')
     transportName: str | None = Field(title='Vehicle Type',max_length=40, description='e.g:VesselName', example='ISEACO WISDOM',default=None)
     referenceType: str | None = Field(title='Reference Type', description='e.g:IMO', example='IMO',default=None)
     reference: int | str | None = Field(title='Reference Value', description='e.g:Vessel IMO Code', example='9172301',default=None)
@@ -47,13 +58,6 @@ class Transportation(BaseModel):
             self.reference = reference_mapping.get(self.transportType)
         return self
 
-    @field_validator('transportType')
-    def check_transport_type(cls, transport_type: str) -> str:
-        if transport_type not in ('Vessel', 'Barge', 'Feeder', 'Truck', 'Rail','Truck / Rail', 'Intermodal'):
-            logging.error('Leg  must contain at least one of transport type')
-            raise ValueError(f'Leg must contain at least one of transport type due to missing {transport_type}')
-        return transport_type
-
 
 class Voyage(BaseModel):
     internalVoyage: str | None = Field(default=None,max_length=10, example='012W')
@@ -61,8 +65,8 @@ class Voyage(BaseModel):
 
 
 class Service(BaseModel):
-    serviceCode: str | None = Field(default=None,max_length=20, example='NVS')
-    serviceName: str | None = Field(default=None,max_length=80, example='EAST ASIA TRADE')
+    serviceCode: str | None = Field(default=None,max_length=80, example='NVS')
+    serviceName: str | None = Field(default=None,max_length=100, example='EAST ASIA TRADE')
 
 
 class Leg(BaseModel):

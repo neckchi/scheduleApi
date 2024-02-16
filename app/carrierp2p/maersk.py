@@ -49,9 +49,7 @@ async def process_response_data(client:HTTPXClientWrapper,cut_off_url:str,cut_of
                                      'transportName': deepget(leg['transport'], 'vessel', 'vesselName'),
                                      'referenceType': 'IMO' if (imo_code := str(deepget(leg['transport'], 'vessel', 'vesselIMONumber'))) and imo_code not in ('9999999', 'None') else None,
                                      'reference': imo_code if imo_code not in ('9999999', 'None', '') else None},
-                    services={'serviceCode': service_name} if (
-                        service_name := leg['transport'].get('carrierServiceName',
-                                                             leg['transport'].get('carrierServiceCode'))) else None,
+                    services={'serviceCode': service_name} if (service_name := leg['transport'].get('carrierServiceName',leg['transport'].get('carrierServiceCode'))) else None,
                     voyages={'internalVoyage': voyage_num} if (voyage_num := leg['transport'].get('carrierDepartureVoyageNumber')) else None,
                     cutoffs=merged_dict.get(hash(leg['facilities']['startLocation']['countryCode'] + pol_name + imo_code + voyage_num)) if pol_name and imo_code and voyage_num else None).model_dump(warnings=False) for leg in task['transportLegs']]
                 schedule_body: dict = schema_response.Schedule.model_construct(scac=carrier_code,
