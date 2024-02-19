@@ -43,7 +43,7 @@ def process_response_data(response_data: dict, direct_only:bool |None,vessel_imo
                         eta=final_eta,
                         transitTime=legs.get('transitTime',leg_transit_time),
                         transportations={'transportType': str(legs['transportMode']).title(),'transportName': legs['vessel']['name'] if imo_code and  vessel_name != '---' else None,
-                                         'referenceType': 'IMO' if imo_code and imo_code not in (9999999,'None') else None,'reference': None if imo_code and imo_code in (9999999,'None') else imo_code},
+                                         'referenceType': 'IMO' if imo_code and imo_code not in (9999999,'9999999','None') else None,'reference': None if imo_code and imo_code in (9999999,'9999999','None') else imo_code},
                         services={'serviceCode': legs['service']['code'],'serviceName':legs['service']['name']} if check_service else None,
                         voyages={'internalVoyage': internal_voy,'externalVoyage':legs.get('externalVoyageNumber')} if (internal_voy:=legs.get('internalVoyageNumber')) else None,
                         cutoffs={'cyCutoffDate':cy_cutoff} if (cy_cutoff:=legs['fromPoint'].get('defaultCutoff')) else None))

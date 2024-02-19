@@ -42,7 +42,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
         async with AsyncTaskManager() as task_group:
             for carriers in scac:
                 if carrier_status['data']['activeCarriers']['cma'] and (carriers in {'CMDU', 'ANNU', 'APLU', 'CHNL', 'CSFU'} or carriers is None):
-                    task_group.create_task(carrier=f'CMA_task' if carriers is None else f'{carriers}_task',coro= lambda :cma.get_cma_p2p(client=client, url=settings.cma_url, scac=carriers, pol=point_from,
+                    task_group.create_task(name=f'CMA_task' if carriers is None else f'{carriers}_task',coro=lambda:cma.get_cma_p2p(client=client, url=settings.cma_url, scac=carriers, pol=point_from,
                                         pod=point_to,
                                         departure_date=start_date if start_date_type == 'Departure' else None,
                                         arrival_date=start_date if start_date_type == 'Arrival'else None,
@@ -51,7 +51,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                         service=service, pw=settings.cma_token.get_secret_value()))
 
                 if carrier_status['data']['activeCarriers']['one'] and (carriers == 'ONEY' or carriers is None):
-                    task_group.create_task(carrier='ONE_task',coro=lambda :one.get_one_p2p(client=client,background_task = background_tasks, url=settings.oney_url, turl=settings.oney_turl,
+                    task_group.create_task(name='ONE_task',coro=lambda:one.get_one_p2p(client=client,background_task = background_tasks, url=settings.oney_url, turl=settings.oney_turl,
                                         pol=point_from, pod=point_to, start_date=start_date,
                                         direct_only=direct_only,
                                         search_range=int(search_range.value), tsp=tsp,vessel_imo = vessel_imo,
@@ -61,14 +61,14 @@ async def get_schedules(background_tasks: BackgroundTasks,
 
                 # Missing Location Code from HDMU response
                 if carrier_status['data']['activeCarriers']['hmm'] and (carriers == 'HDMU' or carriers is None):
-                    task_group.create_task(carrier='HMM_task',coro=lambda :hmm.get_hmm_p2p(client=client, url=settings.hmm_url, pol=point_from, pod=point_to,
+                    task_group.create_task(name='HMM_task',coro=lambda:hmm.get_hmm_p2p(client=client, url=settings.hmm_url, pol=point_from, pod=point_to,
                                         start_date=start_date, service=service, direct_only=direct_only,vessel_imo=vessel_imo,
                                         tsp=tsp, pw=settings.hmm_token.get_secret_value(),
                                         search_range=str(search_range.value)))
 
                 # Missing IMO code and Cut off date from ZIM response
                 if carrier_status['data']['activeCarriers']['zim'] and (carriers == 'ZIMU' or carriers is None):
-                    task_group.create_task(carrier='ZIM_task',coro=lambda :zim.get_zim_p2p(client=client,background_task = background_tasks, url=settings.zim_url, turl=settings.zim_turl,
+                    task_group.create_task(name='ZIM_task',coro=lambda:zim.get_zim_p2p(client=client,background_task = background_tasks, url=settings.zim_url, turl=settings.zim_turl,
                                         pol=point_from, pod=point_to, start_date=start_date,
                                         direct_only=direct_only, tsp=tsp,
                                         search_range=search_range.duration, service=service,vessel_imo=vessel_imo,
@@ -77,7 +77,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                         zim_secret=settings.zim_secret.get_secret_value()))
 
                 if carrier_status['data']['activeCarriers']['maersk'] and (carriers in {'MAEU', 'SEAU', 'SEJJ', 'MCPU', 'MAEI'} or carriers is None):
-                    task_group.create_task(carrier=f'MAEU_task' if carriers is None else f'{carriers}_task',coro=lambda :maersk.get_maersk_p2p(client=client,background_task = background_tasks,url=settings.maeu_p2p,
+                    task_group.create_task(name=f'MAEU_task' if carriers is None else f'{carriers}_task',coro= lambda:maersk.get_maersk_p2p(client=client,background_task = background_tasks,url=settings.maeu_p2p,
                                               location_url=settings.maeu_location,
                                               cutoff_url=settings.maeu_cutoff,
                                               pol=point_from, pod=point_to, start_date=start_date,
@@ -89,7 +89,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                               pw2=settings.maeu_token2.get_secret_value()))
 
                 if carrier_status['data']['activeCarriers']['msc'] and (carriers == 'MSCU' or carriers is None):
-                    task_group.create_task(carrier='MSC_task',coro=lambda :msc.get_msc_p2p(client=client,background_task = background_tasks, url=settings.mscu_url, oauth=settings.mscu_oauth,
+                    task_group.create_task(name='MSC_task',coro=lambda:msc.get_msc_p2p(client=client,background_task = background_tasks, url=settings.mscu_url, oauth=settings.mscu_oauth,
                                         aud=settings.mscu_aud, pol=point_from, pod=point_to,
                                         start_date=start_date, search_range=search_range.duration,
                                         direct_only=direct_only,
@@ -101,7 +101,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                         msc_thumbprint=settings.mscu_thumbprint.get_secret_value()))
 
                 if carrier_status['data']['activeCarriers']['iqax'] and (carriers in {'OOLU', 'COSU'} or carriers is None):
-                    task_group.create_task(carrier=f'IQAX_task' if carriers is None else f'{carriers}_task',coro=lambda :iqax.get_iqax_p2p(client=client, background_task = background_tasks,url=settings.iqax_url, pol=point_from,
+                    task_group.create_task(name=f'IQAX_task' if carriers is None else f'{carriers}_task',coro=lambda:iqax.get_iqax_p2p(client=client, background_task = background_tasks,url=settings.iqax_url, pol=point_from,
                                           pod=point_to,
                                           departure_date=start_date if start_date_type == 'Departure' else None,
                                           arrival_date=start_date if start_date_type == 'Arrival' else None,
@@ -111,7 +111,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                           pw=settings.iqax_token.get_secret_value()))
 
                 if carrier_status['data']['activeCarriers']['hlag'] and (carriers == 'HLCU' or carriers is None):
-                    task_group.create_task(carrier='HLAG_task',coro=lambda :hlag.get_hlag_p2p(client= client,background_task = background_tasks, url = settings.hlcu_url,turl=settings.hlcu_token_url,
+                    task_group.create_task(name='HLAG_task',coro=lambda:hlag.get_hlag_p2p(client= client,background_task = background_tasks, url = settings.hlcu_url,turl=settings.hlcu_token_url,
                                           client_id= settings.hlcu_client_id.get_secret_value(),client_secret=settings.hlcu_client_secret.get_secret_value(),
                                           user= settings.hlcu_user_id.get_secret_value(),pw= settings.hlcu_password.get_secret_value(),
                                           pol=point_from,pod=point_to,search_range= search_range.duration,
@@ -119,9 +119,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                           eta =start_date if start_date_type == 'Arrival' else None,
                                           direct_only=direct_only,
                                           vessel_flag = vessel_flag_code))
-                # 👇 Await ALL
-            p2p_schedules = await task_group.__aexit__()
-            final_schedules = client.gen_all_valid_schedules(matrix=p2p_schedules,product_id=product_id,point_from=point_from,point_to=point_to,background_tasks=background_tasks,task_exception=task_group.error)
+        final_schedules = client.gen_all_valid_schedules(matrix=task_group.results,product_id=product_id,point_from=point_from,point_to=point_to,background_tasks=background_tasks,task_exception=task_group.error)
         return final_schedules
     else:
         return ttl_schedule

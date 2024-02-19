@@ -15,31 +15,20 @@ import logging
 import orjson
 import asyncio
 
-
+#
 class AsyncTaskManager:
-    """Currently there is no built in  python class and method that we can prevent it from cancelling all conroutine tasks if one of the tasks is cancelled e.g:timeout
-    From BU perspective, all those carrier schedules are independent from one antoher so we shouldnt let one/more failed task to cancel all other successful tasks"""
+    """Currently there is no built in  python class and method that we can prevent it from cancelling all conroutine tasks if one of the tasks is cancelled
+    From BU perspective, all those carrier schedules are independent from one antoher so we shouldnt let a failed task to cancel all other successful tasks"""
     def __init__(self,default_timeout=15,max_retries=3):
         self.__tasks:dict = dict()
-        self.error:list[dict] #This is mainly used to catch the error in case asyncio future task is failed
-        self.default_timeout = default_timeout
-        self.max_retries = max_retries
+        self.error:bool = False
+        self.default_timeout:int = default_timeout
+        self.max_retries:int = max_retries
 
     async def __aenter__(self):
         return self
     async def __aexit__(self, exc_type = None, exc = None, tb= None):
-        if exc_type is not None:
-            logging.error(f'Exception occurred:: {exc_type} - {exc}')
-
-        results = await asyncio.gather(*self.__tasks.values(), return_exceptions=True)
-        task_names:list = list(self.__tasks.keys())
-        self.error:list[dict] = [{task_names[i]: result} for i, result in enumerate(results) if isinstance(result, Exception)]
-        if self.error != []:
-            for error in self.error:
-                task_name, exception = list(error.items())[0]
-                logging.critical(f"{task_name} connection attempts failed:{exception}")
-            results:list = [result for result in results if not isinstance(result, Exception)]
-        return results
+        self.results = await asyncio.gather(*self.__tasks.values(), return_exceptions=True)
 
     async def _timeout_wrapper(self, coro:Callable, task_name:str):
         """Wrap a coroutine with a timeout and retry logic."""
@@ -54,13 +43,21 @@ class AsyncTaskManager:
                 retries += 1
                 adjusted_timeout += 5
                 await asyncio.sleep(1)  # Wait for 1 sec before the next retry
-            except asyncio.CancelledError :
-                logging.error(f'{task_name}  is cancelled')
-                break
         logging.error(f"{task_name} reached maximum retries.")
         return coro()
-    def create_task(self, carrier:str,coro:Callable):
-        self.__tasks[carrier] = asyncio.create_task(self._timeout_wrapper(coro=coro,task_name=carrier))
+
+    def create_task(self, name:str,coro:Callable):
+        self.__tasks[name] = asyncio.create_task(self._timeout_wrapper(coro=coro,task_name=name))
+
+    def results(self) -> list:
+        task_names = list(self.__tasks.keys())
+        if not self.error:
+            for i, result in enumerate(self.results):
+                if isinstance(result, Exception):
+                    task_name = task_names[i]
+                    logging.critical(f"{task_name} connection attempts failed: {result}")
+                    self.error = True
+        return [result for result in self.results if not isinstance(result, Exception)] if self.error else self.results
 
 
 
@@ -127,7 +124,7 @@ class HTTPXClientWrapper():
             else:yield None
 
 
-    def gen_all_valid_schedules(self,matrix:list,product_id:UUID,point_from:str,point_to:str,background_tasks:BackgroundTasks,task_exception:list):
+    def gen_all_valid_schedules(self,matrix:list,product_id:UUID,point_from:str,point_to:str,background_tasks:BackgroundTasks,task_exception:bool):
         flat_list:list = [item for row in matrix if row is not None for item in row]
         sorted_schedules:list = sorted(flat_list, key=lambda tt: (tt['etd'][:10], tt['transitTime']))
         count_schedules:int = len(sorted_schedules)
