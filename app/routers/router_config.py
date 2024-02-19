@@ -51,12 +51,11 @@ class AsyncTaskManager:
 
     def results(self) -> list:
         task_names = list(self.__tasks.keys())
-        if not self.error:
-            for i, result in enumerate(self.results):
-                if isinstance(result, Exception):
-                    task_name = task_names[i]
-                    logging.critical(f"{task_name} connection attempts failed: {result}")
-                    self.error = True
+        for i, result in enumerate(self.results):
+            if isinstance(result, Exception):
+                task_name = task_names[i]
+                logging.critical(f"{task_name} connection attempts failed: {result}")
+                self.error = True
         return [result for result in self.results if not isinstance(result, Exception)] if self.error else self.results
 
 
