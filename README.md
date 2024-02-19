@@ -17,6 +17,6 @@ Results are cached in a remote MongoDB based on carrierp2p setting
 
 **TODO:** Currently the .env file contains several secrets, these should be removed from there. Locally the need to be stored in a gitignored file, in OCP they can be provided via Secret.
 
-**TODO:** Logging should most likely go to elastic/kibana? In this case a file- or elastic logging handler should be added.
-
 **TODO:** In mongo_mgr.py there are commented out MongoDB index creations. In theory, they could be left in the code, as the index is not recreated if it already exists. But if the index options change (e.g. the expiry time), recreating the index throws an exception. There this index handling should be taken care of separately.
+
+**TODO:** If we use redis_mgr.py,please setup redis, put the credential into env file ,uncomment the redis credential in config.py and change cacheDB to RedisDB in configmap.yaml

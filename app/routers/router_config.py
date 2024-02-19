@@ -128,10 +128,7 @@ class HTTPXClientWrapper():
 
 
     def gen_all_valid_schedules(self,matrix:list,product_id:UUID,point_from:str,point_to:str,background_tasks:BackgroundTasks,task_exception:list):
-        flat_list: list = []
-        for row in matrix:
-            if row is not None:
-                flat_list.extend(row)
+        flat_list:list = [item for row in matrix if row is not None for item in row]
         sorted_schedules:list = sorted(flat_list, key=lambda tt: (tt['etd'][:10], tt['transitTime']))
         count_schedules:int = len(sorted_schedules)
         if count_schedules == 0:
