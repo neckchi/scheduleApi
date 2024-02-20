@@ -70,7 +70,7 @@ async def get_all_schedule(client:HTTPXClientWrapper,cma_list:list,url:str,heade
 
 async def get_cma_p2p(client:HTTPXClientWrapper,url: str, pw: str, pol: str, pod: str, search_range: int, direct_only: bool | None,tsp: str | None = None,vessel_imo:str | None = None,
                           departure_date: datetime.date = None,arrival_date: datetime.date = None, scac: str | None = None, service: str | None = None):
-    carrier_code: dict = {'0001': 'CMDU', '0002': 'ANNU','0011': 'CHNL', '0014': 'CSFU', '0015': 'APLU'}
+    carrier_code: dict = {'0001': 'CMDU', '0002': 'ANNU','0011': 'CHNL', '0015': 'APLU'}
     api_carrier_code: str = next(k for k, v in carrier_code.items() if v == scac.upper()) if scac else None
     headers: dict = {'keyID': pw}
     params: dict = {'placeOfLoading': pol, 'placeOfDischarge': pod,'departureDate': departure_date,'arrivalDate': arrival_date, 'searchRange': search_range,

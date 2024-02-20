@@ -101,7 +101,7 @@ async def get_maersk_p2p(client:HTTPXClientWrapper,background_task:BackgroundTas
                         'deliveryDestinationCountryCode': des_geo_location[0]['countryCode'],'deliveryDestinationCityName': des_geo_location[0]['cityName'],'deliveryDestinationUNLocationCode': des_geo_location[0]['UNLocationCode'],
                         'dateRange': f'P{search_range}W', 'startDateType': date_type, 'startDate': start_date}
         params.update({'vesselFlagCode': vessel_flag}) if vessel_flag else ...
-        maersk_list: list = ['MAEU', 'SEAU', 'SEJJ', 'MCPU', 'MAEI'] if scac is None else [scac]
+        maersk_list: list = ['MAEU', 'MAEI'] if scac is None else [scac]
         maersk_response_uuid = lambda scac: uuid5(NAMESPACE_DNS,f'{str(params) + str(direct_only) + str(vessel_imo) + str(service) + str(tsp) + str(scac)}')
         response_cache = await asyncio.gather(*(db.get(key=maersk_response_uuid(scac=sub_maersk)) for sub_maersk in maersk_list))
         check_cache:bool = any(item is None for item in response_cache)

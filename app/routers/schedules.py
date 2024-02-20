@@ -41,7 +41,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
         # 👇 Having this allows for waiting for all our tasks with strong safety guarantees,logic around cancellation for failures,coroutine-safe and grouping of exceptions.
         async with AsyncTaskManager() as task_group:
             for carriers in scac:
-                if carrier_status['data']['activeCarriers']['cma'] and (carriers in {'CMDU', 'ANNU', 'APLU', 'CHNL', 'CSFU'} or carriers is None):
+                if carrier_status['data']['activeCarriers']['cma'] and (carriers in {'CMDU', 'ANNU', 'APLU', 'CHNL'} or carriers is None):
                     task_group.create_task(name=f'CMA_task' if carriers is None else f'{carriers}_task',coro=lambda:cma.get_cma_p2p(client=client, url=settings.cma_url, scac=carriers, pol=point_from,
                                         pod=point_to,
                                         departure_date=start_date if start_date_type == 'Departure' else None,
@@ -76,7 +76,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                         zim_client=settings.zim_client.get_secret_value(),
                                         zim_secret=settings.zim_secret.get_secret_value()))
 
-                if carrier_status['data']['activeCarriers']['maersk'] and (carriers in {'MAEU', 'SEAU', 'SEJJ', 'MCPU', 'MAEI'} or carriers is None):
+                if carrier_status['data']['activeCarriers']['maersk'] and (carriers in {'MAEU', 'MAEI'} or carriers is None):
                     task_group.create_task(name=f'MAEU_task' if carriers is None else f'{carriers}_task',coro= lambda:maersk.get_maersk_p2p(client=client,background_task = background_tasks,url=settings.maeu_p2p,
                                               location_url=settings.maeu_location,
                                               cutoff_url=settings.maeu_cutoff,
