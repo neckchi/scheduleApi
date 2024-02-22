@@ -60,7 +60,7 @@ async def get_all_schedule(client:HTTPXClientWrapper,cma_list:list,url:str,heade
             page: int = 50
             last_page: int = int((awaited_response.headers['content-range']).partition('/')[2])
             cma_code_header:str = awaited_response.headers['X-Shipping-Company-Routings']
-            check_if_header:bool = len(cma_code_header.split(',')) > 1  # if it contains mutiple value, we should it 'shippingCompany' blank  so that we can return all schedules from CMA
+            check_if_header:bool = len(cma_code_header.split(',')) > 1  # if it contains mutiple value, we should leave 'shippingCompany' blank  so that we can return all schedules from CMA
             extra_tasks: list = [asyncio.create_task(anext(client.parse(method='GET', url=url,params=updated_params(cma_internal_code=cma_code_header) if not check_if_header else  dict(params,**{'specificRoutings':'Commercial'}),
                                                                         headers=dict(headers, **{'range': f'{num}-{49 + num}'})))) for num in range(page, last_page, page)]
             for extra_p2p in asyncio.as_completed(extra_tasks):
@@ -77,14 +77,7 @@ async def get_cma_p2p(client:HTTPXClientWrapper,url: str, pw: str, pol: str, pod
                     'maxTs': 3 if direct_only in (False,None) else 0,'polVesselIMO':vessel_imo,'polServiceCode': service, 'tsPortCode': tsp}
     extra_condition: bool = True if pol.startswith('US') and pod.startswith('US') else False
     cma_list:list = [None, '0015'] if api_carrier_code is None else [api_carrier_code]
-    """
-    Shippingcompany 0015 (APL) is excluded and works as a separate entity. Usually, customers asking for APL route only wants APL.
-    It is the reason why we search for APL schedule, commercial routes of other carriers are not suggested.
-    APL is mainly used for US government looking for US military/Gov routes by using the parameter specificRoutings populated with “USGovernment”
-    If commercial routes are not defined for a shipping company, you will get solutions of the other shipping companies (except for APL)
-    """
     response_json = await get_all_schedule(client=client,url=url,headers=headers,params=params,cma_list=cma_list,extra_condition=extra_condition)
-
     if response_json:
         p2p_schedule: list = await asyncio.to_thread(process_response_data,response_data=response_json,carrier_list = carrier_code)
         return p2p_schedule

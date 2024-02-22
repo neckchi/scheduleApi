@@ -63,7 +63,7 @@ class AsyncTaskManager:
 class HTTPXClientWrapper():
     def __init__(self):
         self.session_id: str = str(uuid4())
-        self.client:httpx.AsyncClient = httpx.AsyncClient(proxies="http://zscaler.proxy.int.kn:80", verify=False, timeout=httpx.Timeout(30.0, connect=65.0), limits=httpx.Limits(max_connections=100,max_keepalive_connections=5))
+        self.client:httpx.AsyncClient = httpx.AsyncClient(proxies="http://zscaler.proxy.int.kn:80", verify=False, timeout=httpx.Timeout(30.0, connect=65.0), limits=httpx.Limits(max_connections=200,max_keepalive_connections=20))
         logging.info(f'Client Session Started - {self.session_id}')
 
     async def close(self):
@@ -75,7 +75,6 @@ class HTTPXClientWrapper():
         standalone_client = HTTPXClientWrapper() ## standalone client session
         try:
             yield standalone_client
-            # yield global_wrapper
         except ConnectionError as connect_error:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail=f'{connect_error.__class__.__name__}:{connect_error}')
         except ValueError as value_error:
@@ -88,7 +87,6 @@ class HTTPXClientWrapper():
             logging.error(f'{eg.__class__.__name__}:{eg.args}')
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f'An error occurred while creating the client - {eg.args}')
         finally:
-            # await global_wrapper.close()
             await standalone_client.close()
 
 
