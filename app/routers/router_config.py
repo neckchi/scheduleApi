@@ -107,7 +107,7 @@ class HTTPXClientWrapper():
             else:yield None
         else:
             """
-            At the moment Only Maersk('MAEU', 'SEAU', 'SEJJ', 'MCPU', 'MAEI') need consumer to stream the response
+            At the moment Only Maersk need consumer to stream the response
             """
             client_request = self.client.build_request(method=method, url=url, params=params, headers=headers, data=data)
             stream_request = await self.client.send(client_request, stream=True)

@@ -20,7 +20,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
                         start_date_type: schema_request.StartDateType = Query(alias='startDateType', default=...,description="Search by either ETD or ETA"),
                         start_date: datetime.date = Query(alias='startDate', default=...,example=datetime.datetime.now().strftime("%Y-%m-%d"),description='YYYY-MM-DD'),
                         search_range: schema_request.SearchRange = Query(alias='searchRange',description='Search range based on start date and type,max 4 weeks',default=..., example=3),
-                        scac: set[schema_request.CarrierCode | None] = Query(default={None},description='Prefer to search p2p schedule by scac.Empty means searching for all API schedules'),
+                        scac: list[schema_request.CarrierCode | None] = Query(default=[None],description='Prefer to search p2p schedule by scac.Empty means searching for all API schedules'),
                         direct_only: bool | None = Query(alias='directOnly', default=None,description='Direct means only show direct schedule Else show both(direct/transshipment)type of schedule'),
                         tsp: str | None = Query(default=None, alias='transhipmentPort', max_length=5,regex=r"[A-Z]{2}[A-Z0-9]{3}",description="Filter By Transshipment Port"),
                         vessel_imo:str|None = Query(alias='vesselIMO', default=None,description='Restricts the search to a particular vessel IMO lloyds code on port of loading', max_length=7),
@@ -42,7 +42,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
         async with AsyncTaskManager() as task_group:
             for carriers in scac:
                 if carrier_status['data']['activeCarriers']['cma'] and (carriers in {'CMDU', 'ANNU', 'APLU', 'CHNL'} or carriers is None):
-                    task_group.create_task(name=f'CMA_task' if carriers is None else f'{carriers}_task',coro=lambda:cma.get_cma_p2p(client=client, url=settings.cma_url, scac=carriers, pol=point_from,
+                    task_group.create_task(name=f'CMA_task' if carriers is None else f'{carriers}_task',coro=lambda cma_scac=carriers :cma.get_cma_p2p(client=client, url=settings.cma_url, scac=cma_scac, pol=point_from,
                                         pod=point_to,
                                         departure_date=start_date if start_date_type == 'Departure' else None,
                                         arrival_date=start_date if start_date_type == 'Arrival'else None,
@@ -51,7 +51,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                         service=service, pw=settings.cma_token.get_secret_value()))
 
                 if carrier_status['data']['activeCarriers']['one'] and (carriers == 'ONEY' or carriers is None):
-                    task_group.create_task(name='ONE_task',coro=lambda:one.get_one_p2p(client=client,background_task = background_tasks, url=settings.oney_url, turl=settings.oney_turl,
+                    task_group.create_task(name='ONE_task',coro=lambda :one.get_one_p2p(client=client,background_task = background_tasks, url=settings.oney_url, turl=settings.oney_turl,
                                         pol=point_from, pod=point_to, start_date=start_date,
                                         direct_only=direct_only,
                                         search_range=int(search_range.value), tsp=tsp,vessel_imo = vessel_imo,
@@ -77,11 +77,11 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                         zim_secret=settings.zim_secret.get_secret_value()))
 
                 if carrier_status['data']['activeCarriers']['maersk'] and (carriers in {'MAEU', 'MAEI'} or carriers is None):
-                    task_group.create_task(name=f'MAEU_task' if carriers is None else f'{carriers}_task',coro= lambda:maersk.get_maersk_p2p(client=client,background_task = background_tasks,url=settings.maeu_p2p,
+                    task_group.create_task(name=f'MAEU_task' if carriers is None else f'{carriers}_task',coro= lambda maersk_scac = carriers :maersk.get_maersk_p2p(client=client,background_task = background_tasks,url=settings.maeu_p2p,
                                               location_url=settings.maeu_location,
                                               cutoff_url=settings.maeu_cutoff,
                                               pol=point_from, pod=point_to, start_date=start_date,
-                                              search_range=search_range.value, scac=carriers,
+                                              search_range=search_range.value, scac=maersk_scac,
                                               direct_only=direct_only, tsp=tsp,
                                               vessel_flag=vessel_flag_code,vessel_imo=vessel_imo,
                                               date_type='D' if start_date_type == 'Departure' else 'A',
@@ -101,13 +101,13 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                         msc_thumbprint=settings.mscu_thumbprint.get_secret_value()))
 
                 if carrier_status['data']['activeCarriers']['iqax'] and (carriers in {'OOLU', 'COSU'} or carriers is None):
-                    task_group.create_task(name=f'IQAX_task' if carriers is None else f'{carriers}_task',coro=lambda:iqax.get_iqax_p2p(client=client, background_task = background_tasks,url=settings.iqax_url, pol=point_from,
+                    task_group.create_task(name=f'IQAX_task' if carriers is None else f'{carriers}_task',coro=lambda cosco_scac = carriers :iqax.get_iqax_p2p(client=client, background_task = background_tasks,url=settings.iqax_url, pol=point_from,
                                           pod=point_to,
                                           departure_date=start_date if start_date_type == 'Departure' else None,
                                           arrival_date=start_date if start_date_type == 'Arrival' else None,
                                           search_range=search_range.value, direct_only=direct_only,
                                           tsp=tsp,vessel_imo=vessel_imo,
-                                          scac=carriers, service=service,
+                                          scac=cosco_scac, service=service,
                                           pw=settings.iqax_token.get_secret_value()))
 
                 if carrier_status['data']['activeCarriers']['hlag'] and (carriers == 'HLCU' or carriers is None):
