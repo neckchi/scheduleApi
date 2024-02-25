@@ -79,7 +79,7 @@ async def get_msc_p2p(client:HTTPXClientWrapper, background_task:BackgroundTasks
     params: dict = {'fromPortUNCode': pol, 'toPortUNCode': pod, 'fromDate': start_date,'toDate': (start_date + timedelta(days=search_range)).strftime("%Y-%m-%d"), 'datesRelated': start_date_type}
     token = await anext(get_msc_token(client=client,background_task=background_task,oauth=oauth, aud=aud, rsa=pw, msc_client=msc_client, msc_scope=msc_scope,msc_thumbprint=msc_thumbprint))
     headers: dict = {'Authorization': f'Bearer {token}'}
-    response_json = await anext(client.parse(method='GET', url=url, params=params, headers=headers))
+    response_json:dict = await anext(client.parse(method='GET', url=url, params=params, headers=headers))
     if response_json:
         p2p_schedule: list = await asyncio.to_thread(process_response_data,response_data=response_json,direct_only=direct_only,vessel_imo=vessel_imo, service=service, tsp=tsp)
         return p2p_schedule

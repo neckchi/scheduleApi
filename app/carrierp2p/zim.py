@@ -68,7 +68,7 @@ async def get_zim_p2p(client:HTTPXClientWrapper, background_task:BackgroundTasks
     params: dict = {'originCode': pol, 'destCode': pod, 'fromDate': start_date,'toDate': (start_date + datetime.timedelta(days=search_range)).strftime("%Y-%m-%d"), 'sortByDepartureOrArrival': 'Departure'}
     token:str = await anext(get_zim_access_token(client=client,background_task=background_task, url=turl, api_key=pw, client_id=zim_client, secret=zim_secret))
     headers: dict = {'Ocp-Apim-Subscription-Key': pw, 'Authorization': f'Bearer {token}','Accept': 'application/json'}
-    response_json = await anext(client.parse(method='GET', url=url, params=params,headers=headers))
+    response_json:dict = await anext(client.parse(method='GET', url=url, params=params,headers=headers))
     if response_json:
         p2p_schedule: list = await asyncio.to_thread(process_response_data,response_data=response_json,direct_only=direct_only,vessel_imo=vessel_imo, service=service, tsp=tsp)
         return p2p_schedule

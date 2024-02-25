@@ -88,7 +88,7 @@ async def get_one_p2p(client:HTTPXClientWrapper, background_task:BackgroundTasks
     # weekout:1 ≤ value ≤ 14
     token:str = await anext(get_one_access_token(client=client,background_task=background_task, url=turl, auth=auth, api_key=pw))
     headers: dict = {'apikey': pw, 'Authorization': f'Bearer {token}', 'Accept': 'application/json'}
-    response_json = await anext(client.parse(method='GET', url=url, params=params,headers=headers))
+    response_json:dict = await anext(client.parse(method='GET', url=url, params=params,headers=headers))
     if response_json and response_json.get('errorMessages') is None:
         p2p_schedule: list = await asyncio.to_thread(process_response_data,response_data=response_json, vessel_imo=vessel_imo, service=service,tsp=tsp)
         return p2p_schedule
