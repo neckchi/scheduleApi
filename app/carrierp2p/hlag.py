@@ -11,15 +11,17 @@ import asyncio
 def process_response_data(response_data: dict,  service: str, tsp: str) -> list:
     total_schedule_list: list = []
     for task in response_data:
-        first_point_from: str = task['placeOfReceipt']
-        last_point_to: str = task['placeOfDelivery']
-        first_etd: datetime = task['placeOfReceiptDateTime']
-        last_eta: datetime = task['placeOfDeliveryDateTime']
+        print(task)
+        first_point_from: str = task.get('placeOfReceipt')
+        last_point_to: str = task.get('placeOfDelivery')
+        first_etd: datetime = task.get('placeOfReceiptDateTime')
+        last_eta: datetime = task.get('placeOfDeliveryDateTime')
         transit_time: int = task.get('transitTime', (datetime.fromisoformat(last_eta[:10]) - datetime.fromisoformat(first_etd[:10])).days)
-        first_cy_cutoff: datetime = next((cutoff['cutOffDateTime'] for cutoff in task['gateInCutOffDateTimes'] if cutoff['cutOffDateTimeCode'] == 'FCO'), None)
-        first_vgm_cuttoff: datetime = next((cutoff['cutOffDateTime'] for cutoff in task['gateInCutOffDateTimes'] if cutoff['cutOffDateTimeCode'] == 'VCO'), None)
-        first_doc_cutoff: datetime = next((cutoff['cutOffDateTime'] for cutoff in task['gateInCutOffDateTimes'] if cutoff['cutOffDateTimeCode'] == 'LCO'), None)
+        first_cy_cutoff: datetime = next((cutoff.get('cutOffDateTime') for cutoff in task['gateInCutOffDateTimes'] if cutoff.get('cutOffDateTimeCode') == 'FCO'), None)
+        first_vgm_cuttoff: datetime = next((cutoff.get('cutOffDateTime') for cutoff in task['gateInCutOffDateTimes'] if cutoff.get('cutOffDateTimeCode')  == 'VCO'), None)
+        first_doc_cutoff: datetime = next((cutoff.get('cutOffDateTime') for cutoff in task['gateInCutOffDateTimes'] if cutoff.get('cutOffDateTimeCode')  == 'LCO'), None)
         check_transshipment: bool = len(task['legs']) > 1
+        print('test')
         leg_list: list = [schema_response.Leg.model_construct(
             pointFrom={'locationName': leg['departureLocation']['locationName'],
                        'locationCode': leg['departureLocation']['UNLocationCode']},
@@ -28,13 +30,12 @@ def process_response_data(response_data: dict,  service: str, tsp: str) -> list:
             etd=(etd := leg['departureDateTime']),
             eta=(eta := leg['arrivalDateTime']),
             transitTime=int((datetime.fromisoformat(eta) - datetime.fromisoformat(etd)).days),
-            transportations={'transportType': str(leg['modeOfTransport']).title(),
+            transportations={'transportType': str(leg.get('modeOfTransport')).title(),
                              'transportName': leg['vesselName'] if (vessel_imo := leg.get('vesselImoNumber')) else None,
                              'referenceType': 'IMO' if vessel_imo and vessel_imo != '0000000' else None,
                              'reference': vessel_imo if vessel_imo != '0000000' else None},
             services={'serviceName': check_service} if (check_service := leg.get('serviceName')) else None,
-            voyages={'internalVoyage': internal_voy} if (internal_voy := leg.get('importVoyageNumber')) else None) for
-            leg in task['legs']]
+            voyages={'internalVoyage': internal_voy} if (internal_voy := leg.get('importVoyageNumber')) else None) for leg in task['legs']]
         schedule_body: dict = schema_response.Schedule.model_construct(scac='HLCU', pointFrom=first_point_from,
                                                                        pointTo=last_point_to, etd=first_etd,
                                                                        eta=last_eta, cyCutOffDate=first_cy_cutoff,

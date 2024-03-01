@@ -19,7 +19,7 @@ import asyncio
 class AsyncTaskManager:
     """Currently there is no built in  python class and method that we can prevent it from cancelling all conroutine tasks if one of the tasks is cancelled
     From BU perspective, all those carrier schedules are independent from one antoher so we shouldnt let a failed task to cancel all other successful tasks"""
-    def __init__(self,default_timeout=15,max_retries=3):
+    def __init__(self,default_timeout=25,max_retries=3):
         self.__tasks:dict = dict()
         self.error:bool = False
         self.default_timeout:int = default_timeout
@@ -41,10 +41,11 @@ class AsyncTaskManager:
                 """Due to timeout, the coroutine task is cancelled. Once its cancelled, we retry it 3 times"""
                 logging.error(f"{task_name} timed out after {self.default_timeout} seconds. Retrying {retries + 1}/{self.max_retries}...")
                 retries += 1
-                adjusted_timeout += 5
+                adjusted_timeout += 3
                 await asyncio.sleep(1)  # Wait for 1 sec before the next retry
         logging.error(f"{task_name} reached maximum retries.")
-        return coro()
+        # return coro()
+        return None
 
     def create_task(self, name:str,coro:Callable):
         self.__tasks[name] = asyncio.create_task(self._timeout_wrapper(coro=coro,task_name=name))
