@@ -23,10 +23,10 @@ def process_response_data(response_data: dict, direct_only:bool |None,vessel_imo
             last_point_to: str = task['Schedules'][-1]['Calls'][-1]['Code']
             first_etd: str = next(ed['CallDateTime'] for ed in task['Schedules'][0]['Calls'][0]['CallDates'] if ed['Type'] == 'ETD')
             last_eta: str = next(ed['CallDateTime'] for ed in task['Schedules'][-1]['Calls'][-1]['CallDates'] if ed['Type'] == 'ETA')
-            find_cutoff = lambda cutoff_type: next((led['CallDateTime'] for led in task['Schedules'][0]['Calls'][0]['CallDates'] if led['Type'] == cutoff_type and led.get('CallDateTime')), None)
-            first_cy_cutoff: str = find_cutoff('CYCUTOFF')
-            first_doc_cutoff: str = find_cutoff('SI')
-            first_vgm_cutoff: str = find_cutoff('VGM')
+            # find_cutoff = lambda cutoff_type: next((led['CallDateTime'] for led in task['Schedules'][0]['Calls'][0]['CallDates'] if led['Type'] == cutoff_type and led.get('CallDateTime')), None)
+            # first_cy_cutoff: str = find_cutoff('CYCUTOFF')
+            # first_doc_cutoff: str = find_cutoff('SI')
+            # first_vgm_cutoff: str = find_cutoff('VGM')
             transit_time:int = int((datetime.fromisoformat(last_eta) - datetime.fromisoformat(first_etd)).days)
             leg_list: list = [schema_response.Leg.model_construct(
                 pointFrom={'locationName': leg['Calls'][0]['Name'], 'locationCode': leg['Calls'][0]['Code'],
@@ -51,9 +51,6 @@ def process_response_data(response_data: dict, direct_only:bool |None,vessel_imo
                                                                            pointFrom=first_point_from,
                                                                            pointTo=last_point_to, etd=first_etd,
                                                                            eta=last_eta,
-                                                                           cyCutOffDate=first_cy_cutoff,
-                                                                           docCutOffDate=first_doc_cutoff,
-                                                                           vgmCutOffDate=first_vgm_cutoff,
                                                                            transitTime=transit_time,
                                                                            transshipment=check_transshipment,
                                                                            legs=leg_list).model_dump(warnings=False)

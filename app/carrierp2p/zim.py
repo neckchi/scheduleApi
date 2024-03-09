@@ -25,14 +25,11 @@ def process_response_data(response_data: dict, direct_only:bool |None,vessel_imo
             first_etd: str = task['departureDate']
             last_eta: str = task['arrivalDate']
             find_cutoff = lambda cutoff_type: next((leg.get(cutoff_type) for leg in task['routeLegs'] if leg.get(cutoff_type)), None)
-            first_cy_cutoff: str = find_cutoff('containerClosingDate')
-            first_doc_cutoff: str = find_cutoff('docClosingDate')
-            first_vgm_cutoff: str = find_cutoff('vgmClosingDate')
+            # first_cy_cutoff: str = find_cutoff('containerClosingDate')
+            # first_doc_cutoff: str = find_cutoff('docClosingDate')
+            # first_vgm_cutoff: str = find_cutoff('vgmClosingDate')
             schedule_body: dict = schema_response.Schedule.model_construct(scac=carrier_code,pointFrom=first_point_from,pointTo=last_point_to, etd=first_etd,
                eta=last_eta,
-               cyCutOffDate=first_cy_cutoff,
-               docCutOffDate=first_doc_cutoff,
-               vgmCutOffDate=first_vgm_cutoff,
                transitTime=transit_time,
                transshipment=check_transshipment,
                legs = [schema_response.Leg.model_construct(pointFrom={'locationName': leg['departurePortName'],

@@ -64,7 +64,8 @@ class AsyncTaskManager:
 class HTTPXClientWrapper():
     def __init__(self):
         self.session_id: str = str(uuid4())
-        self.client:httpx.AsyncClient = httpx.AsyncClient(proxies="http://zscaler.proxy.int.kn:80", verify=False, timeout=httpx.Timeout(30.0, connect=65.0), limits=httpx.Limits(max_connections=200,max_keepalive_connections=20))
+        self.client:httpx.AsyncClient = httpx.AsyncClient(proxies="http://zscaler.proxy.int.kn:80", verify=False, timeout=httpx.Timeout(30.0, connect=65.0),
+                                                          limits=httpx.Limits(max_connections=200,max_keepalive_connections=20),transport=httpx.AsyncHTTPTransport(retries=3))
         logging.info(f'Client Session Started - {self.session_id}')
 
     async def close(self):
@@ -94,18 +95,21 @@ class HTTPXClientWrapper():
     async def parse(self,url: str, method: str = Literal['GET', 'POST'],params: dict = None, headers: dict = None, json: dict = None, token_key=None,
                           data: dict = None, background_tasks: BackgroundTasks = None, expire=timedelta(hours = load_yaml()['data']['backgroundTasks']['scheduleExpiry']),stream: bool = False):
         if not stream:
-            response = await self.client.request(method=method, url=url, params=params, headers=headers, json=json,data=data)
-            if response.status_code == 206: #only CMA returns 206 if the number of schedule is more than 49. That means we shouldnt deserialize the json response at the beginning coz there are more responses need to be fetched based on the header range.
-                yield response
-            if response.status_code == 200:
-                response_json = response.json()
-                if background_tasks:
-                    background_tasks.add_task(db.set, key=token_key, value=response_json, expire=expire)
-                yield response_json
-            if response.status_code in (500,502):
-                logging.critical(f'Unable to connect to {url}')
-                yield None
-            else:yield None
+            try:
+                response = await self.client.request(method=method, url=url, params=params, headers=headers, json=json,data=data)
+                if response.status_code == 206: #only CMA returns 206 if the number of schedule is more than 49. That means we shouldnt deserialize the json response at the beginning coz there are more responses need to be fetched based on the header range.
+                    yield response
+                if response.status_code == 200:
+                    response_json = response.json()
+                    if background_tasks:
+                        background_tasks.add_task(db.set, key=token_key, value=response_json, expire=expire)
+                    yield response_json
+                if response.status_code in (500,502):
+                    logging.critical(f'Unable to connect to {url}')
+                    yield None
+                else:yield None
+            except Exception as http_error:
+                logging.error(f'Connection Error - {http_error}')
         else:
             """
             At the moment Only Maersk need consumer to stream the response

@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
-from fastapi.middleware.gzip import GZipMiddleware
 from app.routers import schedules
 from app.background_tasks import db
 from app.config import log_queue_listener
@@ -12,6 +12,14 @@ import atexit
 
 queue_lister = log_queue_listener()
 app = FastAPI(docs_url=None, redoc_url=None)
+app.add_middleware(GZipMiddleware, minimum_size=2000)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=['GET'],
+    allow_headers=["*"],
+)
 app.include_router(schedules.router)
 
 
@@ -55,15 +63,6 @@ def custom_openapi():
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 
-
-app.add_middleware(GZipMiddleware, minimum_size=4000)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=['GET'],
-    allow_headers=["*"],
-)
 
 
 app.openapi = custom_openapi

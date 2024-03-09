@@ -54,6 +54,7 @@ def process_response_data(response_data: dict, vessel_imo: str, service: str, ts
                          'terminalCode': first_pot_terminal_code if check_transshipment and legs['vesselSequence'] == 1 else last_pod_terminal_code},
                 etd=etd,
                 eta=(eta := legs.get('vesselArrivalDate')),
+                cutoffs={'cyCutoffDate': first_cy_cutoff, 'docCutoffDate': first_doc_cutoff} if index == 0 and (first_cy_cutoff or first_doc_cutoff) else None,
                 transitTime=int((datetime.datetime.fromisoformat(eta) - datetime.datetime.fromisoformat(etd)).days),
                 transportations={'transportType': 'Vessel' if (vessel_name := legs.get('vesselName')) else 'Feeder',
                                  'transportName': vessel_name,
@@ -61,7 +62,7 @@ def process_response_data(response_data: dict, vessel_imo: str, service: str, ts
                                  'reference': imo_code},
                 services={'serviceCode': check_service} if (check_service := legs.get('vesselLoop')) else None,
                 voyages={'internalVoyage': internal_voy} if (internal_voy := legs.get('voyageNumber')) else None)
-                for legs in task['vessel'] if (etd := legs.get('vesselDepartureDate'))]
+                for index, legs in enumerate(task['vessel']) if (etd := legs.get('vesselDepartureDate'))]
             # inbound
             leg_list += [schema_response.Leg.model_construct(
                 pointFrom={'locationName': task['inboundInland']['fromLocationName'],
@@ -80,8 +81,6 @@ def process_response_data(response_data: dict, vessel_imo: str, service: str, ts
                                                                            pointFrom=first_point_from,
                                                                            pointTo=last_point_to, etd=first_etd,
                                                                            eta=last_eta,
-                                                                           cyCutOffDate=first_cy_cutoff,
-                                                                           docCutoffDate=first_doc_cutoff,
                                                                            transitTime=transit_time,
                                                                            transshipment=check_transshipment,
                                                                            legs=leg_list).model_dump(warnings=False)

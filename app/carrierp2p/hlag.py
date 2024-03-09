@@ -11,7 +11,6 @@ import asyncio
 def process_response_data(response_data: dict,  service: str, tsp: str) -> list:
     total_schedule_list: list = []
     for task in response_data:
-        print(task)
         first_point_from: str = task.get('placeOfReceipt')
         last_point_to: str = task.get('placeOfDelivery')
         first_etd: datetime = task.get('placeOfReceiptDateTime')
@@ -21,7 +20,6 @@ def process_response_data(response_data: dict,  service: str, tsp: str) -> list:
         first_vgm_cuttoff: datetime = next((cutoff.get('cutOffDateTime') for cutoff in task['gateInCutOffDateTimes'] if cutoff.get('cutOffDateTimeCode')  == 'VCO'), None)
         first_doc_cutoff: datetime = next((cutoff.get('cutOffDateTime') for cutoff in task['gateInCutOffDateTimes'] if cutoff.get('cutOffDateTimeCode')  == 'LCO'), None)
         check_transshipment: bool = len(task['legs']) > 1
-        print('test')
         leg_list: list = [schema_response.Leg.model_construct(
             pointFrom={'locationName': leg['departureLocation']['locationName'],
                        'locationCode': leg['departureLocation']['UNLocationCode']},

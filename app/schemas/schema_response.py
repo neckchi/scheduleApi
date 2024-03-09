@@ -101,9 +101,9 @@ class Schedule(BaseModel):
     pointTo: str = Field(max_length=5, title="Last Port Of Discharge", example='DEHAM', pattern =r"[A-Z]{2}[A-Z0-9]{3}")
     etd: datetime = Field(example='2023-11-13T18:00:00')
     eta: datetime = Field(example='2023-12-15T07:00:00')
-    cyCutOffDate: datetime | None = Field(default= None, example='2023-11-11T22:00:00')
-    docCutOffDate: datetime | None = Field(default= None,example = '2023-11-10T11:00:00')
-    vgmCutOffDate: datetime | None = Field(default= None,example='2023-11-11T22:00:00')
+    # cyCutOffDate: datetime | None = Field(default= None, example='2023-11-11T22:00:00')
+    # docCutOffDate: datetime | None = Field(default= None,example = '2023-11-10T11:00:00')
+    # vgmCutOffDate: datetime | None = Field(default= None,example='2023-11-11T22:00:00')
     transitTime: int = Field(ge=0, alias='transitTime', title="Schedule Transit Time",
                              description="Transit Time on Schedule Level")
     transshipment: bool = Field(title="Is transshipment?",example=False)

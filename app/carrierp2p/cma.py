@@ -14,9 +14,9 @@ def process_response_data(response_data: list,carrier_list:dict) -> list:
         last_point_to:str = task['routingDetails'][-1]['pointTo']['location']['internalCode']
         first_etd = next((ed['pointFrom']['departureDateLocal'] for ed in task['routingDetails'] if ed['pointFrom'].get('departureDateLocal')), default_etd_eta)
         last_eta = next((ea['pointTo']['arrivalDateLocal'] for ea in task['routingDetails'][::-1] if ea['pointTo'].get('arrivalDateLocal')), default_etd_eta)
-        first_cy_cutoff = next((cyc['pointFrom']['portCutoffDate'] for cyc in task['routingDetails'] if deepget(cyc['pointFrom'],'portCutoffDate')), None)
-        first_vgm_cuttoff = next((vgmc['pointFrom']['vgmCutoffDate'] for vgmc in task['routingDetails'] if deepget(vgmc['pointFrom'],'vgmCutoffDate')), None)
-        first_doc_cutoff = next((doc['pointFrom']['cutOff']['shippingInstructionAcceptance']['local'] for doc in task['routingDetails'] if deepget(doc['pointFrom'],'cutOff', 'shippingInstructionAcceptance', 'local')), None)
+        # first_cy_cutoff = next((cyc['pointFrom']['portCutoffDate'] for cyc in task['routingDetails'] if deepget(cyc['pointFrom'],'portCutoffDate')), None)
+        # first_vgm_cuttoff = next((vgmc['pointFrom']['vgmCutoffDate'] for vgmc in task['routingDetails'] if deepget(vgmc['pointFrom'],'vgmCutoffDate')), None)
+        # first_doc_cutoff = next((doc['pointFrom']['cutOff']['shippingInstructionAcceptance']['local'] for doc in task['routingDetails'] if deepget(doc['pointFrom'],'cutOff', 'shippingInstructionAcceptance', 'local')), None)
         check_transshipment:bool = len(task['routingDetails']) > 1
         leg_list: list = [schema_response.Leg.model_construct(
             pointFrom={'locationName': leg['pointFrom']['location']['name'],
@@ -41,7 +41,6 @@ def process_response_data(response_data: list,carrier_list:dict) -> list:
                      'vgmCutoffDate':deepget(leg['pointFrom']['cutOff'], 'vgm', 'local')} if leg['pointFrom'].get('cutOff') else None)for leg in task['routingDetails']]
         schedule_body: dict = schema_response.Schedule.model_construct(scac=carrier_list.get(task['shippingCompany']), pointFrom=first_point_from,
                                                                        pointTo=last_point_to, etd=first_etd,eta=last_eta,
-                                                                       cyCutOffDate=first_cy_cutoff,docCutOffDate=first_doc_cutoff,vgmCutOffDate=first_vgm_cuttoff,
                                                                        transitTime=transit_time,transshipment=check_transshipment,
                                                                        legs=leg_list).model_dump(warnings=False)
         total_schedule_list.append(schedule_body)
