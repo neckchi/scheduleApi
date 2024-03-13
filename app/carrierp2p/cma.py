@@ -5,8 +5,8 @@ from app.schemas import schema_response
 from datetime import datetime
 from typing import Generator
 
-
-def process_response_data(task: dict,carrier_list:dict) -> list:
+carrier_code: dict = {'0001': 'CMDU', '0002': 'ANNU', '0011': 'CHNL', '0015': 'APLU'}
+def process_response_data(task: dict) -> list:
     default_etd_eta = datetime.now().astimezone().replace(microsecond=0).isoformat()
     transit_time:int = task['transitTime']
     first_point_from:str = task['routingDetails'][0]['pointFrom']['location']['internalCode']
@@ -35,7 +35,7 @@ def process_response_data(task: dict,carrier_list:dict) -> list:
         cutoffs={'docCutoffDate':deepget(leg['pointFrom']['cutOff'], 'shippingInstructionAcceptance','local'),
                  'cyCutoffDate':deepget(leg['pointFrom']['cutOff'], 'portCutoff', 'local'),
                  'vgmCutoffDate':deepget(leg['pointFrom']['cutOff'], 'vgm', 'local')} if leg['pointFrom'].get('cutOff') else None)for leg in task['routingDetails']]
-    schedule_body: dict = schema_response.Schedule.model_construct(scac=carrier_list.get(task['shippingCompany']), pointFrom=first_point_from,
+    schedule_body: dict = schema_response.Schedule.model_construct(scac=carrier_code.get(task['shippingCompany']), pointFrom=first_point_from,
                                                                    pointTo=last_point_to, etd=first_etd,eta=last_eta,
                                                                    transitTime=transit_time,transshipment=check_transshipment,
                                                                    legs=leg_list).model_dump(warnings=False)
@@ -63,7 +63,7 @@ async def get_all_schedule(client:HTTPXClientWrapper,cma_list:list,url:str,heade
 
 async def get_cma_p2p(client:HTTPXClientWrapper,url: str, pw: str, pol: str, pod: str, search_range: int, direct_only: bool | None,tsp: str | None = None,vessel_imo:str | None = None,
                           departure_date: datetime.date = None,arrival_date: datetime.date = None, scac: str | None = None, service: str | None = None):
-    carrier_code: dict = {'0001': 'CMDU', '0002': 'ANNU','0011': 'CHNL', '0015': 'APLU'}
+
     api_carrier_code: str = next(k for k, v in carrier_code.items() if v == scac.upper()) if scac else None
     headers: dict = {'keyID': pw}
     params: dict = {'placeOfLoading': pol, 'placeOfDischarge': pod,'departureDate': departure_date,'arrivalDate': arrival_date, 'searchRange': search_range,
@@ -72,7 +72,7 @@ async def get_cma_p2p(client:HTTPXClientWrapper,url: str, pw: str, pol: str, pod
     cma_list:list = [None, '0015'] if api_carrier_code is None else [api_carrier_code]
     response_json = await anext(get_all_schedule(client=client,url=url,headers=headers,params=params,cma_list=cma_list,extra_condition=extra_condition))
     if response_json:
-        p2p_schedule: Generator = (schedule_result for task in  response_json for schedule_result in process_response_data(task=task,carrier_list = carrier_code))
+        p2p_schedule: Generator = (schedule_result for task in  response_json for schedule_result in process_response_data(task=task))
         return p2p_schedule
 
 
