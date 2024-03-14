@@ -14,7 +14,6 @@ def process_response_data(task: dict, vessel_imo: str, service: str, tsp: str) -
         transit_time: int = task.get('totalTransitDay')
         first_pol: str = task.get('loadingPortCode')
         first_point_from: str = task['outboundInland']['fromUnLocationCode'] if task.get('outboundInland') else first_pol
-        first_pot_code: str = task.get('transshipPortCode')
         first_pol_terminal_name: str = task.get('loadingTerminalName')
         first_pol_terminal_code: str = task.get('loadingTerminalCode')
         first_pot_terminal_name: str = task.get('transshipTerminalName')
@@ -43,11 +42,11 @@ def process_response_data(task: dict, vessel_imo: str, service: str, tsp: str) -
         # main routing
         leg_list += [schema_response.Leg.model_construct(
             pointFrom={'locationName': legs['loadPort'],
-                       'locationCode': first_pol if legs['vesselSequence'] == 1 else first_pot_code,
+                       'locationCode': legs['loadPortCode'],
                        'terminalName': first_pol_terminal_name if legs['vesselSequence'] == 1 else first_pot_terminal_name,
                        'terminalCode': first_pol_terminal_code if legs['vesselSequence'] == 1 else first_pot_terminal_code},
             pointTo={'locationName': legs['dischargePort'],
-                     'locationCode': first_pot_code if check_transshipment and legs['vesselSequence'] == 1 else last_point_to,
+                     'locationCode': legs['dischargePortCode'],
                      'terminalName': first_pot_terminal_name if check_transshipment and legs['vesselSequence'] == 1 else last_pod_terminal_name,
                      'terminalCode': first_pot_terminal_code if check_transshipment and legs['vesselSequence'] == 1 else last_pod_terminal_code},
             etd=etd,
