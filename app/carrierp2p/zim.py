@@ -6,10 +6,8 @@ from uuid import uuid5,NAMESPACE_DNS,UUID
 from fastapi import BackgroundTasks
 from typing import Generator
 
-
-
+transport_type: dict = {'Land Trans': 'Truck', 'Feeder': 'Feeder', 'TO BE NAMED': 'Vessel'}
 def process_response_data(task: dict, direct_only:bool |None,vessel_imo: str, service: str, tsp: str) -> dict:
-    transport_type: dict = {'Land Trans': 'Truck', 'Feeder': 'Feeder', 'TO BE NAMED': 'Vessel'}
     # Additional check on service code/name in order to fullfill business requirment(query the result by service code)
     check_service_code: bool = any(service == services['line'] for services in task['routeLegs'] if services.get('voyage')) if service else True
     check_transshipment: bool = task['routeLegCount'] > 1

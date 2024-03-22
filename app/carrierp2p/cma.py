@@ -5,7 +5,9 @@ from app.schemas import schema_response
 from datetime import datetime
 from typing import Generator
 
+
 carrier_code: dict = {'0001': 'CMDU', '0002': 'ANNU', '0011': 'CHNL', '0015': 'APLU'}
+
 def process_response_data(task: dict) -> list:
     default_etd_eta = datetime.now().astimezone().replace(microsecond=0).isoformat()
     transit_time:int = task['transitTime']
@@ -28,8 +30,8 @@ def process_response_data(task: dict) -> list:
         transitTime=leg.get('legTransitTime', 0),
         transportations={'transportType': str(leg['transportation']['meanOfTransport']).title(),
                          'transportName': deepget(leg['transportation'], 'vehicule', 'vehiculeName'),
-                         'referenceType': 'IMO' if (vessel_imo := deepget(leg['transportation'], 'vehicule', 'reference')) and len(vessel_imo) < 8  else None,
-                         'reference':vessel_imo if len(vessel_imo) < 8 else None},
+                         'referenceType': 'IMO' if (vessel_imo := deepget(leg['transportation'], 'vehicule', 'reference')) and (len(vessel_imo) < 8 if vessel_imo else None) else None,
+                         'reference':vessel_imo if (len(vessel_imo) < 8 if vessel_imo else None) else None },
         services={'serviceCode': service_name} if (service_name := deepget(leg['transportation'], 'voyage', 'service', 'code')) else None,
         voyages={'internalVoyage': voyage_num} if (voyage_num := deepget(leg['transportation'], 'voyage', 'voyageReference')) else None,
         cutoffs={'docCutoffDate':deepget(leg['pointFrom']['cutOff'], 'shippingInstructionAcceptance','local'),
