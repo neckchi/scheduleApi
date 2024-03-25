@@ -14,8 +14,9 @@ import httpx
 import logging
 import orjson
 import asyncio
+import ssl
 
-#
+context = ssl.create_default_context()
 class AsyncTaskManager:
     """Currently there is no built in  python class and method that we can prevent it from cancelling all conroutine tasks if one of the tasks is cancelled
     From BU perspective, all those carrier schedules are independent from one antoher so we shouldnt let a failed task to cancel all other successful tasks"""
@@ -57,14 +58,14 @@ class AsyncTaskManager:
                 task_name = task_names[i]
                 logging.critical(f"{task_name} connection attempts failed: {result}")
                 self.error = True
-        return [result for result in self.results if not isinstance(result, Exception)] if self.error else self.results
+        return (result for result in self.results if not isinstance(result, Exception)) if self.error else self.results
 
 
 
 class HTTPXClientWrapper():
     def __init__(self):
         self.session_id: str = str(uuid4())
-        self.client:httpx.AsyncClient = httpx.AsyncClient(proxies="http://zscaler.proxy.int.kn:80", verify=False, timeout=httpx.Timeout(30.0, connect=65.0),
+        self.client:httpx.AsyncClient = httpx.AsyncClient(proxies="http://zscaler.proxy.int.kn:80", verify=context, timeout=httpx.Timeout(30.0, connect=65.0),
                                                           limits=httpx.Limits(max_connections=200,max_keepalive_connections=20),transport=httpx.AsyncHTTPTransport(retries=3))
         logging.info(f'Client Session Started - {self.session_id}')
 
@@ -126,8 +127,8 @@ class HTTPXClientWrapper():
             else:yield None
 
 
-    def gen_all_valid_schedules(self,matrix:list,product_id:UUID,point_from:str,point_to:str,background_tasks:BackgroundTasks,task_exception:bool):
-        flat_list:list = [item for row in matrix if row is not None for item in row]
+    def gen_all_valid_schedules(self,matrix:Generator,product_id:UUID,point_from:str,point_to:str,background_tasks:BackgroundTasks,task_exception:bool):
+        flat_list:Generator = (item for row in matrix if row is not None for item in row)
         sorted_schedules:list = sorted(flat_list, key=lambda tt: (tt['etd'][:10], tt['transitTime']))
         count_schedules:int = len(sorted_schedules)
         if count_schedules == 0:
