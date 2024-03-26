@@ -14,9 +14,7 @@ import httpx
 import logging
 import orjson
 import asyncio
-import ssl
 
-context = ssl.create_default_context()
 class AsyncTaskManager:
     """Currently there is no built in  python class and method that we can prevent it from cancelling all conroutine tasks if one of the tasks is cancelled
     From BU perspective, all those carrier schedules are independent from one antoher so we shouldnt let a failed task to cancel all other successful tasks"""
@@ -60,22 +58,23 @@ class AsyncTaskManager:
                 self.error = True
         return (result for result in self.results if not isinstance(result, Exception)) if self.error else self.results
 
-
-
+SSL_CONTEXT = httpx.create_ssl_context()
+KN_PROXY:str = "http://zscaler.proxy.int.kn:80"
+HTTPX_TIMEOUT = httpx.Timeout(30.0, connect=65.0)
+HTTPX_LIMITS = httpx.Limits(max_connections=200,max_keepalive_connections=20)
+HTTPX_ASYNC_HTTP = httpx.AsyncHTTPTransport(retries=3)
 class HTTPXClientWrapper():
     def __init__(self):
         self.session_id: str = str(uuid4())
-        self.client:httpx.AsyncClient = httpx.AsyncClient(proxies="http://zscaler.proxy.int.kn:80", verify=context, timeout=httpx.Timeout(30.0, connect=65.0),
-                                                          limits=httpx.Limits(max_connections=200,max_keepalive_connections=20),transport=httpx.AsyncHTTPTransport(retries=3))
-        logging.info(f'Client Session Started - {self.session_id}')
-
+        self.client:httpx.AsyncClient = httpx.AsyncClient(proxies=KN_PROXY,verify=SSL_CONTEXT, timeout=HTTPX_TIMEOUT,
+                                                          limits=HTTPX_LIMITS,transport=HTTPX_ASYNC_HTTP)
     async def close(self):
-        logging.info(f'Client Session Closed - {self.session_id}')
         await self.client.aclose()
 
     @staticmethod
     async def get_httpx_client_wrapper() -> Generator:
         standalone_client = HTTPXClientWrapper() ## standalone client session
+        logging.info(f'Client Session Started - {standalone_client.session_id}')
         try:
             yield standalone_client
         except ConnectionError as connect_error:
@@ -90,6 +89,7 @@ class HTTPXClientWrapper():
             logging.error(f'{eg.__class__.__name__}:{eg.args}')
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f'An error occurred while creating the client - {eg.args}')
         finally:
+            logging.info(f'Client Session Closed - {standalone_client.session_id}')
             await standalone_client.close()
 
 
