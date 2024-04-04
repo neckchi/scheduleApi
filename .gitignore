@@ -29,3 +29,5 @@ app/carrierp2p/hamburgsud.py
 # vim temporary files
 *~
 .*.sw?
+.terraform**
+**terraform.tfstate**

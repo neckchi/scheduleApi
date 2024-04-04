@@ -1,0 +1,89 @@
+.before_script_terraform: &before_script_terraform
+  - 'which ssh-agent || ( apt-get update -y && apt-get install openssh-client -y )'
+  - eval $(ssh-agent -s)
+  - ssh-add <(echo "$SSH_PRIVATE_KEY")
+  - mkdir -p ~/.ssh
+  - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
+  - terraform --version
+  - terraform -chdir=cicd init -backend-config=environments/dev/backend.conf
+.terraform_image: &terraform_image
+  name: hashicorp/terraform:light
+  entrypoint:
+    - '/usr/bin/env'
+    - 'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+
+variables:
+  PROJECT_NAME: p2p-schedule-api-of-carriers
+  REPO_URL: 934536729814.dkr.ecr.eu-central-1.amazonaws.com
+  HTTP_PROXY: "http://proxy.eu-central-1.aws.int.kn:80"
+  NO_PROXY: "172.20.0.0/16,localhost,127.0.0.1,10.59.244.0/25,169.254.169.254,.internal,s3.amazonaws.com,.s3.eu-central-1.amazonaws.com,api.ecr.eu-central-1.amazonaws.com,.dkr.ecr.eu-central-1.amazonaws.com,.ec2.eu-central-1.amazonaws.com,169.254.170.2,.int.kn,.eks.amazonaws.com,.cluster.local"
+  AWS_SDK_LOAD_CONFIG: "true"
+
+stages:
+  - build
+  - validate
+  - plan_dev
+  - apply_dev
+  - destroy_dev
+
+# Stages Defenition
+build:
+  stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:v1.14.0-debug
+    entrypoint: [""]
+  tags:
+    - dev
+  script:
+    - /kaniko/executor
+      --context .
+      --build-arg HTTP_PROXY=$HTTP_PROXY
+      --build-arg HTTPS_PROXY=$HTTP_PROXY
+      --build-arg http_proxy=$HTTP_PROXY
+      --build-arg https_proxy=$HTTP_PROXY
+      --build-arg no_proxy=$NO_PROXY
+      --build-arg NO_PROXY=$NO_PROXY
+      --dockerfile Dockerfile
+      --destination $REPO_URL/$PROJECT_NAME:latest
+validate:
+  stage: validate
+  image:
+    *terraform_image
+  tags:
+    - dev
+  before_script:
+    *before_script_terraform
+  script:
+    - terraform validate
+plan_dev:
+  stage: plan_dev
+  image:
+    *terraform_image
+  tags:
+    - dev
+  before_script:
+    *before_script_terraform
+  script:
+    - terraform -chdir=cicd plan -var-file=environments/dev/dev.tfvars -var="image_tag=latest"
+apply_dev:
+  stage: apply_dev
+  image:
+    *terraform_image
+  tags:
+    - dev
+  before_script:
+    *before_script_terraform
+  script:
+    - terraform -chdir=cicd apply -var-file=environments/dev/dev.tfvars -var="image_tag=latest" -auto-approve
+  allow_failure: true
+destroy_dev:
+  stage: destroy_dev
+  image:
+    *terraform_image
+  tags:
+    - dev
+  when: manual
+  before_script:
+    *before_script_terraform
+  script:
+    - terraform -chdir=cicd destroy -var-file=environments/dev/dev.tfvars -var="image_tag=latest" -auto-approve
