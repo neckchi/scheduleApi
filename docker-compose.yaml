@@ -5,7 +5,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      MONGO_URL : "mongodb:27017"
+      MONGO_URL : "mongodb://adminuser:password123@docdb-cluster-p2p-api-tmp.cluster-cjfsvyf5yg2g.eu-central-1.docdb.amazonaws.com:27017"
       CMA_URL : ""
       CMA_TOKEN : ""
       SUDU_URL : ""
@@ -43,11 +43,15 @@ services:
       HLCU_PASSWORD : ""
       BASIC_USER : ""
       BASIC_PW : ""
-  mongodb:
-    image: mongo:6-jammy
-    ports:
-      - '27017:27017'
-    volumes:
-      - dbdata6:/data/db
-volumes:
-  dbdata6:
+#  mongodb:
+#    image: mongo:6-jammy
+#    ports:
+#      - '27017:27017'
+#    environment:
+#      - MONGO_INITDB_ROOT_USERNAME=adminuser
+#      - MONGO_INITDB_ROOT_PASSWORD=password123
+#    volumes:
+#      - dbdata6:/data/db
+#    command: [--auth]
+#volumes:
+#  dbdata6:
