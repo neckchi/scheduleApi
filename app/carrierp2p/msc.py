@@ -8,15 +8,15 @@ from app.background_tasks import db
 from app.schemas import schema_response
 from uuid import uuid5,NAMESPACE_DNS,UUID
 from fastapi import BackgroundTasks
-from typing import Generator
+from typing import Generator,Iterator,AsyncIterator
 
-def process_response_data(task: dict, direct_only:bool |None,vessel_imo: str, service: str, tsp: str) -> dict:
+carrier_code: str = 'MSCU'
+def process_response_data(task: dict, direct_only:bool |None,vessel_imo: str, service: str, tsp: str) -> Iterator:
     check_service_code: bool = any(service_desc.get('Service') and service_desc['Service']['Description'] == service for service_desc in task['Schedules']) if service else True
     check_transshipment: bool = len(task.get('Schedules')) > 1
     transshipment_port = any(tsport['Calls'][0]['Code'] == tsp for tsport in task['Schedules'][1:]) if check_transshipment and tsp else False
     check_vessel_imo: bool = any( imo for imo in task['Schedules'] if imo.get('IMONumber') == vessel_imo) if vessel_imo else True
     if (transshipment_port or not tsp) and (direct_only is None or check_transshipment != direct_only) and check_service_code and check_vessel_imo:
-        carrier_code: str = 'MSCU'
         first_point_from: str = task['Schedules'][0]['Calls'][0]['Code']
         last_point_to: str = task['Schedules'][-1]['Calls'][-1]['Code']
         first_etd: str = next(ed['CallDateTime'] for ed in task['Schedules'][0]['Calls'][0]['CallDates'] if ed['Type'] == 'ETD')
@@ -51,7 +51,7 @@ def process_response_data(task: dict, direct_only:bool |None,vessel_imo: str, se
         yield schedule_body
 
 
-async def get_msc_token(client:HTTPXClientWrapper,background_task:BackgroundTasks, oauth: str, aud: str, rsa: str, msc_client: str, msc_scope: str, msc_thumbprint: str):
+async def get_msc_token(client:HTTPXClientWrapper,background_task:BackgroundTasks, oauth: str, aud: str, rsa: str, msc_client: str, msc_scope: str, msc_thumbprint: str) ->AsyncIterator:
     msc_token_key:UUID = uuid5(NAMESPACE_DNS, 'msc-token-uuid-kuehne-nagel')
     response_token:dict = await db.get(key=msc_token_key)
     if response_token is None:
@@ -66,7 +66,7 @@ async def get_msc_token(client:HTTPXClientWrapper,background_task:BackgroundTask
     yield response_token['access_token']
 
 async def get_msc_p2p(client:HTTPXClientWrapper, background_task:BackgroundTasks,url: str, oauth: str, aud: str, pw: str, msc_client: str, msc_scope: str,msc_thumbprint: str, pol: str, pod: str,
-                      search_range: int, start_date_type: str,start_date: datetime.date, direct_only: bool |None, vessel_imo: str | None = None, service: str | None = None, tsp: str | None = None):
+                      search_range: int, start_date_type: str,start_date: datetime.date, direct_only: bool |None, vessel_imo: str | None = None, service: str | None = None, tsp: str | None = None) -> Generator:
     params: dict = {'fromPortUNCode': pol, 'toPortUNCode': pod, 'fromDate': start_date,'toDate': (start_date + timedelta(days=search_range)).strftime("%Y-%m-%d"), 'datesRelated': start_date_type}
     token = await anext(get_msc_token(client=client,background_task=background_task,oauth=oauth, aud=aud, rsa=pw, msc_client=msc_client, msc_scope=msc_scope,msc_thumbprint=msc_thumbprint))
     headers: dict = {'Authorization': f'Bearer {token}'}

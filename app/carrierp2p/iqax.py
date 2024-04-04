@@ -7,10 +7,10 @@ from datetime import datetime,timedelta
 from uuid import uuid5,NAMESPACE_DNS
 from app.background_tasks import db
 from itertools import chain
-from typing import Generator
+from typing import Generator,Iterator
 
 
-def process_response_data(task: dict, direct_only:bool |None,vessel_imo: str, service: str, tsp: str) -> dict:
+def process_response_data(task: dict, direct_only:bool |None,vessel_imo: str, service: str, tsp: str) -> Iterator:
     check_service_code:bool = any(service == leg_service['service']['code'] for leg_service in task['leg']) if service else True
     check_transshipment: bool = not task['direct']
     transshipment_port:bool = any(tsport['fromPoint']['location']['unlocode'] == tsp for tsport in task['leg'][1:]) if check_transshipment and tsp else False
@@ -53,10 +53,10 @@ def process_response_data(task: dict, direct_only:bool |None,vessel_imo: str, se
         yield schedule_body
 
 async def get_iqax_p2p(client:HTTPXClientWrapper,background_task:BackgroundTasks, url: str, pw: str, pol: str, pod: str, search_range: int, direct_only: bool |None ,
-                       tsp: str | None = None, departure_date:datetime.date = None, arrival_date: datetime.date = None,vessel_imo:str|None = None,scac: str | None = None, service: str | None = None):
+                       tsp: str | None = None, departure_date:datetime.date = None, arrival_date: datetime.date = None,vessel_imo:str|None = None,scac: str | None = None, service: str | None = None) -> Generator:
     params: dict = {'appKey': pw, 'porID': pol, 'fndID': pod, 'departureFrom': departure_date,
                     'arrivalFrom': arrival_date, 'searchDuration': search_range}
-    iqax_list: list = ['OOLU', 'COSU'] if scac is None else [scac]
+    iqax_list: list[str] = ['OOLU', 'COSU'] if scac is None else [scac]
     iqax_response_uuid = lambda scac: uuid5(NAMESPACE_DNS,f'{str(params) + str(direct_only) + str(vessel_imo) + str(service) + str(tsp) + str(scac)}')
     response_cache:list = await asyncio.gather(*(db.get(key=iqax_response_uuid(scac=sub_iqax)) for sub_iqax in iqax_list))
     check_cache: bool = any(item is None for item in response_cache)

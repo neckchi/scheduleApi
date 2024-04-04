@@ -4,8 +4,8 @@ from app.schemas import schema_response
 from uuid import uuid5,NAMESPACE_DNS,UUID
 from datetime import timedelta,datetime
 from fastapi import BackgroundTasks
-from typing import Generator
-def process_response_data(task: dict,vessel_imo: str, service: str, tsp: str) -> dict:
+from typing import Generator,Iterator,AsyncIterator
+def process_response_data(task: dict,vessel_imo: str, service: str, tsp: str) -> Iterator:
     service_code: str = task['serviceCode']
     service_name: str = task['serviceName']
     # Additional check on service code/name in order to fullfill business requirment(query the result by service code)
@@ -66,7 +66,7 @@ def process_response_data(task: dict,vessel_imo: str, service: str, tsp: str) ->
                                                                        transshipment=check_transshipment,
                                                                        legs=leg_list).model_dump(warnings=False)
         yield schedule_body
-async def get_one_access_token(client:HTTPXClientWrapper,background_task:BackgroundTasks, url: str, auth: str, api_key: str):
+async def get_one_access_token(client:HTTPXClientWrapper,background_task:BackgroundTasks, url: str, auth: str, api_key: str)->AsyncIterator[str]:
     one_token_key:UUID = uuid5(NAMESPACE_DNS, 'one-token-uuid-kuehne-nagel')
     response_token:dict = await db.get(key=one_token_key)
     if response_token is None:
@@ -75,7 +75,7 @@ async def get_one_access_token(client:HTTPXClientWrapper,background_task:Backgro
     yield response_token['access_token']
 
 async def get_one_p2p(client:HTTPXClientWrapper, background_task:BackgroundTasks,url: str, turl: str, pw: str, auth: str, pol: str, pod: str, search_range: int,
-                      direct_only: bool|None,start_date: datetime.date,date_type: str | None = None, service: str | None = None,vessel_imo: str | None = None, tsp: str | None = None):
+                      direct_only: bool|None,start_date: datetime.date,date_type: str | None = None, service: str | None = None,vessel_imo: str | None = None, tsp: str | None = None) -> Generator:
     params: dict = {'originPort': pol, 'destinationPort': pod, 'searchDate': start_date,'searchDateType': date_type, 'weeksOut': search_range,'directOnly': 'TRUE' if direct_only is True else 'FALSE'}
     # weekout:1 ≤ value ≤ 14
     token:str = await anext(get_one_access_token(client=client,background_task=background_task, url=turl, auth=auth, api_key=pw))

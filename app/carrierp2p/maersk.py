@@ -7,11 +7,11 @@ from uuid import uuid5,NAMESPACE_DNS
 from datetime import timedelta,datetime
 from fastapi import BackgroundTasks
 from itertools import chain
-from typing import Generator
+from typing import Generator,Iterator,AsyncIterator
 
 transport_type: dict = {'BAR': 'Barge', 'BCO': 'Barge', 'FEF': 'Feeder', 'FEO': 'Feeder', 'MVS': 'Vessel',
                         'RCO': 'Rail', 'RR': 'Rail', 'TRK': 'Truck', 'VSF': 'Feeder', 'VSL': 'Feeder', 'VSM': 'Vessel'}
-def process_response_data(resp: dict,first_cut_off:dict, direct_only:bool |None,vessel_imo: str, service: str, tsp: str) -> dict:
+def process_response_data(resp: dict,first_cut_off:dict, direct_only:bool |None,vessel_imo: str, service: str, tsp: str) -> Iterator:
     # BU only want the first leg having cut off date
     carrier_code: str = resp['vesselOperatorCarrierCode']
     for task in resp['transportSchedules']:
@@ -51,7 +51,7 @@ def process_response_data(resp: dict,first_cut_off:dict, direct_only:bool |None,
                                                                            legs=sorted(leg_list, key=lambda d: d['etd']) if check_transshipment else leg_list).model_dump(warnings=False)
             yield schedule_body
 
-async def get_cutoff_first_leg(client:HTTPXClientWrapper,cut_off_url:str,cut_off_pw:str,response_data:list):
+async def get_cutoff_first_leg(client:HTTPXClientWrapper,cut_off_url:str,cut_off_pw:str,response_data:list) -> AsyncIterator:
     get_all_first_leg: list[dict] = [{'country': leg['transportLegs'][0]['facilities']['startLocation']['countryCode'],
                                       'pol': leg['transportLegs'][0]['facilities']['startLocation']['cityName'],'imo': imo, 'voyage': leg['transportLegs'][0]['transport'].get('carrierDepartureVoyageNumber')}
                                      for schedule in response_data for leg in schedule['transportSchedules'] if (imo := deepget(leg['transportLegs'][0]['transport'], 'vessel','vesselIMONumber'))
@@ -62,7 +62,7 @@ async def get_cutoff_first_leg(client:HTTPXClientWrapper,cut_off_url:str,cut_off
     first_cut_off: dict = {key: value for cutoff in get_cut_offs if cutoff is not None for key, value in cutoff.items()}
     yield first_cut_off
 
-async def get_maersk_cutoff(client:HTTPXClientWrapper, url: str, headers: dict, country: str, pol: str, imo: str, voyage: str):
+async def get_maersk_cutoff(client:HTTPXClientWrapper, url: str, headers: dict, country: str, pol: str, imo: str, voyage: str)-> AsyncIterator:
     params: dict = {'ISOCountryCode': country, 'portOfLoad': pol, 'vesselIMONumber': imo, 'voyage': voyage}
     async for response_json in client.parse(url=url,method ='GET',stream=True,headers=headers, params=params):
         if response_json:
@@ -78,7 +78,7 @@ async def get_maersk_cutoff(client:HTTPXClientWrapper, url: str, headers: dict, 
             yield {lookup_key: cut_off_body}
         yield None
 
-async def retrieve_geo_locations(client:HTTPXClientWrapper, background_task:BackgroundTasks, pol:str, pod:str, location_url:str, pw:str):
+async def retrieve_geo_locations(client:HTTPXClientWrapper, background_task:BackgroundTasks, pol:str, pod:str, location_url:str, pw:str) -> AsyncIterator:
     maersk_uuid = lambda port: uuid5(NAMESPACE_DNS, f'maersk-loc-uuid-kuehne-nagel-{port}')
     port_uuid:list = [maersk_uuid(port=port) for port in [pol, pod]]
     [origingeolocation, destinationgeolocation] = await asyncio.gather(*(db.get(key=port_id) for port_id in port_uuid))
@@ -95,14 +95,14 @@ async def retrieve_geo_locations(client:HTTPXClientWrapper, background_task:Back
     yield origingeolocation, destinationgeolocation
 
 async def get_maersk_p2p(client:HTTPXClientWrapper,background_task:BackgroundTasks,url: str, location_url: str, cutoff_url: str, pw: str, pw2: str, pol: str, pod: str,
-                         search_range: str, direct_only: bool|None = None, tsp: str | None = None, scac: str | None = None,start_date: datetime.date = None,date_type: str | None = None, service: str | None = None, vessel_imo:str|None = None,vessel_flag: str | None = None):
+                         search_range: str, direct_only: bool|None = None, tsp: str | None = None, scac: str | None = None,start_date: datetime.date = None,date_type: str | None = None, service: str | None = None, vessel_imo:str|None = None,vessel_flag: str | None = None) -> Generator:
     origin_geo_location, des_geo_location = await anext(retrieve_geo_locations(client=client,background_task=background_task,pol=pol,pod=pod,location_url=location_url,pw=pw))
     if origin_geo_location and des_geo_location:
         params:dict= {'collectionOriginCountryCode': origin_geo_location[0]['countryCode'],'collectionOriginCityName': origin_geo_location[0]['cityName'],'collectionOriginUNLocationCode': origin_geo_location[0]['UNLocationCode'],
                         'deliveryDestinationCountryCode': des_geo_location[0]['countryCode'],'deliveryDestinationCityName': des_geo_location[0]['cityName'],'deliveryDestinationUNLocationCode': des_geo_location[0]['UNLocationCode'],
                         'dateRange': f'P{search_range}W', 'startDateType': date_type, 'startDate': start_date}
         params.update({'vesselFlagCode': vessel_flag}) if vessel_flag else ...
-        maersk_list: list = ['MAEU', 'MAEI'] if scac is None else [scac]
+        maersk_list: list[str] = ['MAEU', 'MAEI'] if scac is None else [scac]
         maersk_response_uuid = lambda scac: uuid5(NAMESPACE_DNS,f'{str(params) + str(direct_only) + str(vessel_imo) + str(service) + str(tsp) + str(scac)}')
         response_cache = await asyncio.gather(*(db.get(key=maersk_response_uuid(scac=sub_maersk)) for sub_maersk in maersk_list))
         check_cache:bool = any(item is None for item in response_cache)

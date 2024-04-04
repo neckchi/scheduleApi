@@ -1,16 +1,15 @@
 import datetime
 from app.routers.router_config import HTTPXClientWrapper
 from app.schemas import schema_response
-from typing import Generator
+from typing import Generator,Iterator
 
-
-def process_response_data(task: dict, vessel_imo: str, service: str, tsp: str) -> dict:
+carrier_code: str = 'HDMU'
+def process_response_data(task: dict, vessel_imo: str, service: str, tsp: str) -> Iterator:
     check_service_code: bool = any(services['vesselLoop'] == service for services in task['vessel'] if services.get('vesselDepartureDate')) if service else True
     check_vessel_imo: bool = any(imo for imo in task['vessel'] if imo.get('lloydRegisterNo') == vessel_imo) if vessel_imo else True
     check_transshipment: bool = bool(task.get('transshipPortCode'))
     first_pot_code: str = task.get('transshipPortCode')
     if ((check_transshipment and tsp and first_pot_code) or not tsp) and check_service_code and check_vessel_imo:
-        carrier_code: str = 'HDMU'
         transit_time: int = task.get('totalTransitDay')
         first_pol: str = task.get('loadingPortCode')
         first_point_from: str = task['outboundInland']['fromUnLocationCode'] if task.get('outboundInland') else first_pol
@@ -85,7 +84,7 @@ def process_response_data(task: dict, vessel_imo: str, service: str, tsp: str) -
 
 
 async def get_hmm_p2p(client:HTTPXClientWrapper, url: str, pw: str, pol: str, pod: str, search_range: str, direct_only: bool|None,
-                      start_date: datetime,tsp: str | None = None,vessel_imo:str | None = None, service: str | None = None):
+                      start_date: datetime,tsp: str | None = None,vessel_imo:str | None = None, service: str | None = None) -> Generator:
 
     params: dict = {'fromLocationCode': pol, 'receiveTermCode': 'CY', 'toLocationCode': pod, 'deliveryTermCode': 'CY',
                     'periodDate': start_date.strftime("%Y%m%d"),'weekTerm': search_range, 'webSort': 'D','webPriority':'D' if direct_only is True else 'T' if direct_only is False else 'A'}

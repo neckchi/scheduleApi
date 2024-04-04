@@ -3,12 +3,12 @@ from app.carrierp2p.helpers import deepget
 from app.routers.router_config import HTTPXClientWrapper
 from app.schemas import schema_response
 from datetime import datetime
-from typing import Generator
+from typing import Generator,Iterator,AsyncIterator
 
 
 carrier_code: dict = {'0001': 'CMDU', '0002': 'ANNU', '0011': 'CHNL', '0015': 'APLU'}
 
-def process_response_data(task: dict) -> list:
+def process_response_data(task: dict) -> Iterator:
     default_etd_eta = datetime.now().astimezone().replace(microsecond=0).isoformat()
     transit_time:int = task['transitTime']
     first_point_from:str = task['routingDetails'][0]['pointFrom']['location']['internalCode']
@@ -43,7 +43,7 @@ def process_response_data(task: dict) -> list:
                                                                    legs=leg_list).model_dump(warnings=False)
     yield schedule_body
 
-async def get_all_schedule(client:HTTPXClientWrapper,cma_list:list,url:str,headers:dict,params:dict,extra_condition:bool):
+async def get_all_schedule(client:HTTPXClientWrapper,cma_list:list,url:str,headers:dict,params:dict,extra_condition:bool) ->AsyncIterator:
     updated_params = lambda cma_internal_code: dict(params,**{'shippingCompany': cma_internal_code ,'specificRoutings': 'USGovernment' if cma_internal_code == '0015' and extra_condition else 'Commercial'})
     p2p_resp_tasks: list = [asyncio.create_task(anext(client.parse(method='GET', url=url,params= updated_params(cma_internal_code=cma_code),headers=headers))) for cma_code in cma_list]
     all_schedule:list = []
@@ -64,7 +64,7 @@ async def get_all_schedule(client:HTTPXClientWrapper,cma_list:list,url:str,heade
     yield all_schedule
 
 async def get_cma_p2p(client:HTTPXClientWrapper,url: str, pw: str, pol: str, pod: str, search_range: int, direct_only: bool | None,tsp: str | None = None,vessel_imo:str | None = None,
-                          departure_date: datetime.date = None,arrival_date: datetime.date = None, scac: str | None = None, service: str | None = None):
+                          departure_date: datetime.date = None,arrival_date: datetime.date = None, scac: str | None = None, service: str | None = None) -> Generator:
 
     api_carrier_code: str = next(k for k, v in carrier_code.items() if v == scac.upper()) if scac else None
     headers: dict = {'keyID': pw}
