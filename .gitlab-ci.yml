@@ -86,6 +86,9 @@ Build:
   image:
     name: gcr.io/kaniko-project/executor:v1.14.0-debug
     entrypoint: [""]
+  only:
+    refs:
+      - RGSDEV-6672/create-cicd-api-hub-dev
   tags:
     - dev
   script:
@@ -104,6 +107,9 @@ Validate:
   stage: Validate
   image:
     *terraform_image
+  only:
+    refs:
+      - RGSDEV-6672/create-cicd-api-hub-dev
   tags:
     - dev
   before_script:
@@ -114,6 +120,9 @@ PlanDev:
   stage: PlanDev
   image:
     *terraform_image
+  only:
+    refs:
+      - RGSDEV-6672/create-cicd-api-hub-dev
   tags:
     - dev
   before_script:
@@ -124,6 +133,9 @@ ApplyDev:
   stage: ApplyDev
   image:
     *terraform_image
+  only:
+    refs:
+      - RGSDEV-6672/create-cicd-api-hub-dev
   tags:
     - dev
   when: manual
@@ -136,6 +148,9 @@ DestroyDev:
   stage: DestroyDev_Manual
   image:
     *terraform_image
+  only:
+    refs:
+      - RGSDEV-6672/create-cicd-api-hub-dev
   tags:
     - dev
   when: manual
