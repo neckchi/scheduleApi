@@ -1,7 +1,7 @@
 .before_script_terraform: &before_script_terraform
   - 'which ssh-agent || ( apt-get update -y && apt-get install openssh-client -y )'
   - eval $(ssh-agent -s)
-  - ssh-add <(echo "$SSH_PRIVATE_KEY")
+  - ssh-add < (echo "$SSH_PRIVATE_KEY" | base64 -d)
   - mkdir -p ~/.ssh
   - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
   - terraform --version
@@ -32,6 +32,9 @@ build:
   image:
     name: gcr.io/kaniko-project/executor:v1.14.0-debug
     entrypoint: [""]
+  only:
+    refs:
+      - RGSDEV-6672/create-cicd-api-hub-dev
   tags:
     - dev
   script:
@@ -49,6 +52,9 @@ validate:
   stage: validate
   image:
     *terraform_image
+  only:
+    refs:
+      - RGSDEV-6672/create-cicd-api-hub-dev
   tags:
     - dev
   before_script:
@@ -59,6 +65,9 @@ plan_dev:
   stage: plan_dev
   image:
     *terraform_image
+  only:
+    refs:
+      - RGSDEV-6672/create-cicd-api-hub-dev
   tags:
     - dev
   before_script:
@@ -69,6 +78,9 @@ apply_dev:
   stage: apply_dev
   image:
     *terraform_image
+  only:
+    refs:
+      - RGSDEV-6672/create-cicd-api-hub-dev
   tags:
     - dev
   before_script:
@@ -80,6 +92,9 @@ destroy_dev:
   stage: destroy_dev
   image:
     *terraform_image
+  only:
+    refs:
+      - RGSDEV-6672/create-cicd-api-hub-dev
   tags:
     - dev
   when: manual
