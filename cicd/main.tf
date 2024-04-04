@@ -77,7 +77,7 @@ module "lb_target_group" {
     type                  = "ip"
     port                  = 80
     vpc_id                = var.vpc_id
-    health_check_path     = "/p2p-api-carriers/docs"
+    health_check_path     = "/docs"
     health_check_protocol = "HTTP"
   }
 }
