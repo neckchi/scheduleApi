@@ -39,13 +39,12 @@ def overridden_swagger():
     return get_swagger_ui_html(openapi_url="/openapi.json", title="P2P Schedule API Hub",
                                swagger_favicon_url="https://ca.kuehne-nagel.com/o/kn-lgo-theme/images/favicons/favicon.ico")
 
-
-@app.get("/docs", include_in_schema=False)
+@app.get("/p2p-api-carriers/docs", include_in_schema=False)
 def overridden_swagger():
     return get_swagger_ui_html(openapi_url="/openapi.json", title="P2P Schedule API Hub",
                                swagger_favicon_url="https://ca.kuehne-nagel.com/o/kn-lgo-theme/images/favicons/favicon.ico")
 
-@app.get("/p2p-api-carriers/redoc", include_in_schema=False)
+@app.get("/redoc", include_in_schema=False)
 def overridden_redoc():
     return get_redoc_html(openapi_url="/openapi.json", title="P2P Schedule API Hub",
                           redoc_favicon_url="https://ca.kuehne-nagel.com/o/kn-lgo-theme/images/favicons/favicon.ico")
