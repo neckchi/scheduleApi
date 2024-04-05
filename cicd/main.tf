@@ -69,6 +69,50 @@ module "security_group" {
   }
 }
 
+module "security_group_lb" {
+  source = "git::ssh://git@gitlab.tools.apim.eu-central-1.aws.int.kn/sea-schedule/terraform-modules//aws/security-group?ref=main"
+  common = {
+    vpc_id       = var.vpc_id
+    subnet_ids   = var.subnet_ids
+    service_name = "${var.project_name}_lb_sg"
+  }
+  security_group = {
+    description = "${var.project_name} Security Group for ALB"
+    rules = [
+      {
+        description      = "${var.project_name} Ingress rule for ALB"
+        from_port        = 80
+        to_port          = 80
+        protocol         = "tcp"
+        cidr_blocks      = var.sg_inboud_rules_cidrs
+        ipv6_cidr_blocks = ["fc00::/7"]
+        type             = "ingress"
+      },
+      {
+        description      = "${var.project_name} Egress rule for ALB"
+        from_port        = 0
+        to_port          = 0
+        protocol         = "-1"
+        cidr_blocks      = var.sg_outboud_rules_cidrs
+        ipv6_cidr_blocks = ["fc00::/7"]
+        type             = "egress"
+      }
+    ]
+  }
+}
+
+module "alb" {
+  source = "git::ssh://git@gitlab.tools.apim.eu-central-1.aws.int.kn/sea-schedule/terraform-modules//aws/lb?ref=main"
+  lb = {
+    name                       = "${var.project_name_abreb}-alb"
+    internal                   = true
+    load_balancer_type         = "application"
+    subnet_ids                 = var.subnet_ids
+    security_groups            = [module.security_group_lb.security_group_id]
+    enable_deletion_protection = false
+  }
+}
+
 module "lb_target_group" {
   source = "git::ssh://git@gitlab.tools.apim.eu-central-1.aws.int.kn/sea-schedule/terraform-modules//aws/lb-target-group?ref=main"
   lb_target_group = {
@@ -82,15 +126,14 @@ module "lb_target_group" {
   }
 }
 
-module "lb_listener_rule" {
-  source = "git::ssh://git@gitlab.tools.apim.eu-central-1.aws.int.kn/sea-schedule/terraform-modules//aws/lb-listener-rule?ref=main"
-  lb_listener_rule = {
-    lb_listener_arn  = var.lb_listener_arn
-    target_group_arn = module.lb_target_group.lb_target_group_arn
-    base_path        = "/p2p-api-carriers"
+module "lb_listener" {
+  source = "git::ssh://git@gitlab.tools.apim.eu-central-1.aws.int.kn/sea-schedule/terraform-modules//aws/lb-listener?ref=main"
+  lb_listener = {
+    load_balancer_arn = module.alb.lb_arn
+    target_group_arn  = module.lb_target_group.lb_target_group_arn
   }
   depends_on = [
-    module.lb_target_group
+    module.lb_target_group, module.alb
   ]
 }
 
@@ -106,6 +149,7 @@ module "ecs_service_task" {
   # Required variables
   ecs_service = {
     name                           = "${var.project_name}-service"
+    force_new_deployment           = true
     cluster_id                     = module.ecs_cluster.ecs_cluster_id
     repository_name                = "${var.project_name}"
     launch_type                    = "FARGATE"
