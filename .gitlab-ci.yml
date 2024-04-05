@@ -38,18 +38,18 @@ cache:
     - .venv
 
 stages:
-  - lint
-  - build
-  - test
-  - validate
-  - plan_dev
-  - apply_dev
-  - destroy_dev
+  - Lint
+  - Build
+  - Test
+  - Validate
+  - PlanDev
+  - ApplyDev
+  - DestroyDev_Manual
 
 # Stages Defenition
 ## Lint
-flake8:
-  stage: lint
+Flake8:
+  stage: Lint
   image: python:3.9
   allow_failure: true
   script:
@@ -59,8 +59,8 @@ flake8:
   only:
     refs:
       - RGSDEV-6672/create-cicd-api-hub-dev
-yamllint:
-  stage: lint
+YamlLint:
+  stage: Lint
   image: registry.gitlab.com/pipeline-components/yamllint:latest
   allow_failure: true
   only:
@@ -71,7 +71,7 @@ yamllint:
 ## Tests
 Testing:
   <<: *poetry_setup
-  stage: test
+  stage: Test
   allow_failure: true
   script:
     - poetry run coverage run
@@ -90,8 +90,8 @@ Testing:
         coverage_format: cobertura
         path: coverage.xml
 ## Build
-build:
-  stage: build
+Build:
+  stage: Build
   image:
     name: gcr.io/kaniko-project/executor:v1.14.0-debug
     entrypoint: [""]
@@ -112,8 +112,8 @@ build:
       --dockerfile Dockerfile
       --destination $REPO_URL/$PROJECT_NAME:latest
 ## Terraform
-validate:
-  stage: validate
+Validate:
+  stage: Validate
   image:
     *terraform_image
   only:
@@ -125,8 +125,8 @@ validate:
     *before_script_terraform
   script:
     - terraform validate
-plan_dev:
-  stage: plan_dev
+PlanDev:
+  stage: PlanDev
   image:
     *terraform_image
   only:
@@ -138,8 +138,8 @@ plan_dev:
     *before_script_terraform
   script:
     - terraform -chdir=cicd plan -var-file=environments/dev/dev.tfvars -var="image_tag=latest"
-apply_dev:
-  stage: apply_dev
+ApplyDev:
+  stage: ApplyDev
   image:
     *terraform_image
   only:
@@ -152,8 +152,8 @@ apply_dev:
   script:
     - terraform -chdir=cicd apply -var-file=environments/dev/dev.tfvars -var="image_tag=latest" -auto-approve
   allow_failure: true
-destroy_dev:
-  stage: destroy_dev
+DestroyDev:
+  stage: DestroyDev_Manual
   image:
     *terraform_image
   only:
