@@ -55,7 +55,7 @@ flake8:
   script:
     - python --version
     - pip install flake8
-    - flake8 src/
+    - flake8 app/
   only:
     refs:
       - RGSDEV-6672/create-cicd-api-hub-dev
