@@ -24,3 +24,9 @@ Results are cached in a remote MongoDB based on carrierp2p setting
 
 # Environments:
 ## [DEV](http://internal-dev-se-AppLo-egQ7iFk5OdfL-1578351337.eu-central-1.elb.amazonaws.com/p2p-api-carriers/docs)
+
+# Aux ECS
+## Force Redeploy
+´´´
+aws ecs update-service --cluster p2p_schedule_api_of_carriers_cluster --service p2p_schedule_api_of_carriers_service --force-new-deployment
+´´´
