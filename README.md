@@ -23,7 +23,7 @@ Results are cached in a remote MongoDB based on carrierp2p setting
 
 
 # Environments:
-## [DEV](http://internal-dev-se-AppLo-egQ7iFk5OdfL-1578351337.eu-central-1.elb.amazonaws.com/p2p-api-carriers/docs)
+## [DEV](http://internal-p2papicarriers-alb-670514342.eu-central-1.elb.amazonaws.com/)
 
 # Aux ECS
 ## Force Redeploy
