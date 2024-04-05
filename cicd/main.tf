@@ -107,7 +107,7 @@ module "alb" {
     name                       = "${var.project_name_abreb}-alb"
     internal                   = true
     load_balancer_type         = "application"
-    subnet_ids                 = var.subnet_ids
+    subnets                    = var.subnet_ids
     security_groups            = [module.security_group_lb.security_group_id]
     enable_deletion_protection = false
   }
