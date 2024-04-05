@@ -20,34 +20,34 @@ variables:
   AWS_SDK_LOAD_CONFIG: "true"
 
 stages:
-  # - build
+  - build
   - validate
   - plan_dev
   - apply_dev
   - destroy_dev
 
 # Stages Defenition
-# build:
-#   stage: build
-#   image:
-#     name: gcr.io/kaniko-project/executor:v1.14.0-debug
-#     entrypoint: [""]
-#   only:
-#     refs:
-#       - RGSDEV-6672/create-cicd-api-hub-dev
-#   tags:
-#     - dev
-#   script:
-#     - /kaniko/executor
-#       --context .
-#       --build-arg HTTP_PROXY=$HTTP_PROXY
-#       --build-arg HTTPS_PROXY=$HTTP_PROXY
-#       --build-arg http_proxy=$HTTP_PROXY
-#       --build-arg https_proxy=$HTTP_PROXY
-#       --build-arg no_proxy=$NO_PROXY
-#       --build-arg NO_PROXY=$NO_PROXY
-#       --dockerfile Dockerfile
-#       --destination $REPO_URL/$PROJECT_NAME:latest
+build:
+  stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:v1.14.0-debug
+    entrypoint: [""]
+  only:
+    refs:
+      - RGSDEV-6672/create-cicd-api-hub-dev
+  tags:
+    - dev
+  script:
+    - /kaniko/executor
+      --context .
+      --build-arg HTTP_PROXY=$HTTP_PROXY
+      --build-arg HTTPS_PROXY=$HTTP_PROXY
+      --build-arg http_proxy=$HTTP_PROXY
+      --build-arg https_proxy=$HTTP_PROXY
+      --build-arg no_proxy=$NO_PROXY
+      --build-arg NO_PROXY=$NO_PROXY
+      --dockerfile Dockerfile
+      --destination $REPO_URL/$PROJECT_NAME:latest
 validate:
   stage: validate
   image:
