@@ -11,6 +11,14 @@
   entrypoint:
     - '/usr/bin/env'
     - 'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+.poetry_setup: &poetry_setup
+  before_script:
+    - python -V
+    - python -m pip install --upgrade pip
+    - python -m pip install pipx
+    - python -m pipx install poetry==1.4.0
+    - export PATH=$PATH:$HOME/.local/bin
+    - poetry install
 
 variables:
   PROJECT_NAME: p2p-schedule-api-of-carriers
@@ -18,15 +26,70 @@ variables:
   HTTP_PROXY: "http://proxy.eu-central-1.aws.int.kn:80"
   NO_PROXY: "172.20.0.0/16,localhost,127.0.0.1,10.59.244.0/25,169.254.169.254,.internal,s3.amazonaws.com,.s3.eu-central-1.amazonaws.com,api.ecr.eu-central-1.amazonaws.com,.dkr.ecr.eu-central-1.amazonaws.com,.ec2.eu-central-1.amazonaws.com,169.254.170.2,.int.kn,.eks.amazonaws.com,.cluster.local"
   AWS_SDK_LOAD_CONFIG: "true"
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  POETRY_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pypoetry"
+  POETRY_VIRTUALENVS_IN_PROJECT: "true"
+
+cache:
+  paths:
+    - .cache/pip
+    - .cache/pytest_cache
+    - .cache/pypoetry
+    - .venv
 
 stages:
+  - lint
   - build
+  - test
   - validate
   - plan_dev
   - apply_dev
   - destroy_dev
 
 # Stages Defenition
+## Lint
+flake8:
+  stage: lint
+  image: python:3.9
+  allow_failure: true
+  script:
+    - python --version
+    - pip install flake8
+    - flake8 src/
+  only:
+    refs:
+      - RGSDEV-6672/create-cicd-api-hub-dev
+yamllint:
+  stage: lint
+  image: registry.gitlab.com/pipeline-components/yamllint:latest
+  allow_failure: true
+  only:
+    refs:
+      - RGSDEV-6672/create-cicd-api-hub-dev
+  script:
+    - yamllint .
+## Tests
+Testing:
+  <<: *poetry_setup
+  stage: test
+  allow_failure: true
+  script:
+    - poetry run coverage run
+    - poetry run coverage report
+    - poetry run coverage xml
+  coverage: '/TOTAL.*\s+(\d+%)$/'
+  only:
+    refs:
+      - RGSDEV-6672/create-cicd-api-hub-dev
+  artifacts:
+    # https://docs.gitlab.com/ee/ci/yaml/index.html#artifactsexpire_in
+    expire_in: 1 week
+    # https://docs.gitlab.com/ee/ci/testing/test_coverage_visualization.html
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+## Build
 build:
   stage: build
   image:
@@ -48,6 +111,7 @@ build:
       --build-arg NO_PROXY=$NO_PROXY
       --dockerfile Dockerfile
       --destination $REPO_URL/$PROJECT_NAME:latest
+## Terraform
 validate:
   stage: validate
   image:
