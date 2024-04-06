@@ -36,13 +36,14 @@ class AsyncTaskManager:
         while retries < self.max_retries:
             try:
                 return await asyncio.wait_for(coro(), timeout=self.default_timeout)
-            except asyncio.TimeoutError:
+            except (asyncio.TimeoutError,httpx.ReadTimeout,httpx.ConnectTimeout):
                 """Due to timeout, the coroutine task is cancelled. Once its cancelled, we retry it 3 times"""
                 logging.error(f"{task_name} timed out after {self.default_timeout} seconds. Retrying {retries + 1}/{self.max_retries}...")
                 retries += 1
                 adjusted_timeout += 3
                 await asyncio.sleep(1)  # Wait for 1 sec before the next retry
-        logging.error(f"{task_name} reached maximum retries.")
+        logging.error(f"{task_name} reached maximum retries. the schedule wont be cached")
+        self.error = True
         # return coro()
         return None
 
@@ -50,12 +51,11 @@ class AsyncTaskManager:
         self.__tasks[name] = asyncio.create_task(self._timeout_wrapper(coro=coro,task_name=name))
 
     def results(self) -> list:
-        task_names = list(self.__tasks.keys())
-        for i, result in enumerate(self.results):
-            if isinstance(result, Exception):
-                task_name = task_names[i]
-                logging.critical(f"{task_name} connection attempts failed: {result}")
-                self.error = True
+        # task_names = list(self.__tasks.keys())
+        # for i, result in enumerate(self.results):
+        #     if isinstance(result, Exception):
+        #         task_name = task_names[i]
+        #         logging.critical(f"{task_name} connection attempts failed: {result}")
         return (result for result in self.results if not isinstance(result, Exception)) if self.error else self.results
 
 SSL_CONTEXT = httpx.create_ssl_context()
@@ -96,21 +96,18 @@ class HTTPXClientWrapper():
     async def parse(self,url: str, method: str = Literal['GET', 'POST'],params: dict = None, headers: dict = None, json: dict = None, token_key=None,
                           data: dict = None, background_tasks: BackgroundTasks = None, expire=timedelta(hours = load_yaml()['data']['backgroundTasks']['scheduleExpiry']),stream: bool = False):
         if not stream:
-            try:
-                response = await self.client.request(method=method, url=url, params=params, headers=headers, json=json,data=data)
-                if response.status_code == 206: #only CMA returns 206 if the number of schedule is more than 49. That means we shouldnt deserialize the json response at the beginning coz there are more responses need to be fetched based on the header range.
-                    yield response
-                if response.status_code == 200:
-                    response_json = response.json()
-                    if background_tasks:
-                        background_tasks.add_task(db.set, key=token_key, value=response_json, expire=expire)
-                    yield response_json
-                if response.status_code in (500,502):
-                    logging.critical(f'Unable to connect to {url}')
-                    yield None
-                else:yield None
-            except Exception as http_error:
-                logging.error(f'Connection Error - {http_error}')
+            response = await self.client.request(method=method, url=url, params=params, headers=headers, json=json,data=data)
+            if response.status_code == 206: #only CMA returns 206 if the number of schedule is more than 49. That means we shouldnt deserialize the json response at the beginning coz there are more responses need to be fetched based on the header range.
+                yield response
+            if response.status_code == 200:
+                response_json = response.json()
+                if background_tasks:
+                    background_tasks.add_task(db.set, key=token_key, value=response_json, expire=expire)
+                yield response_json
+            if response.status_code in (500,502):
+                logging.critical(f'Unable to connect to {url}')
+                yield None
+            else:yield None
         else:
             """
             At the moment Only Maersk need consumer to stream the response
