@@ -2,12 +2,6 @@ variable "environment" {
   type    = string
   default = "dev"
 }
-variable "AWS_PROFILE_ID" {
-  type = string
-}
-variable "AWS_REGION" {
-  type = string
-}
 variable "vpc_id" {
   type = string
 }
@@ -21,13 +15,6 @@ variable "image_tag" {
 variable "image" {
   type    = string
   default = "p2p-schedule-api-of-carriers"
-}
-variable "project_name" {
-  type        = string
-  description = "Project name"
-}
-variable "project_name_abreb" {
-  type = string
 }
 variable "sg_inboud_rules_cidrs" {
   type = list(string)

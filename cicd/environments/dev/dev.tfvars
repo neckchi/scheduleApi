@@ -1,10 +1,6 @@
 environment            = "dev"
-AWS_PROFILE_ID         = "934536729814"
-AWS_REGION             = "eu-central-1"
 vpc_id                 = "vpc-04f663e908ff9ea96"
 subnet_ids             = ["subnet-000d8cf6eb7a43e98", "subnet-0adfd7896a832c7e0", "subnet-0475353e3420a4a8f"]
-project_name           = "p2p-schedule-api-of-carriers"
-project_name_abreb     = "p2papicarriers"
 sg_inboud_rules_cidrs  = ["10.0.0.0/8", "10.59.226.0/24"]
 sg_outboud_rules_cidrs = ["0.0.0.0/0"]
 # ECS Service
