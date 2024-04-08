@@ -393,175 +393,175 @@ module "ecs_service_task" {
         secrets : [
           {
             "name" : "MONGO_URL",
-            "valueFrom" : "${api_secret_config}:MONGO_URL::"
+            "valueFrom" : "${var.api_secret_config}:MONGO_URL::"
           },
           {
             "name" : "CMA_URL",
-            "valueFrom" : "${api_secret_config}:CMA_URL::"
+            "valueFrom" : "${var.api_secret_config}:CMA_URL::"
           },
           {
             "name" : "CMA_TOKEN",
-            "valueFrom" : "${api_secret_config}:CMA_TOKEN::"
+            "valueFrom" : "${var.api_secret_config}:CMA_TOKEN::"
           },
           {
             "name" : "SUDU_URL",
-            "valueFrom" : "${api_secret_config}:SUDU_URL::"
+            "valueFrom" : "${var.api_secret_config}:SUDU_URL::"
           },
           {
             "name" : "SUDU_TOKEN",
-            "valueFrom" : "${api_secret_config}:SUDU_TOKEN::"
+            "valueFrom" : "${var.api_secret_config}:SUDU_TOKEN::"
           },
           {
             "name" : "HMM_URL",
-            "valueFrom" : "${api_secret_config}:HMM_URL::"
+            "valueFrom" : "${var.api_secret_config}:HMM_URL::"
           },
           {
             "name" : "HMM_TOKEN",
-            "valueFrom" : "${api_secret_config}:HMM_TOKEN::"
+            "valueFrom" : "${var.api_secret_config}:HMM_TOKEN::"
           },
           {
             "name" : "IQAX_URL",
-            "valueFrom" : "${api_secret_config}:IQAX_URL::"
+            "valueFrom" : "${var.api_secret_config}:IQAX_URL::"
           },
           {
             "name" : "IQAX_TOKEN",
-            "valueFrom" : "${api_secret_config}:IQAX_TOKEN::"
+            "valueFrom" : "${var.api_secret_config}:IQAX_TOKEN::"
           },
           {
             "name" : "MAEU_P2P",
-            "valueFrom" : "${api_secret_config}:MAEU_P2P::"
+            "valueFrom" : "${var.api_secret_config}:MAEU_P2P::"
           },
           {
             "name" : "MAEU_LOCATION",
-            "valueFrom" : "${api_secret_config}:MAEU_LOCATION::"
+            "valueFrom" : "${var.api_secret_config}:MAEU_LOCATION::"
           },
           {
             "name" : "MAEU_CUTOFF",
-            "valueFrom" : "${api_secret_config}:MAEU_CUTOFF::"
+            "valueFrom" : "${var.api_secret_config}:MAEU_CUTOFF::"
           },
           {
             "name" : "MAEU_TOKEN",
-            "valueFrom" : "${api_secret_config}:MAEU_TOKEN::"
+            "valueFrom" : "${var.api_secret_config}:MAEU_TOKEN::"
           },
           {
             "name" : "MAEU_TOKEN2",
-            "valueFrom" : "${api_secret_config}:MAEU_TOKEN2::"
+            "valueFrom" : "${var.api_secret_config}:MAEU_TOKEN2::"
           },
           {
             "name" : "ONEY_URL",
-            "valueFrom" : "${api_secret_config}:ONEY_URL::"
+            "valueFrom" : "${var.api_secret_config}:ONEY_URL::"
           },
           {
             "name" : "ONEY_TURL",
-            "valueFrom" : "${api_secret_config}:ONEY_TURL::"
+            "valueFrom" : "${var.api_secret_config}:ONEY_TURL::"
           },
           {
             "name" : "ONEY_TOKEN",
-            "valueFrom" : "${api_secret_config}:ONEY_TOKEN::"
+            "valueFrom" : "${var.api_secret_config}:ONEY_TOKEN::"
           },
           {
             "name" : "ONEY_AUTH",
-            "valueFrom" : "${api_secret_config}:ONEY_AUTH::"
+            "valueFrom" : "${var.api_secret_config}:ONEY_AUTH::"
           },
           {
             "name" : "ZIM_URL",
-            "valueFrom" : "${api_secret_config}:ZIM_URL::"
+            "valueFrom" : "${var.api_secret_config}:ZIM_URL::"
           },
           {
             "name" : "ZIM_TURL",
-            "valueFrom" : "${api_secret_config}:ZIM_TURL::"
+            "valueFrom" : "${var.api_secret_config}:ZIM_TURL::"
           },
           {
             "name" : "ZIM_TOKEN",
-            "valueFrom" : "${api_secret_config}:ZIM_TOKEN::"
+            "valueFrom" : "${var.api_secret_config}:ZIM_TOKEN::"
           },
           {
             "name" : "ZIM_CLIENT",
-            "valueFrom" : "${api_secret_config}:ZIM_CLIENT::"
+            "valueFrom" : "${var.api_secret_config}:ZIM_CLIENT::"
           },
           {
             "name" : "ZIM_SECRET",
-            "valueFrom" : "${api_secret_config}:ZIM_SECRET::"
+            "valueFrom" : "${var.api_secret_config}:ZIM_SECRET::"
           },
           {
             "name" : "MSCU_URL",
-            "valueFrom" : "${api_secret_config}:MSCU_URL::"
+            "valueFrom" : "${var.api_secret_config}:MSCU_URL::"
           },
           {
             "name" : "MSCU_AUD",
-            "valueFrom" : "${api_secret_config}:MSCU_AUD::"
+            "valueFrom" : "${var.api_secret_config}:MSCU_AUD::"
           },
           {
             "name" : "MSCU_OAUTH",
-            "valueFrom" : "${api_secret_config}:MSCU_OAUTH::"
+            "valueFrom" : "${var.api_secret_config}:MSCU_OAUTH::"
           },
           {
             "name" : "MSCU_CLIENT",
-            "valueFrom" : "${api_secret_config}:MSCU_CLIENT::"
+            "valueFrom" : "${var.api_secret_config}:MSCU_CLIENT::"
           },
           {
             "name" : "MSCU_THUMBPRINT",
-            "valueFrom" : "${api_secret_config}:MSCU_THUMBPRINT::"
+            "valueFrom" : "${var.api_secret_config}:MSCU_THUMBPRINT::"
           },
           {
             "name" : "MSCU_SCOPE",
-            "valueFrom" : "${api_secret_config}:MSCU_SCOPE::"
+            "valueFrom" : "${var.api_secret_config}:MSCU_SCOPE::"
           },
           {
             "name" : "MSCU_RSA_KEY",
-            "valueFrom" : "${api_secret_config}:MSCU_RSA_KEY::"
+            "valueFrom" : "${var.api_secret_config}:MSCU_RSA_KEY::"
           },
           {
             "name" : "HLCU_TOKEN_URL",
-            "valueFrom" : "${api_secret_config}:HLCU_TOKEN_URL::"
+            "valueFrom" : "${var.api_secret_config}:HLCU_TOKEN_URL::"
           },
           {
             "name" : "HLCU_URL",
-            "valueFrom" : "${api_secret_config}:HLCU_URL::"
+            "valueFrom" : "${var.api_secret_config}:HLCU_URL::"
           },
           {
             "name" : "HLCU_CLIENT_ID",
-            "valueFrom" : "${api_secret_config}:HLCU_CLIENT_ID::"
+            "valueFrom" : "${var.api_secret_config}:HLCU_CLIENT_ID::"
           },
           {
             "name" : "HLCU_CLIENT_SECRET",
-            "valueFrom" : "${api_secret_config}:HLCU_CLIENT_SECRET::"
+            "valueFrom" : "${var.api_secret_config}:HLCU_CLIENT_SECRET::"
           },
           {
             "name" : "HLCU_USER_ID",
-            "valueFrom" : "${api_secret_config}:HLCU_USER_ID::"
+            "valueFrom" : "${var.api_secret_config}:HLCU_USER_ID::"
           },
           {
             "name" : "HLCU_PASSWORD",
-            "valueFrom" : "${api_secret_config}:HLCU_PASSWORD::"
+            "valueFrom" : "${var.api_secret_config}:HLCU_PASSWORD::"
           },
           {
             "name" : "BASIC_USER",
-            "valueFrom" : "${api_secret_config}:BASIC_USER::"
+            "valueFrom" : "${var.api_secret_config}:BASIC_USER::"
           },
           {
             "name" : "BASIC_PW",
-            "valueFrom" : "${api_secret_config}:BASIC_PW::"
+            "valueFrom" : "${var.api_secret_config}:BASIC_PW::"
           },
           {
             "name" : "REDIS_HOST",
-            "valueFrom" : "${api_secret_config}:REDIS_HOST::"
+            "valueFrom" : "${var.api_secret_config}:REDIS_HOST::"
           },
           {
             "name" : "REDIS_PORT",
-            "valueFrom" : "${api_secret_config}:REDIS_PORT::"
+            "valueFrom" : "${var.api_secret_config}:REDIS_PORT::"
           },
           {
             "name" : "REDIS_DB",
-            "valueFrom" : "${api_secret_config}:REDIS_DB::"
+            "valueFrom" : "${var.api_secret_config}:REDIS_DB::"
           },
           {
             "name" : "REDIS_USER",
-            "valueFrom" : "${api_secret_config}:REDIS_USER::"
+            "valueFrom" : "${var.api_secret_config}:REDIS_USER::"
           },
           {
             "name" : "REDIS_PW",
-            "valueFrom" : "${api_secret_config}:REDIS_PW::"
+            "valueFrom" : "${var.api_secret_config}:REDIS_PW::"
           }
         ]
       }
