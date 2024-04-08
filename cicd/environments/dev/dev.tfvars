@@ -23,8 +23,6 @@ ecs_task_log_retention_days           = 7
 ecs_task_container_definitions_cpu    = 1
 ecs_task_container_definitions_memory = 1024
 ecs_task_container_definitions_image  = "934536729814.dkr.ecr.eu-central-1.amazonaws.com/p2p-schedule-api-of-carriers"
-# LB listner rule
-lb_listener_arn = "arn:aws:elasticloadbalancing:eu-central-1:934536729814:listener/app/dev-se-AppLo-egQ7iFk5OdfL/b372e1e24f29f67b/6f6463daf41e3bdb"
 # Secret Configuration
 api_secret_config = "arn:aws:secretsmanager:eu-central-1:934536729814:secret:dev/p2p-schedule-api-of-carriers-IDIdKr"
 # Static Variables
