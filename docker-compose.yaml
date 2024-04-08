@@ -6,6 +6,11 @@ services:
       - "8000:8000"
     environment:
       MONGO_URL : "mongodb://adminuser:password123@docdb-cluster-p2p-api-tmp.cluster-cjfsvyf5yg2g.eu-central-1.docdb.amazonaws.com:27017"
+      REDIS_HOST: "p2p-schedule-api-of-carriers-db.zznbqi.0001.euc1.cache.amazonaws.com"
+      REDIS_PORT: "6379"
+      REDIS_DB: "0"
+      REDIS_USER: "None"
+      REDIS_PW: "'None"
       CMA_URL : ""
       CMA_TOKEN : ""
       SUDU_URL : ""
