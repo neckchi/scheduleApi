@@ -393,155 +393,175 @@ module "ecs_service_task" {
         secrets : [
           {
             "name" : "MONGO_URL",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:MONGO_URL::"
+            "valueFrom" : "${api_secret_config}:MONGO_URL::"
           },
           {
             "name" : "CMA_URL",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:CMA_URL::"
+            "valueFrom" : "${api_secret_config}:CMA_URL::"
           },
           {
             "name" : "CMA_TOKEN",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:CMA_TOKEN::"
+            "valueFrom" : "${api_secret_config}:CMA_TOKEN::"
           },
           {
             "name" : "SUDU_URL",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:SUDU_URL::"
+            "valueFrom" : "${api_secret_config}:SUDU_URL::"
           },
           {
             "name" : "SUDU_TOKEN",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:SUDU_TOKEN::"
+            "valueFrom" : "${api_secret_config}:SUDU_TOKEN::"
           },
           {
             "name" : "HMM_URL",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:HMM_URL::"
+            "valueFrom" : "${api_secret_config}:HMM_URL::"
           },
           {
             "name" : "HMM_TOKEN",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:HMM_TOKEN::"
+            "valueFrom" : "${api_secret_config}:HMM_TOKEN::"
           },
           {
             "name" : "IQAX_URL",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:IQAX_URL::"
+            "valueFrom" : "${api_secret_config}:IQAX_URL::"
           },
           {
             "name" : "IQAX_TOKEN",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:IQAX_TOKEN::"
+            "valueFrom" : "${api_secret_config}:IQAX_TOKEN::"
           },
           {
             "name" : "MAEU_P2P",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:MAEU_P2P::"
+            "valueFrom" : "${api_secret_config}:MAEU_P2P::"
           },
           {
             "name" : "MAEU_LOCATION",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:MAEU_LOCATION::"
+            "valueFrom" : "${api_secret_config}:MAEU_LOCATION::"
           },
           {
             "name" : "MAEU_CUTOFF",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:MAEU_CUTOFF::"
+            "valueFrom" : "${api_secret_config}:MAEU_CUTOFF::"
           },
           {
             "name" : "MAEU_TOKEN",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:MAEU_TOKEN::"
+            "valueFrom" : "${api_secret_config}:MAEU_TOKEN::"
           },
           {
             "name" : "MAEU_TOKEN2",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:MAEU_TOKEN2::"
+            "valueFrom" : "${api_secret_config}:MAEU_TOKEN2::"
           },
           {
             "name" : "ONEY_URL",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:ONEY_URL::"
+            "valueFrom" : "${api_secret_config}:ONEY_URL::"
           },
           {
             "name" : "ONEY_TURL",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:ONEY_TURL::"
+            "valueFrom" : "${api_secret_config}:ONEY_TURL::"
           },
           {
             "name" : "ONEY_TOKEN",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:ONEY_TOKEN::"
+            "valueFrom" : "${api_secret_config}:ONEY_TOKEN::"
           },
           {
             "name" : "ONEY_AUTH",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:ONEY_AUTH::"
+            "valueFrom" : "${api_secret_config}:ONEY_AUTH::"
           },
           {
             "name" : "ZIM_URL",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:ZIM_URL::"
+            "valueFrom" : "${api_secret_config}:ZIM_URL::"
           },
           {
             "name" : "ZIM_TURL",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:ZIM_TURL::"
+            "valueFrom" : "${api_secret_config}:ZIM_TURL::"
           },
           {
             "name" : "ZIM_TOKEN",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:ZIM_TOKEN::"
+            "valueFrom" : "${api_secret_config}:ZIM_TOKEN::"
           },
           {
             "name" : "ZIM_CLIENT",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:ZIM_CLIENT::"
+            "valueFrom" : "${api_secret_config}:ZIM_CLIENT::"
           },
           {
             "name" : "ZIM_SECRET",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:ZIM_SECRET::"
+            "valueFrom" : "${api_secret_config}:ZIM_SECRET::"
           },
           {
             "name" : "MSCU_URL",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:MSCU_URL::"
+            "valueFrom" : "${api_secret_config}:MSCU_URL::"
           },
           {
             "name" : "MSCU_AUD",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:MSCU_AUD::"
+            "valueFrom" : "${api_secret_config}:MSCU_AUD::"
           },
           {
             "name" : "MSCU_OAUTH",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:MSCU_OAUTH::"
+            "valueFrom" : "${api_secret_config}:MSCU_OAUTH::"
           },
           {
             "name" : "MSCU_CLIENT",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:MSCU_CLIENT::"
+            "valueFrom" : "${api_secret_config}:MSCU_CLIENT::"
           },
           {
             "name" : "MSCU_THUMBPRINT",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:MSCU_THUMBPRINT::"
+            "valueFrom" : "${api_secret_config}:MSCU_THUMBPRINT::"
           },
           {
             "name" : "MSCU_SCOPE",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:MSCU_SCOPE::"
+            "valueFrom" : "${api_secret_config}:MSCU_SCOPE::"
           },
           {
             "name" : "MSCU_RSA_KEY",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:MSCU_RSA_KEY::"
+            "valueFrom" : "${api_secret_config}:MSCU_RSA_KEY::"
           },
           {
             "name" : "HLCU_TOKEN_URL",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:HLCU_TOKEN_URL::"
+            "valueFrom" : "${api_secret_config}:HLCU_TOKEN_URL::"
           },
           {
             "name" : "HLCU_URL",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:HLCU_URL::"
+            "valueFrom" : "${api_secret_config}:HLCU_URL::"
           },
           {
             "name" : "HLCU_CLIENT_ID",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:HLCU_CLIENT_ID::"
+            "valueFrom" : "${api_secret_config}:HLCU_CLIENT_ID::"
           },
           {
             "name" : "HLCU_CLIENT_SECRET",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:HLCU_CLIENT_SECRET::"
+            "valueFrom" : "${api_secret_config}:HLCU_CLIENT_SECRET::"
           },
           {
             "name" : "HLCU_USER_ID",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:HLCU_USER_ID::"
+            "valueFrom" : "${api_secret_config}:HLCU_USER_ID::"
           },
           {
             "name" : "HLCU_PASSWORD",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:HLCU_PASSWORD::"
+            "valueFrom" : "${api_secret_config}:HLCU_PASSWORD::"
           },
           {
             "name" : "BASIC_USER",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:BASIC_USER::"
+            "valueFrom" : "${api_secret_config}:BASIC_USER::"
           },
           {
             "name" : "BASIC_PW",
-            "valueFrom" : "arn:aws:secretsmanager:${var.AWS_REGION}:${var.AWS_PROFILE_ID}:secret:${var.environment}/p2p-schedule-api-of-carriers-IDIdKr:BASIC_PW::"
+            "valueFrom" : "${api_secret_config}:BASIC_PW::"
+          },
+          {
+            "name" : "REDIS_HOST",
+            "valueFrom" : "${api_secret_config}:REDIS_HOST::"
+          },
+          {
+            "name" : "REDIS_PORT",
+            "valueFrom" : "${api_secret_config}:REDIS_PORT::"
+          },
+          {
+            "name" : "REDIS_DB",
+            "valueFrom" : "${api_secret_config}:REDIS_DB::"
+          },
+          {
+            "name" : "REDIS_USER",
+            "valueFrom" : "${api_secret_config}:REDIS_USER::"
+          },
+          {
+            "name" : "REDIS_PW",
+            "valueFrom" : "${api_secret_config}:REDIS_PW::"
           }
         ]
       }
