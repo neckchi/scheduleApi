@@ -56,16 +56,10 @@ Flake8:
     - python --version
     - pip install flake8
     - flake8 app/
-  only:
-    refs:
-      - RGSDEV-6672/create-cicd-api-hub-dev
 YamlLint:
   stage: Lint
   image: registry.gitlab.com/pipeline-components/yamllint:latest
   allow_failure: true
-  only:
-    refs:
-      - RGSDEV-6672/create-cicd-api-hub-dev
   script:
     - yamllint .
 ## Tests
@@ -78,9 +72,6 @@ Testing:
     - poetry run coverage report
     - poetry run coverage xml
   coverage: '/TOTAL.*\s+(\d+%)$/'
-  only:
-    refs:
-      - RGSDEV-6672/create-cicd-api-hub-dev
   artifacts:
     # https://docs.gitlab.com/ee/ci/yaml/index.html#artifactsexpire_in
     expire_in: 1 week
@@ -95,9 +86,6 @@ Build:
   image:
     name: gcr.io/kaniko-project/executor:v1.14.0-debug
     entrypoint: [""]
-  only:
-    refs:
-      - RGSDEV-6672/create-cicd-api-hub-dev
   tags:
     - dev
   script:
@@ -116,9 +104,6 @@ Validate:
   stage: Validate
   image:
     *terraform_image
-  only:
-    refs:
-      - RGSDEV-6672/create-cicd-api-hub-dev
   tags:
     - dev
   before_script:
@@ -129,9 +114,6 @@ PlanDev:
   stage: PlanDev
   image:
     *terraform_image
-  only:
-    refs:
-      - RGSDEV-6672/create-cicd-api-hub-dev
   tags:
     - dev
   before_script:
@@ -142,11 +124,9 @@ ApplyDev:
   stage: ApplyDev
   image:
     *terraform_image
-  only:
-    refs:
-      - RGSDEV-6672/create-cicd-api-hub-dev
   tags:
     - dev
+  when: manual
   before_script:
     *before_script_terraform
   script:
@@ -156,9 +136,6 @@ DestroyDev:
   stage: DestroyDev_Manual
   image:
     *terraform_image
-  only:
-    refs:
-      - RGSDEV-6672/create-cicd-api-hub-dev
   tags:
     - dev
   when: manual
