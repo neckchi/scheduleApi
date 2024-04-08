@@ -31,3 +31,4 @@ app/carrierp2p/hamburgsud.py
 .*.sw?
 .terraform**
 **terraform.tfstate**
+test-redis-connec.py
