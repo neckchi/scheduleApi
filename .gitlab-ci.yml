@@ -6,11 +6,13 @@
   - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
   - terraform --version
   - terraform -chdir=cicd init -backend-config=environments/dev/backend.conf
+
 .terraform_image: &terraform_image
   name: hashicorp/terraform:light
   entrypoint:
     - '/usr/bin/env'
     - 'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+
 .poetry_setup: &poetry_setup
   before_script:
     - python -V
@@ -56,12 +58,14 @@ Flake8:
     - python --version
     - pip install flake8
     - flake8 app/
+
 YamlLint:
   stage: Lint
   image: registry.gitlab.com/pipeline-components/yamllint:latest
   allow_failure: true
   script:
     - yamllint .
+
 ## Tests
 Testing:
   <<: *poetry_setup
@@ -73,13 +77,12 @@ Testing:
     - poetry run coverage xml
   coverage: '/TOTAL.*\s+(\d+%)$/'
   artifacts:
-    # https://docs.gitlab.com/ee/ci/yaml/index.html#artifactsexpire_in
     expire_in: 1 week
-    # https://docs.gitlab.com/ee/ci/testing/test_coverage_visualization.html
     reports:
       coverage_report:
         coverage_format: cobertura
         path: coverage.xml
+
 ## Build
 Build:
   stage: Build
@@ -99,6 +102,7 @@ Build:
       --build-arg NO_PROXY=$NO_PROXY
       --dockerfile Dockerfile
       --destination $REPO_URL/$PROJECT_NAME:latest
+
 ## Terraform
 Validate:
   stage: Validate
@@ -110,6 +114,7 @@ Validate:
     *before_script_terraform
   script:
     - terraform validate
+
 PlanDev:
   stage: PlanDev
   image:
@@ -120,6 +125,7 @@ PlanDev:
     *before_script_terraform
   script:
     - terraform -chdir=cicd plan -var-file=environments/dev/dev.tfvars -var="image_tag=latest"
+
 ApplyDev:
   stage: ApplyDev
   image:
@@ -132,6 +138,7 @@ ApplyDev:
   script:
     - terraform -chdir=cicd apply -var-file=environments/dev/dev.tfvars -var="image_tag=latest" -auto-approve
   allow_failure: true
+
 DestroyDev:
   stage: DestroyDev_Manual
   image:

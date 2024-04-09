@@ -23,5 +23,10 @@ ecs_task_container_definitions_image  = "934536729814.dkr.ecr.eu-central-1.amazo
 api_secret_config = "arn:aws:secretsmanager:eu-central-1:934536729814:secret:dev/p2p-schedule-api-of-carriers-IDIdKr"
 # Static Variables
 static_variables = {
-  ENV_TEST = "VALUE_ENV_TEST"
+  HTTP_PROXY  = "http://proxy.eu-central-1.aws.int.kn:80"
+  HTTPS_PROXY = "http://proxy.eu-central-1.aws.int.kn:80"
+  http_proxy  = "http://proxy.eu-central-1.aws.int.kn:80"
+  https_proxy = "http://proxy.eu-central-1.aws.int.kn:80"
+  NO_PROXY    = "172.20.0.0/16,localhost,127.0.0.1,10.59.244.0/25,169.254.169.254,.internal,s3.amazonaws.com,.s3.eu-central-1.amazonaws.com,api.ecr.eu-central-1.amazonaws.com,.dkr.ecr.eu-central-1.amazonaws.com,.ec2.eu-central-1.amazonaws.com,169.254.170.2,.int.kn,.eks.amazonaws.com,.cluster.local"
+  no_proxy    = "172.20.0.0/16,localhost,127.0.0.1,10.59.244.0/25,169.254.169.254,.internal,s3.amazonaws.com,.s3.eu-central-1.amazonaws.com,api.ecr.eu-central-1.amazonaws.com,.dkr.ecr.eu-central-1.amazonaws.com,.ec2.eu-central-1.amazonaws.com,169.254.170.2,.int.kn,.eks.amazonaws.com,.cluster.local"
 }
