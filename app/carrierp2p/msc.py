@@ -8,6 +8,7 @@ from app.background_tasks import db
 from app.schemas import schema_response
 from uuid import uuid5,NAMESPACE_DNS,UUID
 from fastapi import BackgroundTasks
+from base64 import b64decode
 from typing import Generator,Iterator,AsyncIterator
 
 carrier_code: str = 'MSCU'
@@ -51,14 +52,14 @@ def process_response_data(task: dict, direct_only:bool |None,vessel_imo: str, se
         yield schedule_body
 
 
-async def get_msc_token(client:HTTPXClientWrapper,background_task:BackgroundTasks, oauth: str, aud: str, rsa: str, msc_client: str, msc_scope: str, msc_thumbprint: str) ->AsyncIterator:
+async def get_msc_token(client:HTTPXClientWrapper,background_task:BackgroundTasks, oauth: str, aud: str, rsa:str, msc_client: str, msc_scope: str, msc_thumbprint: str) ->AsyncIterator:
     msc_token_key:UUID = uuid5(NAMESPACE_DNS, 'msc-token-uuid-kuehne-nagel')
     response_token:dict = await db.get(key=msc_token_key)
     if response_token is None:
         x5t: bytes = base64.b64encode(bytearray.fromhex(msc_thumbprint))
         payload_header: dict = {'x5t': x5t.decode(), 'typ': 'JWT'}
         payload_data: dict = {'aud': aud,'iss': msc_client,'sub': msc_client,'exp': datetime.now(tz=timezone.utc) + timedelta(hours=2),'nbf': datetime.now(tz=timezone.utc)}
-        private_rsa_key = serialization.load_pem_private_key(rsa.encode('utf8'), password=None,backend=default_backend())
+        private_rsa_key = serialization.load_pem_private_key(b64decode(rsa), password=None,backend=default_backend())
         encoded: str = jwt.encode(headers=payload_header, payload=payload_data, key=private_rsa_key, algorithm='RS256')
         params: dict = {'scope': msc_scope,'client_id': msc_client,'client_assertion_type': 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer','grant_type': 'client_credentials', 'client_assertion': encoded}
         headers: dict = {'Content-Type': 'application/x-www-form-urlencoded'}
