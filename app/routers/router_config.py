@@ -59,7 +59,6 @@ class AsyncTaskManager:
         return (result for result in self.results if not isinstance(result, Exception)) if self.error else self.results
 
 SSL_CONTEXT = httpx.create_ssl_context()
-# KN_PROXY:httpx.Proxy = httpx.Proxy("http://zscaler.proxy.int.kn:80")
 KN_PROXY:httpx.Proxy = httpx.Proxy("http://proxy.eu-central-1.aws.int.kn:80")
 HTTPX_TIMEOUT = httpx.Timeout(30.0, connect=65.0)
 HTTPX_LIMITS = httpx.Limits(max_connections=200,max_keepalive_connections=20)

@@ -20,3 +20,13 @@ Results are cached in a remote MongoDB based on carrierp2p setting
 **TODO:** In mongo_mgr.py there are commented out MongoDB index creations. In theory, they could be left in the code, as the index is not recreated if it already exists. But if the index options change (e.g. the expiry time), recreating the index throws an exception. There this index handling should be taken care of separately.
 
 **TODO:** If we use redis_mgr.py,please setup redis, put the credential into env file ,uncomment the redis credential in config.py and change cacheDB to RedisDB in configmap.yaml
+
+
+# Environments:
+## [DEV](http://internal-p2papicarriers-alb-670514342.eu-central-1.elb.amazonaws.com/)
+
+# Aux ECS
+## Force Redeploy
+´´´
+aws ecs update-service --cluster p2p_schedule_api_of_carriers_cluster --service p2p_schedule_api_of_carriers_service --force-new-deployment
+´´´
