@@ -8,13 +8,13 @@
   - terraform -chdir=cicd init -backend-config=environments/dev/backend.conf
 
 .before_script_plublish: &before_script_plublish
-    - apk update && apk add --update --no-cache --force-overwrite gc-dev pcre-dev libevent-dev git curl
-    - curl -LO https://github.com/codacy/git-version/releases/download/2.8.0/git-version 
-    - mv git-version /usr/bin
-    - chmod +x /usr/bin/git-version
-    - curl --location --output /usr/local/bin/release-cli "https://gitlab.com/api/v4/projects/gitlab-org%2Frelease-cli/packages/generic/release-cli/latest/release-cli-linux-amd64"
-    - chmod +x /usr/local/bin/release-cli
-    - git checkout $CI_COMMIT_BRANCH
+  - apk update && apk add --update --no-cache --force-overwrite gc-dev pcre-dev libevent-dev git curl
+  - curl -LO https://github.com/codacy/git-version/releases/download/2.8.0/git-version 
+  - mv git-version /usr/bin
+  - chmod +x /usr/bin/git-version
+  - curl --location --output /usr/local/bin/release-cli "https://gitlab.com/api/v4/projects/gitlab-org%2Frelease-cli/packages/generic/release-cli/latest/release-cli-linux-amd64"
+  - chmod +x /usr/local/bin/release-cli
+  - git checkout $CI_COMMIT_BRANCH
 
 .terraform_image: &terraform_image
   name: hashicorp/terraform:light
