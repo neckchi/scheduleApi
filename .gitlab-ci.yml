@@ -111,6 +111,10 @@ PulishRC:
   image:
     name: gcr.io/kaniko-project/executor:v1.14.0-debug
     entrypoint: [""]
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   tags:
     - dev
   script:
@@ -142,6 +146,10 @@ PlanDev:
   stage: PlanDev
   image:
     *terraform_image
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   tags:
     - dev
   before_script:
@@ -153,6 +161,10 @@ ApplyDev:
   stage: ApplyDev
   image:
     *terraform_image
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   tags:
     - dev
   when: manual
@@ -166,6 +178,10 @@ DestroyDev:
   stage: DestroyDev_Manual
   image:
     *terraform_image
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   tags:
     - dev
   when: manual
