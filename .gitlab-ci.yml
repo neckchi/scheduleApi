@@ -7,6 +7,15 @@
   - terraform --version
   - terraform -chdir=cicd init -backend-config=environments/dev/backend.conf
 
+.before_script_plublish:
+    - apt-get update -y && apt-get install libevent-dev curl git -y
+    - curl -LO https://github.com/codacy/git-version/releases/download/2.8.0/git-version 
+    - mv git-version /usr/bin
+    - chmod +x /usr/bin/git-version
+    - curl --location --output /usr/local/bin/release-cli "https://gitlab.com/api/v4/projects/gitlab-org%2Frelease-cli/packages/generic/release-cli/latest/release-cli-linux-amd64"
+    - chmod +x /usr/local/bin/release-cli
+    - git checkout $CI_COMMIT_BRANCH
+
 .terraform_image: &terraform_image
   name: hashicorp/terraform:light
   entrypoint:
@@ -41,8 +50,8 @@ cache:
 
 stages:
   - Lint
-  - Build
   - Test
+  - PulishRC
   - Validate
   - PlanDev
   - ApplyDev
@@ -83,15 +92,20 @@ Testing:
         coverage_format: cobertura
         path: coverage.xml
 
-## Build
-Build:
-  stage: Build
+## Pulish Release Candidate
+PulishRC:
+  stage: PulishRC
   image:
     name: gcr.io/kaniko-project/executor:v1.14.0-debug
     entrypoint: [""]
+  before_script:
+    *before_script_plublish
   tags:
     - dev
   script:
+    - export TAG_VERSION_RC=$(git-version -b $CI_COMMIT_BRANCH -r snapshot --minor-identifier "\"/(feat|feature)/\"" --major-identifier "\"/(break|breaking)/\"")
+    - echo "Release=$TAG_VERSION_RC" >> release.env
+    - cat release.env
     - /kaniko/executor
       --context .
       --build-arg HTTP_PROXY=$HTTP_PROXY
@@ -101,7 +115,10 @@ Build:
       --build-arg no_proxy=$NO_PROXY
       --build-arg NO_PROXY=$NO_PROXY
       --dockerfile Dockerfile
-      --destination $REPO_URL/$PROJECT_NAME:latest
+      --destination $REPO_URL/$PROJECT_NAME:$TAG_VERSION_RC
+  artifacts:
+    reports:
+      dotenv: release.env
 
 ## Terraform
 Validate:
@@ -124,7 +141,7 @@ PlanDev:
   before_script:
     *before_script_terraform
   script:
-    - terraform -chdir=cicd plan -var-file=environments/dev/dev.tfvars -var="image_tag=latest"
+    - terraform -chdir=cicd plan -var-file=environments/dev/dev.tfvars -var="image_tag=$TAG_VERSION_RC"
 
 ApplyDev:
   stage: ApplyDev
@@ -136,7 +153,7 @@ ApplyDev:
   before_script:
     *before_script_terraform
   script:
-    - terraform -chdir=cicd apply -var-file=environments/dev/dev.tfvars -var="image_tag=latest" -auto-approve
+    - terraform -chdir=cicd apply -var-file=environments/dev/dev.tfvars -var="image_tag=$TAG_VERSION_RC" -auto-approve
   allow_failure: true
 
 DestroyDev:
@@ -149,4 +166,4 @@ DestroyDev:
   before_script:
     *before_script_terraform
   script:
-    - terraform -chdir=cicd destroy -var-file=environments/dev/dev.tfvars -var="image_tag=latest" -auto-approve
+    - terraform -chdir=cicd destroy -var-file=environments/dev/dev.tfvars -var="image_tag=$TAG_VERSION_RC" -auto-approve
