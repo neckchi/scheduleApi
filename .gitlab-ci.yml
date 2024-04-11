@@ -8,7 +8,7 @@
   - terraform -chdir=cicd init -backend-config=environments/dev/backend.conf
 
 .before_script_plublish: &before_script_plublish
-    - apk add --update --no-cache --force-overwrite gc-dev pcre-dev libevent-dev git curl
+    - apt update && apt install -y gc-dev pcre-dev libevent-dev git curl
     - curl -LO https://github.com/codacy/git-version/releases/download/2.8.0/git-version 
     - mv git-version /usr/bin
     - chmod +x /usr/bin/git-version
