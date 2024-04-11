@@ -82,9 +82,10 @@ Testing:
     - coverage xml
   coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
   artifacts:
-    path: 
+    paths: 
       - coverage.xml
   allow_failure: true
+
 GetRC:
   stage: GetRC
   image: alpine
