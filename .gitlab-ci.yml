@@ -95,11 +95,11 @@ GetRC:
     - dev
   script:
     - export TAG_VERSION_RC=$(git-version -b $CI_COMMIT_BRANCH -r snapshot --minor-identifier "\"/(feat|feature)/\"" --major-identifier "\"/(break|breaking)/\"")
-    - echo "Release=$TAG_VERSION_RC" >> releaserc.env
-    - cat releaserc.env
+    - echo "ReleaseRC=$TAG_VERSION_RC" >> release.env
+    - cat release.env
   artifacts:
     reports:
-      dotenv: releaserc.env
+      dotenv: release.env
 
 ## Pulish Release Candidate
 PulishRC:
@@ -110,7 +110,7 @@ PulishRC:
   tags:
     - dev
   script:
-    - echo $releaserc.env
+    - echo $ReleaseRC
     - /kaniko/executor
       --context .
       --build-arg HTTP_PROXY=$HTTP_PROXY
@@ -120,7 +120,7 @@ PulishRC:
       --build-arg no_proxy=$NO_PROXY
       --build-arg NO_PROXY=$NO_PROXY
       --dockerfile Dockerfile
-      --destination $REPO_URL/$PROJECT_NAME:$releaserc.env
+      --destination $REPO_URL/$PROJECT_NAME:$ReleaseRC
 
 ## Terraform
 Validate:
@@ -143,7 +143,7 @@ PlanDev:
   before_script:
     *before_script_terraform
   script:
-    - terraform -chdir=cicd plan -var-file=environments/dev/dev.tfvars -var="image_tag=$releaserc.env"
+    - terraform -chdir=cicd plan -var-file=environments/dev/dev.tfvars -var="image_tag=$ReleaseRC"
 
 ApplyDev:
   stage: ApplyDev
@@ -155,7 +155,7 @@ ApplyDev:
   before_script:
     *before_script_terraform
   script:
-    - terraform -chdir=cicd apply -var-file=environments/dev/dev.tfvars -var="image_tag=$releaserc.env" -auto-approve
+    - terraform -chdir=cicd apply -var-file=environments/dev/dev.tfvars -var="image_tag=$ReleaseRC" -auto-approve
   allow_failure: true
 
 DestroyDev:
@@ -168,4 +168,4 @@ DestroyDev:
   before_script:
     *before_script_terraform
   script:
-    - terraform -chdir=cicd destroy -var-file=environments/dev/dev.tfvars -var="image_tag=$releaserc.env" -auto-approve
+    - terraform -chdir=cicd destroy -var-file=environments/dev/dev.tfvars -var="image_tag=$ReleaseRC" -auto-approve
