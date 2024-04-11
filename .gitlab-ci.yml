@@ -45,7 +45,6 @@ stages:
   - Test
   - GetRC
   - PulishRC
-  - Validate
   - PlanDev
   - ApplyDev
   - DestroyDev_Manual
@@ -129,7 +128,7 @@ PulishRC:
 
 ## Terraform
 Validate:
-  stage: Validate
+  stage: Lint
   image:
     *terraform_image
   tags:
