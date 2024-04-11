@@ -9,7 +9,7 @@
 
 .before_script_plublish: &before_script_plublish
     - cat /etc/os-release
-    - apt update && apt install -y gc-dev pcre-dev libevent-dev git curl
+    - apk update && apk add --update --no-cache --force-overwrite gc-dev pcre-dev libevent-dev git curl
     - curl -LO https://github.com/codacy/git-version/releases/download/2.8.0/git-version 
     - mv git-version /usr/bin
     - chmod +x /usr/bin/git-version
@@ -22,16 +22,6 @@
   entrypoint:
     - '/usr/bin/env'
     - 'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
-
-.poetry_setup: &poetry_setup
-  before_script:
-    - python -V
-    - python -m pip install --upgrade pip
-    - python -m pip install pipx
-    - python -m pip install coverage
-    - python -m pipx install poetry==1.4.0
-    - export PATH=$PATH:$HOME/.local/bin
-    - poetry install
 
 variables:
   PROJECT_NAME: p2p-schedule-api-of-carriers
@@ -53,6 +43,7 @@ cache:
 stages:
   - Lint
   - Test
+  - GetRC
   - PulishRC
   - Validate
   - PlanDev
@@ -79,28 +70,24 @@ YamlLint:
 
 ## Tests
 Testing:
-  image: python:3.7
-  <<: *poetry_setup
   stage: Test
-  allow_failure: true
-  script:
-    - poetry run coverage run
-    - poetry run coverage report
-    - poetry run coverage xml
-  coverage: '/TOTAL.*\s+(\d+%)$/'
-  artifacts:
-    expire_in: 1 week
-    reports:
-      coverage_report:
-        coverage_format: cobertura
-        path: coverage.xml
-
-## Pulish Release Candidate
-PulishRC:
-  stage: PulishRC
   image:
-    name: gcr.io/kaniko-project/executor:v1.14.0-debug
-    entrypoint: [""]
+    name: python:3.8-slim 
+  before_script:
+    - pip install pytest pytest-cov coverage
+    - pip install --no-cache-dir -r requirements.txt
+  script:
+    - coverage run -m pytest
+    - coverage report -m
+    - coverage xml
+  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
+  artifacts:
+    path: 
+      - coverage.xml
+  allow_failure: true
+GetRC:
+  stage: GetRC
+  image: alpine
   before_script:
     *before_script_plublish
   tags:
@@ -109,6 +96,20 @@ PulishRC:
     - export TAG_VERSION_RC=$(git-version -b $CI_COMMIT_BRANCH -r snapshot --minor-identifier "\"/(feat|feature)/\"" --major-identifier "\"/(break|breaking)/\"")
     - echo "Release=$TAG_VERSION_RC" >> release.env
     - cat release.env
+  artifacts:
+    reports:
+      dotenv: release.env
+
+## Pulish Release Candidate
+PulishRC:
+  stage: PulishRC
+  image:
+    name: gcr.io/kaniko-project/executor:v1.14.0-debug
+    entrypoint: [""]
+  tags:
+    - dev
+  script:
+    - echo "Release=$TAG_VERSION_RC"
     - /kaniko/executor
       --context .
       --build-arg HTTP_PROXY=$HTTP_PROXY
@@ -119,9 +120,6 @@ PulishRC:
       --build-arg NO_PROXY=$NO_PROXY
       --dockerfile Dockerfile
       --destination $REPO_URL/$PROJECT_NAME:$TAG_VERSION_RC
-  artifacts:
-    reports:
-      dotenv: release.env
 
 ## Terraform
 Validate:
