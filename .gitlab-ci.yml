@@ -77,6 +77,7 @@ YamlLint:
 
 ## Tests
 Testing:
+  image: python:3.7
   <<: *poetry_setup
   stage: Test
   allow_failure: true
