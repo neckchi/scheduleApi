@@ -97,6 +97,7 @@ GetRC:
     - export TAG_VERSION_RC=$(git-version -b $CI_COMMIT_BRANCH -r snapshot --minor-identifier "\"/(feat|feature)/\"" --major-identifier "\"/(break|breaking)/\"")
     - echo "ReleaseRC=$TAG_VERSION_RC" >> release.env
     - cat release.env
+    - release-cli create --name "Release $CI_COMMIT_MESSAGE" --description "Created by user $CI_COMMIT_AUTHOR" --tag-name "$TAG_VERSION_RC"
   artifacts:
     reports:
       dotenv: release.env
