@@ -41,7 +41,7 @@ cache:
     - .venv
 
 stages:
-  - Lint
+  - Checks
   - Test
   - GetRC
   - PulishRC
@@ -52,7 +52,7 @@ stages:
 # Stages Defenition
 ## Lint
 Flake8:
-  stage: Lint
+  stage: Checks
   image: python:3.9
   allow_failure: true
   script:
@@ -61,7 +61,7 @@ Flake8:
     - flake8 app/
 
 YamlLint:
-  stage: Lint
+  stage: Checks
   image: registry.gitlab.com/pipeline-components/yamllint:latest
   allow_failure: true
   script:
@@ -128,7 +128,7 @@ PulishRC:
 
 ## Terraform
 Validate:
-  stage: Lint
+  stage: Checks
   image:
     *terraform_image
   tags:
