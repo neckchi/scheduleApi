@@ -46,7 +46,8 @@ stages:
   - PulishRC
   - PlanDev
   - ApplyDev
-  - DestroyDev_Manual
+  - PlanUat
+  - ApplyUat
 
 # Stages Defenition
 ## Lint
@@ -141,6 +142,7 @@ Validate:
   script:
     - terraform validate
 
+## DEV
 PlanDev:
   stage: PlanDev
   image:
@@ -169,8 +171,20 @@ ApplyDev:
     - terraform -chdir=cicd apply -var-file=environments/dev/dev.tfvars -var="image_tag=$ReleaseRC" -auto-approve
   allow_failure: true
 
-DestroyDev:
-  stage: DestroyDev_Manual
+## UAT
+PlanUat:
+  stage: PlanUat
+  image:
+    *terraform_image
+  tags:
+    - uat
+  before_script:
+    *before_script_terraform
+  script:
+    - terraform -chdir=cicd plan -var-file=environments/uat/uat.tfvars -var="image_tag=$ReleaseRC"
+
+ApplyUat:
+  stage: ApplyUat
   image:
     *terraform_image
   rules:
@@ -178,9 +192,26 @@ DestroyDev:
       when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   tags:
-    - dev
+    - uat
   when: manual
   before_script:
     *before_script_terraform
   script:
-    - terraform -chdir=cicd destroy -var-file=environments/dev/dev.tfvars -var="image_tag=$ReleaseRC" -auto-approve
+    - terraform -chdir=cicd apply -var-file=environments/uat/uat.tfvars -var="image_tag=$ReleaseRC" -auto-approve
+  allow_failure: true
+
+#DestroyDev:
+#  stage: DestroyDev_Manual
+#  image:
+#    *terraform_image
+#  rules:
+#    - if: $CI_COMMIT_TAG
+#      when: never
+#    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+#  tags:
+#    - dev
+#  when: manual
+#  before_script:
+#    *before_script_terraform
+#  script:
+#    - terraform -chdir=cicd destroy -var-file=environments/dev/dev.tfvars -var="image_tag=$ReleaseRC" -auto-approve
