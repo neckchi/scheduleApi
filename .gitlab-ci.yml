@@ -5,7 +5,6 @@
   - mkdir -p ~/.ssh
   - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
   - terraform --version
-  - terraform -chdir=cicd init -backend-config=environments/dev/backend.conf
 
 .before_script_plublish: &before_script_plublish
   - apk update && apk add --update --no-cache --force-overwrite gc-dev pcre-dev libevent-dev git curl
@@ -140,6 +139,7 @@ Validate:
   before_script:
     *before_script_terraform
   script:
+    - terraform -chdir=cicd init -backend-config=environments/dev/backend.conf
     - terraform validate
 
 ## DEV
@@ -152,6 +152,7 @@ PlanDev:
   before_script:
     *before_script_terraform
   script:
+    - terraform -chdir=cicd init -backend-config=environments/dev/backend.conf
     - terraform -chdir=cicd plan -var-file=environments/dev/dev.tfvars -var="image_tag=$ReleaseRC"
 
 ApplyDev:
@@ -168,6 +169,7 @@ ApplyDev:
   before_script:
     *before_script_terraform
   script:
+    - terraform -chdir=cicd init -backend-config=environments/dev/backend.conf
     - terraform -chdir=cicd apply -var-file=environments/dev/dev.tfvars -var="image_tag=$ReleaseRC" -auto-approve
   allow_failure: true
 
@@ -181,6 +183,7 @@ PlanUat:
   before_script:
     *before_script_terraform
   script:
+    - terraform -chdir=cicd init -backend-config=environments/uat/backend.conf
     - terraform -chdir=cicd plan -var-file=environments/uat/uat.tfvars -var="image_tag=$ReleaseRC"
 
 ApplyUat:
@@ -197,6 +200,7 @@ ApplyUat:
   before_script:
     *before_script_terraform
   script:
+    - terraform -chdir=cicd init -backend-config=environments/uat/backend.conf
     - terraform -chdir=cicd apply -var-file=environments/uat/uat.tfvars -var="image_tag=$ReleaseRC" -auto-approve
   allow_failure: true
 
