@@ -171,7 +171,7 @@ ApplyDev:
   script:
     - terraform -chdir=cicd init -backend-config=environments/dev/backend.conf
     - terraform -chdir=cicd apply -var-file=environments/dev/dev.tfvars -var="image_tag=$ReleaseRC" -auto-approve
-  allow_failure: true
+  allow_failure: false
 
 ## UAT
 PlanUat:
