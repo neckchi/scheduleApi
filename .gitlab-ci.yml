@@ -165,7 +165,6 @@ ApplyDev:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   tags:
     - dev
-  when: manual
   before_script:
     *before_script_terraform
   script:
