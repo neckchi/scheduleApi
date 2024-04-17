@@ -33,10 +33,10 @@ def process_response_data(task: dict) -> Iterator:
                          'referenceType': 'IMO' if (vessel_imo := deepget(leg['transportation'], 'vehicule', 'reference')) and (len(vessel_imo) < 8 if vessel_imo else None) else None,
                          'reference':vessel_imo if (len(vessel_imo) < 8 if vessel_imo else None) else None },
         services={'serviceCode': service_name} if (service_name := deepget(leg['transportation'], 'voyage', 'service', 'code')) else None,
-        voyages={'internalVoyage': voyage_num} if (voyage_num := deepget(leg['transportation'], 'voyage', 'voyageReference')) else None,
+        voyages={'internalVoyage': voyage_num if (voyage_num := deepget(leg['transportation'], 'voyage', 'voyageReference')) else None},
         cutoffs={'docCutoffDate':deepget(leg['pointFrom']['cutOff'], 'shippingInstructionAcceptance','local'),
                  'cyCutoffDate':deepget(leg['pointFrom']['cutOff'], 'portCutoff', 'local'),
-                 'vgmCutoffDate':deepget(leg['pointFrom']['cutOff'], 'vgm', 'local')} if leg['pointFrom'].get('cutOff') else None)for leg in task['routingDetails']]
+                 'vgmCutoffDate':deepget(leg['pointFrom']['cutOff'], 'vgm', 'local')} if leg['pointFrom'].get('cutOff') else None) for leg in task['routingDetails']]
     schedule_body: dict = schema_response.Schedule.model_construct(scac=carrier_code.get(task['shippingCompany']), pointFrom=first_point_from,
                                                                    pointTo=last_point_to, etd=first_etd,eta=last_eta,
                                                                    transitTime=transit_time,transshipment=check_transshipment,

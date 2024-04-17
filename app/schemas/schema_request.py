@@ -1,24 +1,10 @@
 from enum import Enum,StrEnum
+from typing_extensions import Literal
 
+CarrierCode = Literal['MSCU', 'CMDU', 'ANNU', 'APLU', 'CHNL', 'ONEY','HDMU','ZIMU','MAEU','MAEI','OOLU','COSU','HLCU']
 class StartDateType(StrEnum):
     departure = "Departure"
     arrival = "Arrival"
-
-class CarrierCode(StrEnum):
-    MSCU = 'MSCU'
-    CMDU = 'CMDU'
-    ANNU = 'ANNU'
-    APLU = 'APLU'
-    CHNL = 'CHNL'
-    ONEY = 'ONEY'
-    HDMU = 'HDMU'
-    ZIMU = 'ZIMU'
-    MAEU = 'MAEU'
-    MAEI = 'MAEI'
-    OOLU = 'OOLU'
-    COSU = 'COSU'
-    HLCU = 'HLCU'
-
 
 class SearchRange(Enum):
     One = ('1', 7)

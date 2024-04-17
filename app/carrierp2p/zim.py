@@ -38,7 +38,7 @@ def process_response_data(task: dict, direct_only:bool |None,vessel_imo: str, se
                                                      services={'serviceCode': leg['line']} if (voyage_num := leg.get('voyage')) else None,
                                                      cutoffs={'cyCutoffDate': cyoff,'docCutoffDate': leg.get('docClosingDate'),
                                                               'vgmCutoffDate': leg.get('vgmClosingDate')} if (cyoff := leg.get('containerClosingDate')) or leg.get('docClosingDate') or leg.get('vgmClosingDate') else None,
-                                                     voyages={'internalVoyage': voyage_num + leg['leg'],'externalVoyage': leg.get('consortSailingNumber')} if voyage_num else None) for leg in task['routeLegs']]).model_dump(warnings=False)
+                                                     voyages={'internalVoyage': voyage_num + leg['leg'] if voyage_num else None,'externalVoyage': leg.get('consortSailingNumber')}) for leg in task['routeLegs']]).model_dump(warnings=False)
         yield schedule_body
 
 

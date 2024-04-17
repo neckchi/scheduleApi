@@ -1,14 +1,18 @@
 import logging
 from uuid import UUID
 from datetime import datetime
-from enum import StrEnum
-from pydantic import BaseModel, Field, PositiveInt,model_validator
+from pydantic import BaseModel, Field, PositiveInt,model_validator,ConfigDict
 from .schema_request import CarrierCode
+from typing_extensions import Literal
+from functools import lru_cache
 
+
+@lru_cache(maxsize=128)
 def convert_datetime_to_iso_8601(dt: datetime) -> str:
     return dt.strftime('%Y-%m-%dT%H:%M:%S')
 
 class PointBase(BaseModel):
+    model_config = ConfigDict(cache_strings='all')
     locationName: str | None = Field(max_length=100, default=None, example='Hong Kong')
     locationCode: str = Field(max_length=5, title="Port Of Discharge", example='HKHKG', pattern =r"[A-Z]{2}[A-Z0-9]{3}")
     terminalName: str | None = Field(max_length=100, default=None, example='HONG KONG INTL TERMINAL (HIT4)')
@@ -16,26 +20,17 @@ class PointBase(BaseModel):
 
 
 class Cutoff(BaseModel):
+    model_config = ConfigDict(json_encoders={datetime: convert_datetime_to_iso_8601})
     cyCutoffDate: datetime | None = Field(default=None,example='2023-11-11T22:00:00')
     docCutoffDate: datetime | None = Field(default=None,example='2023-11-11T22:00:00')
     vgmCutoffDate: datetime | None = Field(default=None,example='2023-11-11T22:00:00')
-    class Config:
-        json_encoders = {
-            datetime: convert_datetime_to_iso_8601
-        }
-
-class TransportType(StrEnum):
-    Vessel = 'Vessel'
-    Barge = 'Barge'
-    Feeder = 'Feeder'
-    Truck =  'Truck'
-    Rail = 'Rail'
-    TruckRail = 'Truck / Rail'
-    Intermodal = 'Intermodal'
 
 
+TRANSPORT_TYPE = Literal['Vessel', 'Barge', 'Feeder', 'Truck', 'Rail', 'Truck / Rail','Intermodal']
+REFERENCE_MAPPING: dict = {'Vessel': '1', 'Barge': '9', 'Feeder': '9', 'Truck': '3', 'Rail': '11', 'Truck / Rail': '11','Intermodal': '5'}
 class Transportation(BaseModel):
-    transportType: TransportType = Field(description='e.g:Vessel,Barge,Feeder,Truck,Rail,Truck / Rail,Intermodal', example='Vessel')
+    model_config = ConfigDict(cache_strings='all')
+    transportType: TRANSPORT_TYPE = Field(description='e.g:Vessel,Barge,Feeder,Truck,Rail,Truck / Rail,Intermodal', example='Vessel')
     transportName: str | None = Field(title='Vehicle Type',max_length=40, description='e.g:VesselName', example='ISEACO WISDOM',default=None)
     referenceType: str | None = Field(title='Reference Type', description='e.g:IMO', example='IMO',default=None)
     reference: int | str | None = Field(title='Reference Value', description='e.g:Vessel IMO Code', example='9172301',default=None)
@@ -44,32 +39,38 @@ class Transportation(BaseModel):
     def check_reference_type_or_reference(self) -> 'Transportation':
         reference = self.reference
         reference_type = self.referenceType
-        if (reference_type is not None and reference is not None ) or (reference_type is None and reference is None):
-            return self
-        logging.error(' Either both of reference type and reference existed or both are not existed ')
-        raise ValueError(f'Either both of reference type and reference existed or both are not existed')
+        if (reference_type is  None and reference is not None) or (reference_type is not None and reference is None):
+            logging.error(' Either both of reference type and reference existed or both are not existed ')
+            raise ValueError(f'Either both of reference type and reference existed or both are not existed')
+        return self
 
     @model_validator(mode = 'after')
     def add_reference(self)-> 'Transportation':
-        reference_mapping:dict = {'Vessel':'1', 'Barge':'9', 'Feeder':'9', 'Truck':'3', 'Rail':'11','Truck / Rail':'11', 'Intermodal':'5'}
         if self.referenceType is None and self.reference is None and self.transportType is not None:
             self.transportName = 'TBN' if self.transportName is None else self.transportName
             self.referenceType = 'IMO'
-            self.reference = reference_mapping.get(self.transportType)
+            self.reference = REFERENCE_MAPPING.get(self.transportType)
         return self
 
 
 class Voyage(BaseModel):
-    internalVoyage: str | None = Field(default=None,max_length=10, example='012W')
+    internalVoyage: str | None = Field(default=None,max_length=10, example='126W')
     externalVoyage: str | None = Field(default=None,max_length=10, example='126W')
-
+    @model_validator(mode='after')
+    def check_voyage(self) -> 'Voyage':
+        if self.internalVoyage is None:
+            self.internalVoyage = 'NA'
+        return self
 
 class Service(BaseModel):
+    model_config = ConfigDict(cache_strings='all')
     serviceCode: str | None = Field(default=None,max_length=80, example='NVS')
     serviceName: str | None = Field(default=None,max_length=100, example='EAST ASIA TRADE')
 
 
+
 class Leg(BaseModel):
+    model_config = ConfigDict(json_encoders={datetime: convert_datetime_to_iso_8601})
     pointFrom: PointBase = Field(description="This could be point/port")
     pointTo: PointBase = Field(description="This could be point/port")
     etd: datetime = Field(example='2023-11-13T18:00:00')
@@ -78,32 +79,25 @@ class Leg(BaseModel):
     transitTime: int = Field(ge=0, title="Leg Transit Time",
                              description="Transit Time on Leg Level",example='31')
     transportations: Transportation | None
-    voyages: Voyage | None = Field(default=None, title="Voyage Number.Keep in mind that voyage number is not mandatory")
+    voyages: Voyage = Field(title="Voyage Number.Keep in mind that voyage number is mandatory")
     services: Service | None = Field(default=None, title="Service Loop")
     @model_validator(mode='after')
-    def check_etd_eta(self) -> 'Leg':
-        etd = self.etd
-        eta = self.eta
-        if eta >= etd  or etd <= eta:
-            return self
-        logging.error('ETA must be equal  or greater than ETD.vice versa')
-        raise ValueError(f'ETA must be equal  or greater than ETD.vice versa')
-    class Config:
-        json_encoders = {
-            datetime: convert_datetime_to_iso_8601
-        }
+    def check_leg_details(self) -> 'Leg':
+        if self.eta < self.etd  or self.etd > self.eta:
+            logging.error('ETA must be equal  or greater than ETD.vice versa')
+            raise ValueError(f'ETA must be equal  or greater than ETD.vice versa')
+        return self
+
 
 
 class Schedule(BaseModel):
+    model_config = ConfigDict(json_encoders={datetime: convert_datetime_to_iso_8601})
     scac: CarrierCode = Field(max_length=4, title="Carrier Code", description="This is SCAC.It must be 4 characters",
                               example="MAEU")
     pointFrom: str = Field(max_length=5, title="First Port Of Loading", example='HKHKG', pattern =r"[A-Z]{2}[A-Z0-9]{3}")
     pointTo: str = Field(max_length=5, title="Last Port Of Discharge", example='DEHAM', pattern =r"[A-Z]{2}[A-Z0-9]{3}")
     etd: datetime = Field(example='2023-11-13T18:00:00')
     eta: datetime = Field(example='2023-12-15T07:00:00')
-    # cyCutOffDate: datetime | None = Field(default= None, example='2023-11-11T22:00:00')
-    # docCutOffDate: datetime | None = Field(default= None,example = '2023-11-10T11:00:00')
-    # vgmCutOffDate: datetime | None = Field(default= None,example='2023-11-11T22:00:00')
     transitTime: int = Field(ge=0, alias='transitTime', title="Schedule Transit Time",
                              description="Transit Time on Schedule Level")
     transshipment: bool = Field(title="Is transshipment?",example=False)
@@ -111,17 +105,10 @@ class Schedule(BaseModel):
 
     @model_validator(mode='after')
     def check_etd_eta(self) -> 'Schedule':
-        etd = self.etd
-        eta = self.eta
-        if eta >= etd  or etd <= eta:
-            return self
-        logging.error('ETA must be equal or greater than ETD.vice versa')
-        raise ValueError(f'ETA must be equal  or greater than ETD.vice versa')
-
-    class Config:
-        json_encoders = {
-            datetime: convert_datetime_to_iso_8601
-        }
+        if self.eta < self.etd  or self.etd > self.eta:
+            logging.error('ETA must be equal  or greater than ETD.vice versa')
+            raise ValueError(f'ETA must be equal  or greater than ETD.vice versa')
+        return self
 
 
 class Product(BaseModel):

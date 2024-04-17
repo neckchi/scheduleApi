@@ -59,6 +59,7 @@ class AsyncTaskManager:
         return (result for result in self.results if not isinstance(result, Exception)) if self.error else self.results
 
 SSL_CONTEXT = httpx.create_ssl_context()
+# KN_PROXY:httpx.Proxy = httpx.Proxy("http://zscaler.proxy.int.kn:80")
 KN_PROXY:httpx.Proxy = httpx.Proxy("http://proxy.eu-central-1.aws.int.kn:80")
 HTTPX_TIMEOUT = httpx.Timeout(30.0, connect=65.0)
 HTTPX_LIMITS = httpx.Limits(max_connections=200,max_keepalive_connections=20)
@@ -109,15 +110,6 @@ class HTTPXClientWrapper(httpx.AsyncClient):
             """
             At the moment Only Maersk need consumer to stream the response
             """
-            # async with self.stream(method=method, url=url, params=params, headers=headers, data=data) as stream_request:
-            #     if stream_request.status_code == 200:
-            #         async for result in stream_request.aiter_lines():
-            #             response = orjson.loads(result)
-            #             if background_tasks:
-            #                 background_tasks.add_task(db.set, key=token_key, value=response, expire=expire)
-            #             yield response
-            #     else:
-            #         yield None
             client_request = self.build_request(method=method, url=url, params=params, headers=headers, data=data)
             stream_request = await self.send(client_request, stream=True)
             if stream_request.status_code == 200:
@@ -141,7 +133,7 @@ class HTTPXClientWrapper(httpx.AsyncClient):
             productid=product_id,
             origin=point_from,
             destination=point_to, noofSchedule=count_schedules,
-            schedules=sorted_schedules).model_dump(exclude_none=True)
+            schedules=sorted_schedules).model_dump(mode='json',exclude_none=True)
             if not task_exception:
                 if load_yaml()['data']['backgroundTasks']['cacheDB'] == 'Redis':
                     background_tasks.add_task(db.set,key=product_id,value=final_result)

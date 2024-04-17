@@ -42,7 +42,7 @@ def process_response_data(task: dict,vessel_imo: str, service: str, tsp: str) ->
                                  'referenceType': None if (transport_type := leg.get('transportID')) == 'UNKNOWN' else 'IMO',
                                  'reference': None if transport_type == 'UNKNOWN' else transport_type},
                 services={'serviceCode': service_code, 'serviceName': leg['serviceName']} if (service_code :=leg['serviceCode']) or leg['serviceName'] else None,
-                voyages={'internalVoyage': voyage_num} if (voyage_num := leg['conveyanceNumber']) else None) for index, leg in enumerate(task['legs'])]
+                voyages={'internalVoyage': voyage_num if (voyage_num := leg.get('conveyanceNumber')) else None }) for index, leg in enumerate(task['legs'])]
         else:
             leg_list: list = [schema_response.Leg.model_construct(
                 pointFrom={'locationCode': first_point_from, 'terminalName': first_origin_terminal},
@@ -57,7 +57,7 @@ def process_response_data(task: dict,vessel_imo: str, service: str, tsp: str) ->
                                  'reference': None if first_imo == 'UNKNOWN' else first_imo},
                 services={'serviceCode': first_service_code,
                           'serviceName': first_service_name} if first_service_code or first_service_name else None,
-                voyages={'internalVoyage': first_voyage} if first_voyage else None)]
+                voyages={'internalVoyage': first_voyage if first_voyage else None})]
         schedule_body: dict = schema_response.Schedule.model_construct(scac=carrier_code,
                                                                        pointFrom=first_point_from,
                                                                        pointTo=last_point_to, etd=first_etd,

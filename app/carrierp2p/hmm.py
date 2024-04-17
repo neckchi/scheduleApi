@@ -37,7 +37,8 @@ def process_response_data(task: dict, vessel_imo: str, service: str, tsp: str) -
             etd=(outbound_etd := task['outboundInland']['fromLocationDepatureDate']),
             eta=(outbound_eta := task['outboundInland']['toLocationArrivalDate']),
             transitTime=int((datetime.datetime.fromisoformat(outbound_eta) - datetime.datetime.fromisoformat(outbound_etd)).days),
-            transportations={'transportType': task['outboundInland']['transMode']})] if task.get('outboundInland') else []
+            transportations={'transportType': task['outboundInland']['transMode']},
+            voyages={'internalVoyage': 'NA'})] if task.get('outboundInland') else []
         # main routing
         leg_list += [schema_response.Leg.model_construct(
             pointFrom={'locationName': legs['loadPort'],
@@ -57,7 +58,7 @@ def process_response_data(task: dict, vessel_imo: str, service: str, tsp: str) -
                              'referenceType': 'IMO' if (imo_code := legs.get('lloydRegisterNo')) else None,
                              'reference': imo_code},
             services={'serviceCode': check_service} if (check_service := legs.get('vesselLoop')) else None,
-            voyages={'internalVoyage': internal_voy} if (internal_voy := legs.get('voyageNumber')) else None)
+            voyages={'internalVoyage': internal_voy if (internal_voy := legs.get('voyageNumber')) else None})
             for index, legs in enumerate(task['vessel']) if (etd := legs.get('vesselDepartureDate'))]
         # inbound
         leg_list += [schema_response.Leg.model_construct(
@@ -72,7 +73,8 @@ def process_response_data(task: dict, vessel_imo: str, service: str, tsp: str) -
             etd=(inbound_etd := task['inboundInland']['fromLocationDepatureDate']),
             eta=(inbound_eta := task['inboundInland']['toLocationArrivalDate']),
             transitTime=int((datetime.datetime.fromisoformat(inbound_eta) - datetime.datetime.fromisoformat(inbound_etd)).days),
-            transportations={'transportType': task['inboundInland']['transMode']})] if task.get('inboundInland') else []
+            transportations={'transportType': task['inboundInland']['transMode']},
+            voyages={'internalVoyage': 'NA'})] if task.get('inboundInland') else []
         schedule_body: dict = schema_response.Schedule.model_construct(scac=carrier_code,
                                                                        pointFrom=first_point_from,
                                                                        pointTo=last_point_to, etd=first_etd,
