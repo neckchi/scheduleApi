@@ -42,6 +42,7 @@ This section describes the CICD workflow.
 
 # Environments:
 ## [DEV](http://internal-p2papicarriers-alb-670514342.eu-central-1.elb.amazonaws.com/)
+## [UAT](http://internal-p2papicarriers-alb-1729903004.eu-central-1.elb.amazonaws.com/)
 
 # Aux ECS
 ## Force Redeploy
