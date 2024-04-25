@@ -75,8 +75,8 @@ async def get_one_access_token(client:HTTPXClientWrapper,background_task:Backgro
     yield response_token['access_token']
 
 async def get_one_p2p(client:HTTPXClientWrapper, background_task:BackgroundTasks,url: str, turl: str, pw: str, auth: str, pol: str, pod: str, search_range: int,
-                      direct_only: bool|None,start_date: datetime.date,date_type: str | None = None, service: str | None = None,vessel_imo: str | None = None, tsp: str | None = None) -> Generator:
-    params: dict = {'originPort': pol, 'destinationPort': pod, 'searchDate': start_date,'searchDateType': date_type, 'weeksOut': search_range,'directOnly': 'TRUE' if direct_only is True else 'FALSE'}
+                      direct_only: bool|None,start_date_type: str,start_date: datetime.date, service: str | None = None,vessel_imo: str | None = None, tsp: str | None = None) -> Generator:
+    params: dict = {'originPort': pol, 'destinationPort': pod, 'searchDate': start_date,'searchDateType': start_date_type, 'weeksOut': search_range,'directOnly': 'TRUE' if direct_only is True else 'FALSE'}
     # weekout:1 ≤ value ≤ 14
     token:str = await anext(get_one_access_token(client=client,background_task=background_task, url=turl, auth=auth, api_key=pw))
     headers: dict = {'apikey': pw, 'Authorization': f'Bearer {token}', 'Accept': 'application/json'}

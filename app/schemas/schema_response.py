@@ -59,12 +59,12 @@ class Voyage(BaseModel):
     @model_validator(mode='after')
     def check_voyage(self) -> 'Voyage':
         if self.internalVoyage is None:
-            self.internalVoyage = 'NA'
+            self.internalVoyage = '001'
         return self
 
 class Service(BaseModel):
     model_config = ConfigDict(cache_strings='all')
-    serviceCode: str | None = Field(default=None,max_length=80, example='NVS')
+    serviceCode: str | None = Field(default=None,max_length=100, example='NVS')
     serviceName: str | None = Field(default=None,max_length=100, example='EAST ASIA TRADE')
 
 

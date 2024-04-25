@@ -8,7 +8,7 @@ data:
     scheduleExpiry: 6
   activeCarriers:
     cma:  True
-    hlag: True
+    hlag: False
     hmm: True
     iqax: True
     maersk: True

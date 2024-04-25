@@ -52,10 +52,9 @@ async def get_schedules(background_tasks: BackgroundTasks,
 
                 if carrier_status['data']['activeCarriers']['one'] and (carriers == 'ONEY' or carriers is None):
                     task_group.create_task(name='ONE_task',coro=lambda :one.get_one_p2p(client=client,background_task = background_tasks, url=settings.oney_url, turl=settings.oney_turl,
-                                        pol=point_from, pod=point_to, start_date=start_date,
+                                        pol=point_from, pod=point_to,start_date_type='BY_DEPARTURE_DATE' if start_date_type == 'Departure' else 'BY_ARRIVAL_DATE',start_date=start_date,
                                         direct_only=direct_only,
                                         search_range=int(search_range.value), tsp=tsp,vessel_imo = vessel_imo,
-                                        date_type='BY_DEPARTURE_DATE' if start_date_type == 'Departure' else 'BY_ARRIVAL_DATE',
                                         service=service, auth=settings.oney_auth.get_secret_value(),
                                         pw=settings.oney_token.get_secret_value()))
 
@@ -69,7 +68,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
                 # Missing IMO code and Cut off date from ZIM response
                 if carrier_status['data']['activeCarriers']['zim'] and (carriers == 'ZIMU' or carriers is None):
                     task_group.create_task(name='ZIM_task',coro=lambda:zim.get_zim_p2p(client=client,background_task = background_tasks, url=settings.zim_url, turl=settings.zim_turl,
-                                        pol=point_from, pod=point_to, start_date=start_date,
+                                        pol=point_from, pod=point_to, start_date_type = start_date_type,start_date=start_date,
                                         direct_only=direct_only, tsp=tsp,
                                         search_range=search_range.duration, service=service,vessel_imo=vessel_imo,
                                         pw=settings.zim_token.get_secret_value(),
