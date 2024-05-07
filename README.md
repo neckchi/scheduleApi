@@ -49,3 +49,6 @@ This section describes the CICD workflow.
 ´´´
 aws ecs update-service --cluster p2p_schedule_api_of_carriers_cluster --service p2p_schedule_api_of_carriers_service --force-new-deployment
 ´´´
+
+
+demo01
