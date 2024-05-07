@@ -23,7 +23,6 @@ class AsyncTaskManager:
         self.error:bool = False
         self.default_timeout:int = default_timeout
         self.max_retries:int = max_retries
-
     async def __aenter__(self):
         return self
     async def __aexit__(self, exc_type = None, exc = None, tb= None):
@@ -50,7 +49,7 @@ class AsyncTaskManager:
     def create_task(self, name:str,coro:Callable):
         self.__tasks[name] = asyncio.create_task(self._timeout_wrapper(coro=coro,task_name=name))
 
-    def results(self) -> list:
+    def results(self) -> Generator:
         # task_names = list(self.__tasks.keys())
         # for i, result in enumerate(self.results):
         #     if isinstance(result, Exception):
@@ -65,6 +64,7 @@ HTTPX_TIMEOUT = httpx.Timeout(30.0, connect=65.0)
 HTTPX_LIMITS = httpx.Limits(max_connections=200,max_keepalive_connections=20)
 HTTPX_ASYNC_HTTP = httpx.AsyncHTTPTransport(retries=3,proxy=KN_PROXY,verify=SSL_CONTEXT,limits=HTTPX_LIMITS)
 class HTTPXClientWrapper(httpx.AsyncClient):
+    __slots__ = ('session_id')
     def __init__(self):
         super().__init__(timeout=HTTPX_TIMEOUT, transport=HTTPX_ASYNC_HTTP)
         self.session_id: str = str(uuid4())

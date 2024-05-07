@@ -1,6 +1,7 @@
 from datetime import timedelta
 from redis.asyncio import BlockingConnectionPool, Redis,WatchError
 from app.config import Settings,load_yaml
+from starlette.responses import JSONResponse
 import uuid
 import logging
 import orjson
@@ -30,7 +31,7 @@ class ClientSideCache:
                     time.sleep(3)
                     logging.critical(f'Retry - Unable to connect to the RedisDB - {disconnect}')
 
-    async def set(self, key:uuid.UUID, value: dict| list,expire:int = timedelta(hours = load_yaml()['data']['backgroundTasks']['scheduleExpiry'])):
+    async def set(self, key:uuid.UUID, value: JSONResponse,expire:int = timedelta(hours = load_yaml()['data']['backgroundTasks']['scheduleExpiry'])):
         async with self._pool.pipeline(transaction=True) as pipe:
             try:
                 await pipe.watch(key.urn) #tells Redis to monitor this key. If this key is modified by any other client before the transaction is executed, the transaction will be aborted.

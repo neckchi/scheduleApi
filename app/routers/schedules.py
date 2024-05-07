@@ -1,6 +1,6 @@
 import datetime
 from uuid import uuid5,NAMESPACE_DNS,UUID
-from fastapi import APIRouter, Query, Depends, BackgroundTasks
+from fastapi import APIRouter, Query, Depends, BackgroundTasks,Response
 from app.carrierp2p import cma, one, hmm, zim, maersk, msc, iqax,hlag
 from app.schemas import schema_response, schema_request
 from app.background_tasks import db
@@ -15,6 +15,7 @@ router = APIRouter(prefix='/schedules', tags=["API Point To Point Schedules"])
             response_description='Return a list of carrier ocean products with multiple schedules')
 
 async def get_schedules(background_tasks: BackgroundTasks,
+                        response:Response,
                         point_from: str = Query(alias='pointFrom', default=..., max_length=5,regex=r"[A-Z]{2}[A-Z0-9]{3}",example='HKHKG',description='Search by either port or point of origin'),
                         point_to: str = Query(alias='pointTo', default=..., max_length=5, regex=r"[A-Z]{2}[A-Z0-9]{3}",example='DEHAM',description="Search by either port or point of destination"),
                         start_date_type: schema_request.StartDateType = Query(alias='startDateType', default=...,description="Search by either ETD or ETA"),
@@ -36,6 +37,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
     - **pointFrom/pointTo** : Provide either Point or Port in UNECE format
     """
     product_id:UUID = uuid5(NAMESPACE_DNS,f'{scac}-p2p-api-{point_from}{point_to}{start_date_type}{start_date}{search_range}{tsp}{direct_only}{vessel_imo}{service}')
+    response.headers["X-Correlation-ID"] = str(product_id)
     ttl_schedule = await db.get(key=product_id)
     if not ttl_schedule:
         # 👇 Having this allows for waiting for all our tasks with strong safety guarantees,logic around cancellation for failures,coroutine-safe and grouping of exceptions.
