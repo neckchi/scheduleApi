@@ -1,6 +1,6 @@
 import datetime
 from uuid import uuid5,NAMESPACE_DNS,UUID
-from fastapi import APIRouter, Query, Depends, BackgroundTasks,Response
+from fastapi import APIRouter, Query, Depends,Header, BackgroundTasks,Response
 from app.carrierp2p import cma, one, hmm, zim, maersk, msc, iqax,hlag
 from app.schemas import schema_response, schema_request
 from app.background_tasks import db
@@ -16,6 +16,7 @@ router = APIRouter(prefix='/schedules', tags=["API Point To Point Schedules"])
 
 async def get_schedules(background_tasks: BackgroundTasks,
                         response:Response,
+                        X_Correlation_ID: str | None = Header(default=None),
                         point_from: str = Query(alias='pointFrom', default=..., max_length=5,regex=r"[A-Z]{2}[A-Z0-9]{3}",example='HKHKG',description='Search by either port or point of origin'),
                         point_to: str = Query(alias='pointTo', default=..., max_length=5, regex=r"[A-Z]{2}[A-Z0-9]{3}",example='DEHAM',description="Search by either port or point of destination"),
                         start_date_type: schema_request.StartDateType = Query(alias='startDateType', default=...,description="Search by either ETD or ETA"),
@@ -62,7 +63,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
 
                 # Missing Location Code from HDMU response
                 if carrier_status['data']['activeCarriers']['hmm'] and (carriers == 'HDMU' or carriers is None):
-                    task_group.create_task(name='HMM_task',coro=lambda:hmm.get_hmm_p2p(client=client, url=settings.hmm_url, pol=point_from, pod=point_to,
+                    task_group.create_task(name='HMM_task',coro=lambda:hmm.get_hmm_p2p(client=client,background_task = background_tasks, url=settings.hmm_url, pol=point_from, pod=point_to,
                                         start_date=start_date, service=service, direct_only=direct_only,vessel_imo=vessel_imo,
                                         tsp=tsp, pw=settings.hmm_token.get_secret_value(),
                                         search_range=str(search_range.value)))

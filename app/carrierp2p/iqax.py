@@ -11,7 +11,7 @@ from typing import Generator,Iterator
 
 
 def process_response_data(task: dict, direct_only:bool |None,vessel_imo: str, service: str, tsp: str) -> Iterator:
-    check_service_code:bool = any(service == leg_service['service']['code'] for leg_service in task['leg']) if service else True
+    check_service_code:bool = any(service == leg_service['service']['code'] for leg_service in task['leg'] if leg_service.get('service')) if service else True
     check_transshipment: bool = not task['direct']
     transshipment_port:bool = any(tsport['fromPoint']['location']['unlocode'] == tsp for tsport in task['leg'][1:]) if check_transshipment and tsp else False
     check_vessel_imo: bool = any(str(imo['vessel'].get('IMO')) == vessel_imo for imo in task['leg'] if imo.get('vessel') ) if vessel_imo else True

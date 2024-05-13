@@ -78,10 +78,17 @@ async def get_one_p2p(client:HTTPXClientWrapper, background_task:BackgroundTasks
                       direct_only: bool|None,start_date_type: str,start_date: datetime.date, service: str | None = None,vessel_imo: str | None = None, tsp: str | None = None) -> Generator:
     params: dict = {'originPort': pol, 'destinationPort': pod, 'searchDate': start_date,'searchDateType': start_date_type, 'weeksOut': search_range,'directOnly': 'TRUE' if direct_only is True else 'FALSE'}
     # weekout:1 ≤ value ≤ 14
+    one_response_uuid: UUID = uuid5(NAMESPACE_DNS,'one-response-kuehne-nagel' + str(params) + str(direct_only) + str(vessel_imo) + str(service) + str(tsp))
+    response_cache = await db.get(key=one_response_uuid)
+    generate_schedule = lambda data:(schedule_result for schedule_type in data for task in data[schedule_type] for schedule_result in process_response_data(task=task, vessel_imo=vessel_imo, service=service,tsp=tsp))
+    if response_cache:
+        p2p_schedule: Generator = generate_schedule(data= response_cache)
+        return p2p_schedule
     token:str = await anext(get_one_access_token(client=client,background_task=background_task, url=turl, auth=auth, api_key=pw))
     headers: dict = {'apikey': pw, 'Authorization': f'Bearer {token}', 'Accept': 'application/json'}
     response_json:dict = await anext(client.parse(method='GET', url=url, params=params,headers=headers))
     if response_json and response_json.get('errorMessages') is None:
-        p2p_schedule: Generator = (schedule_result for schedule_type in response_json for task in response_json[schedule_type] for schedule_result in process_response_data(task=task, vessel_imo=vessel_imo, service=service,tsp=tsp))
+        p2p_schedule: Generator = generate_schedule(data= response_json)
+        background_task.add_task(db.set, key=one_response_uuid, value=response_json)
         return p2p_schedule
 

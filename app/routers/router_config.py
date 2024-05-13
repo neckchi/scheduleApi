@@ -50,11 +50,6 @@ class AsyncTaskManager:
         self.__tasks[name] = asyncio.create_task(self._timeout_wrapper(coro=coro,task_name=name))
 
     def results(self) -> Generator:
-        # task_names = list(self.__tasks.keys())
-        # for i, result in enumerate(self.results):
-        #     if isinstance(result, Exception):
-        #         task_name = task_names[i]
-        #         logging.critical(f"{task_name} connection attempts failed: {result}")
         return (result for result in self.results if not isinstance(result, Exception)) if self.error else self.results
 
 SSL_CONTEXT = httpx.create_ssl_context()

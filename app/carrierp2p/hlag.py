@@ -53,7 +53,7 @@ async def get_hlag_access_token(client:HTTPXClientWrapper,background_task, url: 
                          'Accept': 'application/json'}
         body:dict = {'mode': "raw",'userId': user,'password': pw,'orgUnit': "HLAG"}
         response_token:dict  = await anext(client.parse(method='POST',background_tasks =background_task,url=url, headers=headers,json=body,token_key=hlcu_token_key,expire=timedelta(minutes=10)))
-    print(response_token)
+    # print(response_token)
     yield response_token['token']
 async def get_hlag_p2p(client:HTTPXClientWrapper,background_task:BackgroundTasks,url: str, turl: str,user:str, pw: str, client_id: str,client_secret:str,pol: str, pod: str,search_range: int,
                        etd: datetime.date = None, eta: datetime.date = None, direct_only: bool|None = None,vessel_flag:str|None = None,service: str | None = None, tsp: str | None = None):

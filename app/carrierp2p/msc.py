@@ -69,10 +69,17 @@ async def get_msc_token(client:HTTPXClientWrapper,background_task:BackgroundTask
 async def get_msc_p2p(client:HTTPXClientWrapper, background_task:BackgroundTasks,url: str, oauth: str, aud: str, pw: str, msc_client: str, msc_scope: str,msc_thumbprint: str, pol: str, pod: str,
                       search_range: int, start_date_type: str,start_date: datetime.date, direct_only: bool |None, vessel_imo: str | None = None, service: str | None = None, tsp: str | None = None) -> Generator:
     params: dict = {'fromPortUNCode': pol, 'toPortUNCode': pod, 'fromDate': start_date,'toDate': (start_date + timedelta(days=search_range)).strftime("%Y-%m-%d"), 'datesRelated': start_date_type}
+    msc_response_uuid: UUID = uuid5(NAMESPACE_DNS, 'msc-response-kuehne-nagel' + str(params) + str(direct_only) + str(vessel_imo) + str(service) + str(tsp))
+    response_cache = await db.get(key=msc_response_uuid)
+    generate_schedule = lambda data:(schedule_result for task in data['MSCSchedule']['Transactions'] for schedule_result in process_response_data(task=task,direct_only=direct_only, vessel_imo=vessel_imo, service=service,tsp=tsp))
+    if response_cache:
+        p2p_schedule: Generator = generate_schedule(data=response_cache)
+        return p2p_schedule
     token = await anext(get_msc_token(client=client,background_task=background_task,oauth=oauth, aud=aud, rsa=pw, msc_client=msc_client, msc_scope=msc_scope,msc_thumbprint=msc_thumbprint))
     headers: dict = {'Authorization': f'Bearer {token}'}
     response_json:dict = await anext(client.parse(method='GET', url=url, params=params, headers=headers))
     if response_json:
-        p2p_schedule: Generator = (schedule_result for task in response_json['MSCSchedule']['Transactions'] for schedule_result in process_response_data(task=task,direct_only=direct_only, vessel_imo=vessel_imo, service=service,tsp=tsp))
+        p2p_schedule: Generator = generate_schedule(data=response_json)
+        background_task.add_task(db.set, key=msc_response_uuid, value=response_json)
         return p2p_schedule
 

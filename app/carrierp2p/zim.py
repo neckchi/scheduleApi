@@ -42,6 +42,7 @@ def process_response_data(task: dict, direct_only:bool |None,vessel_imo: str, se
         yield schedule_body
 
 
+
 async def get_zim_access_token(client:HTTPXClientWrapper,background_task:BackgroundTasks, url: str, api_key: str, client_id: str, secret: str) -> AsyncIterator[str]:
     zim_token_key:UUID = uuid5(NAMESPACE_DNS, 'zim-token-uuid-kuehne-nagel2')
     response_token:dict = await db.get(key=zim_token_key)
@@ -54,10 +55,17 @@ async def get_zim_access_token(client:HTTPXClientWrapper,background_task:Backgro
 async def get_zim_p2p(client:HTTPXClientWrapper, background_task:BackgroundTasks,url: str, turl: str, pw: str, zim_client: str, zim_secret: str, pol: str, pod: str,
                       search_range: int,start_date_type: str,start_date: datetime.datetime.date, direct_only: bool |None,vessel_imo:str|None = None, service: str | None = None, tsp: str | None = None):
     params: dict = {'originCode': pol, 'destCode': pod, 'fromDate': start_date,'toDate': (start_date + datetime.timedelta(days=search_range)).strftime("%Y-%m-%d"), 'sortByDepartureOrArrival': start_date_type}
+    zim_response_uuid: UUID = uuid5(NAMESPACE_DNS,'zim-response-kuehne-nagel' + str(params) + str(direct_only) + str(vessel_imo) + str(service) + str(tsp))
+    response_cache = await db.get(key=zim_response_uuid)
+    generate_schedule = lambda data: (result for task in data['response']['routes'] for result in process_response_data(task=task, direct_only=direct_only, vessel_imo=vessel_imo, service=service, tsp=tsp))
+    if response_cache:
+        p2p_schedule: Generator = generate_schedule(data=response_cache)
+        return p2p_schedule
     token:str = await anext(get_zim_access_token(client=client,background_task=background_task, url=turl, api_key=pw, client_id=zim_client, secret=zim_secret))
     headers: dict = {'Ocp-Apim-Subscription-Key': pw, 'Authorization': f'Bearer {token}','Accept': 'application/json'}
-    response_json:dict = await anext(client.parse(method='GET', url=url, params=params,headers=headers))
+    response_json:dict = await anext(client.parse(background_tasks=background_task,token_key=zim_response_uuid,method='GET', url=url, params=params,headers=headers))
     if response_json:
-        p2p_schedule: Generator =  (schedule_result for task in response_json['response']['routes'] for schedule_result in process_response_data(task=task,direct_only=direct_only, vessel_imo=vessel_imo, service=service,tsp=tsp))
+        p2p_schedule: Generator =  generate_schedule(data=response_json)
+        background_task.add_task(db.set, key=zim_response_uuid,value=response_json)
         return p2p_schedule
 
