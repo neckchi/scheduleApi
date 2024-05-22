@@ -17,6 +17,7 @@ def process_response_data(task: dict, direct_only:bool |None,vessel_imo: str, se
     if (transshipment_port or not tsp) and (direct_only is None or direct_only != check_transshipment) and (check_service_code or not service) and check_vessel_imo:
         transit_time: int = task['transitTime']
         first_point_from: str = task['departurePort']
+        check_nearest_pol:int = next(leg['legOrder'] for leg in task['routeLegs'][::-1] if leg['departurePort'] == first_point_from)
         last_point_to: str = task['arrivalPort']
         first_etd: str = task['departureDate']
         last_eta: str = task['arrivalDate']
@@ -38,7 +39,7 @@ def process_response_data(task: dict, direct_only:bool |None,vessel_imo: str, se
                                                      services={'serviceCode': leg['line']} if (voyage_num := leg.get('voyage')) else None,
                                                      cutoffs={'cyCutoffDate': cyoff,'docCutoffDate': leg.get('docClosingDate'),
                                                               'vgmCutoffDate': leg.get('vgmClosingDate')} if (cyoff := leg.get('containerClosingDate')) or leg.get('docClosingDate') or leg.get('vgmClosingDate') else None,
-                                                     voyages={'internalVoyage': voyage_num + leg['leg'] if voyage_num else None,'externalVoyage': leg.get('consortSailingNumber')}) for leg in task['routeLegs']]).model_dump(warnings=False)
+                                                     voyages={'internalVoyage': voyage_num + leg['leg'] if voyage_num else None,'externalVoyage': leg.get('consortSailingNumber')}) for leg in task['routeLegs'] if leg['legOrder'] >= check_nearest_pol]).model_dump(warnings=False)
         yield schedule_body
 
 
