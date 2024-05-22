@@ -21,33 +21,37 @@ def process_response_data(task: dict, direct_only:bool |None,vessel_imo: str, se
         leg_list:list =[]
         for index, legs in enumerate(task['leg'], start=1):
             imo_code: str  = str(legs['vessel'].get('IMO')) if legs.get('vessel') else None
+            leg_pol: str = legs['fromPoint']['location']['unlocode']
+            leg_pod: str = legs['toPoint']['location']['unlocode']
             vessel_name:str |None  = deepget(legs,'vessel','name')
             check_service = legs.get('service')
             leg_transport:str = legs['transportMode']
             leg_tt:int = legs.get('transitTime')
             leg_etd:str = legs['fromPoint'].get('etd', first_etd)
-            if index == 1:
-                final_etd: str = (datetime.strptime(leg_etd,"%Y-%m-%dT%H:%M:%S.000Z") - timedelta(days=leg_tt if leg_tt else 0.5)).strftime("%Y-%m-%dT%H:%M:%S.000Z") if leg_transport == 'TRUCK' else leg_etd
-                final_eta: str = legs['toPoint'].get('eta',(datetime.strptime(final_etd, "%Y-%m-%dT%H:%M:%S.000Z") + timedelta(days=leg_tt if leg_tt else 0.5)).strftime("%Y-%m-%dT%H:%M:%S.000Z"))
-            else:
-                final_eta: str = legs['toPoint'].get('eta', last_eta)
-                final_etd: str = legs['fromPoint'].get('etd', (datetime.strptime(final_eta,"%Y-%m-%dT%H:%M:%S.000Z") + timedelta(days=-(leg_tt if leg_tt else 0.5))).strftime("%Y-%m-%dT%H:%M:%S.000Z"))
-            leg_transit_time:int = leg_tt if leg_tt else ((datetime.fromisoformat(final_eta[:10]) - datetime.fromisoformat(final_etd[:10])).days)
-            leg_list.append(schema_response.Leg.model_construct(
-                pointFrom={'locationName': legs['fromPoint']['location']['name'],'locationCode': legs['fromPoint']['location']['unlocode'],
-                           'terminalName': legs['fromPoint']['location']['facility']['name'] if (check_origin_terminal:=legs['fromPoint']['location'].get('facility')) else None,
-                           'terminalCode':legs['fromPoint']['location']['facility']['code'] if check_origin_terminal else None},
-                pointTo={'locationName': legs['toPoint']['location']['name'],'locationCode': legs['toPoint']['location']['unlocode'],
-                         'terminalName': legs['toPoint']['location']['facility']['name'] if (check_des_terminal:=legs['toPoint']['location'].get('facility')) else None,
-                         'terminalCode':legs['toPoint']['location']['facility']['code'] if check_des_terminal else None},
-                etd=final_etd,
-                eta=final_eta,
-                transitTime=legs.get('transitTime',leg_transit_time),
-                transportations={'transportType': leg_transport.title(),'transportName': legs['vessel']['name'] if imo_code and  vessel_name != '---' else None,
-                                 'referenceType': 'IMO' if imo_code and imo_code not in (9999999,'9999999','None') else None,'reference': None if imo_code and imo_code in (9999999,'9999999','None') else imo_code},
-                services={'serviceCode': legs['service']['code'],'serviceName':legs['service']['name']} if check_service else None,
-                voyages={'internalVoyage': internal_voyage if (internal_voyage:=legs.get('internalVoyageNumber')) else None,'externalVoyage':legs.get('externalVoyageNumber')},
-                cutoffs={'cyCutoffDate':cy_cutoff} if (cy_cutoff:=legs['fromPoint'].get('defaultCutoff')) else None))
+            if leg_pol != leg_pod:
+                if index == 1:
+                    final_etd: str = (datetime.strptime(leg_etd,"%Y-%m-%dT%H:%M:%S.000Z") - timedelta(days=leg_tt if leg_tt else 0.5)).strftime("%Y-%m-%dT%H:%M:%S.000Z") if leg_transport == 'TRUCK' else leg_etd
+                    final_eta: str = legs['toPoint'].get('eta',(datetime.strptime(final_etd, "%Y-%m-%dT%H:%M:%S.000Z") + timedelta(days=leg_tt if leg_tt else 0.5)).strftime("%Y-%m-%dT%H:%M:%S.000Z"))
+                else:
+                    final_eta: str = legs['toPoint'].get('eta', last_eta)
+                    final_etd: str = legs['fromPoint'].get('etd', (datetime.strptime(final_eta,"%Y-%m-%dT%H:%M:%S.000Z") + timedelta(days=-(leg_tt if leg_tt else 0.5))).strftime("%Y-%m-%dT%H:%M:%S.000Z"))
+                leg_transit_time:int = leg_tt if leg_tt else ((datetime.fromisoformat(final_eta[:10]) - datetime.fromisoformat(final_etd[:10])).days)
+                leg_list.append(schema_response.Leg.model_construct(
+                    pointFrom={'locationName': legs['fromPoint']['location']['name'],'locationCode': leg_pol,
+                               'terminalName': legs['fromPoint']['location']['facility']['name'] if (check_origin_terminal:=legs['fromPoint']['location'].get('facility')) else None,
+                               'terminalCode':legs['fromPoint']['location']['facility']['code'] if check_origin_terminal else None},
+                    pointTo={'locationName': legs['toPoint']['location']['name'],'locationCode': leg_pod,
+                             'terminalName': legs['toPoint']['location']['facility']['name'] if (check_des_terminal:=legs['toPoint']['location'].get('facility')) else None,
+                             'terminalCode':legs['toPoint']['location']['facility']['code'] if check_des_terminal else None},
+                    etd=final_etd,
+                    eta=final_eta,
+                    transitTime=legs.get('transitTime',leg_transit_time),
+                    transportations={'transportType': leg_transport.title(),'transportName': legs['vessel']['name'] if imo_code and  vessel_name != '---' else None,
+                                     'referenceType': 'IMO' if imo_code and imo_code not in (9999999,'9999999','None') else None,'reference': None if imo_code and imo_code in (9999999,'9999999','None') else imo_code},
+                    services={'serviceCode': legs['service']['code'],'serviceName':legs['service']['name']} if check_service else None,
+                    voyages={'internalVoyage': internal_voyage if (internal_voyage:=legs.get('internalVoyageNumber')) else None,'externalVoyage':legs.get('externalVoyageNumber')},
+                    cutoffs={'cyCutoffDate':cy_cutoff} if (cy_cutoff:=legs['fromPoint'].get('defaultCutoff')) else None))
+            else:pass
         schedule_body: dict = schema_response.Schedule.model_construct(scac=task.get('carrierScac'),pointFrom=task['por']['location']['unlocode'],
                                                                        pointTo=task['fnd']['location']['unlocode'],
                                                                        etd=first_etd, eta=last_eta,transitTime=task.get('transitTime'),
