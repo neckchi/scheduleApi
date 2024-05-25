@@ -17,11 +17,10 @@ def process_response_data(task: dict, direct_only:bool |None,vessel_imo: str, se
     if (transshipment_port or not tsp) and (direct_only is None or direct_only != check_transshipment) and (check_service_code or not service) and check_vessel_imo:
         transit_time: int = task['transitTime']
         first_point_from: str = task['departurePort']
-        check_nearest_pol:int = next(leg['legOrder'] for leg in task['routeLegs'][::-1] if leg['departurePort'] == first_point_from)
+        check_nearest_pol_etd:tuple = next((leg['legOrder'],leg['departureDate']) for leg in task['routeLegs'][::-1] if leg['departurePort'] == first_point_from)
         last_point_to: str = task['arrivalPort']
-        first_etd: str = task['departureDate']
         last_eta: str = task['arrivalDate']
-        schedule_body: dict = schema_response.Schedule.model_construct(scac=carrier_code,pointFrom=first_point_from,pointTo=last_point_to, etd=first_etd,
+        schedule_body: dict = schema_response.Schedule.model_construct(scac=carrier_code,pointFrom=first_point_from,pointTo=last_point_to, etd=check_nearest_pol_etd[1],
            eta=last_eta,
            transitTime=transit_time,
            transshipment=check_transshipment,
@@ -39,10 +38,8 @@ def process_response_data(task: dict, direct_only:bool |None,vessel_imo: str, se
                                                      services={'serviceCode': leg['line']} if (voyage_num := leg.get('voyage')) else None,
                                                      cutoffs={'cyCutoffDate': cyoff,'docCutoffDate': leg.get('docClosingDate'),
                                                               'vgmCutoffDate': leg.get('vgmClosingDate')} if (cyoff := leg.get('containerClosingDate')) or leg.get('docClosingDate') or leg.get('vgmClosingDate') else None,
-                                                     voyages={'internalVoyage': voyage_num + leg['leg'] if voyage_num else None,'externalVoyage': leg.get('consortSailingNumber')}) for leg in task['routeLegs'] if leg['legOrder'] >= check_nearest_pol]).model_dump(warnings=False)
+                                                     voyages={'internalVoyage': voyage_num + leg['leg'] if voyage_num else None,'externalVoyage': leg.get('consortSailingNumber')}) for leg in task['routeLegs'] if leg['legOrder'] >= check_nearest_pol_etd[0]]).model_dump(warnings=False)
         yield schedule_body
-
-
 
 async def get_zim_access_token(client:HTTPXClientWrapper,background_task:BackgroundTasks, url: str, api_key: str, client_id: str, secret: str) -> AsyncIterator[str]:
     zim_token_key:UUID = uuid5(NAMESPACE_DNS, 'zim-token-uuid-kuehne-nagel2')
@@ -52,6 +49,7 @@ async def get_zim_access_token(client:HTTPXClientWrapper,background_task:Backgro
         params: dict = {'grant_type': 'client_credentials', 'client_id': client_id,'client_secret': secret, 'scope': 'Vessel Schedule'}
         response_token:dict = await anext(client.parse(background_tasks=background_task,method='POST',url=url, headers=headers, data=params,token_key=zim_token_key,expire=datetime.timedelta(minutes=55)))
     yield response_token['access_token']
+
 
 async def get_zim_p2p(client:HTTPXClientWrapper, background_task:BackgroundTasks,url: str, turl: str, pw: str, zim_client: str, zim_secret: str, pol: str, pod: str,
                       search_range: int,start_date_type: str,start_date: datetime.datetime.date, direct_only: bool |None,vessel_imo:str|None = None, service: str | None = None, tsp: str | None = None):
@@ -64,7 +62,7 @@ async def get_zim_p2p(client:HTTPXClientWrapper, background_task:BackgroundTasks
         return p2p_schedule
     token:str = await anext(get_zim_access_token(client=client,background_task=background_task, url=turl, api_key=pw, client_id=zim_client, secret=zim_secret))
     headers: dict = {'Ocp-Apim-Subscription-Key': pw, 'Authorization': f'Bearer {token}','Accept': 'application/json'}
-    response_json:dict = await anext(client.parse(background_tasks=background_task,token_key=zim_response_uuid,method='GET', url=url, params=params,headers=headers))
+    response_json:dict = await anext(client.parse(method='GET', url=url, params=params,headers=headers))
     if response_json:
         p2p_schedule: Generator =  generate_schedule(data=response_json)
         background_task.add_task(db.set, key=zim_response_uuid,value=response_json)
