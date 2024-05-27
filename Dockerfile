@@ -1,4 +1,4 @@
-FROM harbor.emea.ocp.int.kn/dockerhub/library/python:3.11.1
+FROM harbor.emea.ocp.int.kn/dockerhub/library/python:3.12.3
 ##########
 ARG HTTP_PROXY
 ARG HTTPS_PROXY
