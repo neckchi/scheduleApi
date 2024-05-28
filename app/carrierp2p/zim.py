@@ -5,9 +5,22 @@ from app.schemas import schema_response
 from uuid import uuid5,NAMESPACE_DNS,UUID
 from fastapi import BackgroundTasks
 from typing import Generator,Iterator,AsyncIterator
+from functools import lru_cache
 
-transport_type: dict = {'Land Trans': 'Truck', 'Feeder': 'Feeder', 'TO BE NAMED': 'Vessel'}
-carrier_code: str = 'ZIMU'
+
+TRANSPORT_TYPE: dict = {'Land Trans': 'Truck', 'Feeder': 'Feeder', 'TO BE NAMED': 'Vessel'}
+CARRIER_CODE: str = 'ZIMU'
+
+@lru_cache(maxsize=None)
+def map_imo(leg_imo:str|None, vessel_name:str|None,line:str|None, transport:str) ->str:
+    if leg_imo and vessel_name != 'TO BE NAMED' and transport != 'Truck':
+        return leg_imo
+    elif (line == 'UNK' and leg_imo is None and transport != 'Truck') or transport == 'Feeder':
+        return '9'
+    elif transport == 'Truck':
+        return '3'
+    else:
+        return '1'
 def process_response_data(task: dict, direct_only:bool |None,vessel_imo: str, service: str, tsp: str) -> Iterator:
     # Additional check on service code/name in order to fullfill business requirment(query the result by service code)
     check_service_code: bool = any(service == services['line'] for services in task['routeLegs'] if services.get('voyage')) if service else True
@@ -20,7 +33,7 @@ def process_response_data(task: dict, direct_only:bool |None,vessel_imo: str, se
         check_nearest_pol_etd:tuple = next((leg['legOrder'],leg['departureDate']) for leg in task['routeLegs'][::-1] if leg['departurePort'] == first_point_from)
         last_point_to: str = task['arrivalPort']
         last_eta: str = task['arrivalDate']
-        schedule_body: dict = schema_response.Schedule.model_construct(scac=carrier_code,pointFrom=first_point_from,pointTo=last_point_to, etd=check_nearest_pol_etd[1],
+        schedule_body: dict = schema_response.Schedule.model_construct(scac=CARRIER_CODE,pointFrom=first_point_from,pointTo=last_point_to, etd=check_nearest_pol_etd[1],
            eta=last_eta,
            transitTime=transit_time,
            transshipment=check_transshipment,
@@ -31,15 +44,16 @@ def process_response_data(task: dict, direct_only:bool |None,vessel_imo: str, se
                                                      etd=(etd := leg['departureDate']),
                                                      eta=(eta := leg['arrivalDate']),
                                                      transitTime=int((datetime.datetime.fromisoformat(eta) - datetime.datetime.fromisoformat(etd)).days),
-                                                     transportations={'transportType': transport_type.get(leg['vesselName'],'Vessel'),
-                                                                      'transportName': None if (vessel_name :=leg['vesselName']) == 'TO BE NAMED' else vessel_name,
-                                                                      'referenceType': 'IMO' if (vessel_code := leg.get('lloydsCode')) and vessel_name != 'TO BE NAMED' else None,
-                                                                      'reference': vessel_code if vessel_name != 'TO BE NAMED' else None},
+                                                     transportations={'transportType': (transport:=TRANSPORT_TYPE.get(leg['vesselName'],'Vessel')),
+                                                                      'transportName': (vessel_name :=leg['vesselName']),
+                                                                      'referenceType': 'IMO',
+                                                                      'reference':  map_imo(leg_imo = leg.get('lloydsCode'),vessel_name = vessel_name,line=leg.get('line'),transport=transport )},
                                                      services={'serviceCode': leg['line']} if (voyage_num := leg.get('voyage')) else None,
                                                      cutoffs={'cyCutoffDate': cyoff,'docCutoffDate': leg.get('docClosingDate'),
                                                               'vgmCutoffDate': leg.get('vgmClosingDate')} if (cyoff := leg.get('containerClosingDate')) or leg.get('docClosingDate') or leg.get('vgmClosingDate') else None,
                                                      voyages={'internalVoyage': voyage_num + leg['leg'] if voyage_num else None,'externalVoyage': leg.get('consortSailingNumber')}) for leg in task['routeLegs'] if leg['legOrder'] >= check_nearest_pol_etd[0]]).model_dump(warnings=False)
         yield schedule_body
+
 
 async def get_zim_access_token(client:HTTPXClientWrapper,background_task:BackgroundTasks, url: str, api_key: str, client_id: str, secret: str) -> AsyncIterator[str]:
     zim_token_key:UUID = uuid5(NAMESPACE_DNS, 'zim-token-uuid-kuehne-nagel2')
