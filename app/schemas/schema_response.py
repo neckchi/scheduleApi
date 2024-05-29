@@ -87,8 +87,11 @@ class Leg(BaseModel):
             logging.error('ETA must be equal  or greater than ETD.vice versa')
             raise ValueError(f'ETA must be equal  or greater than ETD.vice versa')
         return self
-
-
+    @model_validator(mode='after')
+    def check_cy_cut_off(self) -> 'Leg':
+        if self.cutoffs and self.cutoffs.cyCutoffDate and self.etd < self.cutoffs.cyCutoffDate:
+            self.cutoffs = None
+        return self
 
 class Schedule(BaseModel):
     model_config = ConfigDict(json_encoders={datetime: convert_datetime_to_iso_8601})
