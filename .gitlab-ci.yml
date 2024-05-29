@@ -74,7 +74,7 @@ YamlLint:
 Testing:
   stage: Test
   image:
-    name: python:3.8-slim 
+    name: python:3.8-slim
   before_script:
     - pip install pytest pytest-cov coverage
     - pip install --no-cache-dir -r requirements.txt
@@ -230,10 +230,10 @@ ApplyUat:
 GetRelease:
   stage: GetRelease
   image: alpine
-  #rules:
-  #  - if: $CI_COMMIT_TAG
-  #    when: never
-  #  - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   before_script:
     *before_script_plublish
   tags:
@@ -253,10 +253,10 @@ PublishRelease:
   image:
     name: gcr.io/kaniko-project/executor:v1.14.0-debug
     entrypoint: [""]
-  #rules:
-  #  - if: $CI_COMMIT_TAG
-  #    when: never
-  #  - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   tags:
     - dev
   script:
@@ -278,9 +278,9 @@ PlanPRD:
   image:
     *terraform_image
   rules:
-  #  - if: $CI_COMMIT_TAG
-  #    when: never
-  #  - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   tags:
     - production
   before_script:
@@ -293,10 +293,10 @@ ApplyPRD:
   stage: ApplyPRD
   image:
     *terraform_image
-  #rules:
-  #  - if: $CI_COMMIT_TAG
-  #    when: never
-  #  - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   tags:
     - production
   when: manual
