@@ -6,7 +6,7 @@ from app.background_tasks import db
 from typing import Generator,Iterator
 from fastapi import BackgroundTasks
 
-carrier_code: str = 'HDMU'
+CARRIER_CODE: str = 'HDMU'
 def process_response_data(task: dict, vessel_imo: str, service: str, tsp: str) -> Iterator:
     check_service_code: bool = any(services['vesselLoop'] == service for services in task['vessel'] if services.get('vesselDepartureDate')) if service else True
     check_vessel_imo: bool = any(imo for imo in task['vessel'] if imo.get('lloydRegisterNo') == vessel_imo) if vessel_imo else True
@@ -78,7 +78,7 @@ def process_response_data(task: dict, vessel_imo: str, service: str, tsp: str) -
             transitTime=int((datetime.datetime.fromisoformat(inbound_eta) - datetime.datetime.fromisoformat(inbound_etd)).days),
             transportations={'transportType': task['inboundInland']['transMode']},
             voyages={'internalVoyage': 'NA'})] if task.get('inboundInland') else []
-        schedule_body: dict = schema_response.Schedule.model_construct(scac=carrier_code,
+        schedule_body: dict = schema_response.Schedule.model_construct(scac=CARRIER_CODE,
                                                                        pointFrom=first_point_from,
                                                                        pointTo=last_point_to, etd=first_etd,
                                                                        eta=last_eta,

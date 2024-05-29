@@ -50,7 +50,7 @@ def process_response_data(task: dict, direct_only:bool |None,vessel_imo: str, se
                                      'referenceType': 'IMO' if imo_code and imo_code not in (9999999,'9999999','None') else None,'reference': None if imo_code and imo_code in (9999999,'9999999','None') else imo_code},
                     services={'serviceCode': legs['service']['code'],'serviceName':legs['service']['name']} if check_service else None,
                     voyages={'internalVoyage': internal_voyage if (internal_voyage:=legs.get('internalVoyageNumber')) else None,'externalVoyage':legs.get('externalVoyageNumber')},
-                    cutoffs={'cyCutoffDate':cy_cutoff} if (cy_cutoff:=legs['fromPoint'].get('defaultCutoff')) else None))
+                    cutoffs={'cyCutoffDate':cy_cutoff} if (cy_cutoff:=legs['fromPoint'].get('defaultCutoff')) and cy_cutoff <= final_etd else None))
             else:pass
         schedule_body: dict = schema_response.Schedule.model_construct(scac=task.get('carrierScac'),pointFrom=task['por']['location']['unlocode'],
                                                                        pointTo=task['fnd']['location']['unlocode'],

@@ -35,7 +35,7 @@ class AsyncTaskManager:
         while retries < self.max_retries:
             try:
                 return await asyncio.wait_for(coro(), timeout=self.default_timeout)
-            except (asyncio.TimeoutError,httpx.ReadTimeout,httpx.ReadError,httpx.ConnectTimeout):
+            except (asyncio.TimeoutError,asyncio.CancelledError,httpx.ReadTimeout,httpx.ReadError,httpx.ConnectTimeout,):
                 """Due to timeout, the coroutine task is cancelled. Once its cancelled, we retry it 3 times"""
                 logging.error(f"{task_name} timed out after {self.default_timeout} seconds. Retrying {retries + 1}/{self.max_retries}...")
                 retries += 1
@@ -130,9 +130,7 @@ class HTTPXClientWrapper(httpx.AsyncClient):
             destination=point_to, noofSchedule=count_schedules,
             schedules=sorted_schedules).model_dump(mode='json',exclude_none=True)
             if not task_exception:
-                if load_yaml()['data']['backgroundTasks']['cacheDB'] == 'Redis':
-                    background_tasks.add_task(db.set,key=product_id,value=final_result)
-                else: background_tasks.add_task(db.set, value=final_result)
+                background_tasks.add_task(db.set,key=product_id,value=final_result)
         return final_result
 
 
