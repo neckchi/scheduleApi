@@ -217,10 +217,6 @@ locals {
       environment = [for k, v in var.static_variables : { name : k, value : v }],
       secrets : [
         {
-          "name" : "MONGO_URL",
-          "valueFrom" : "${aws_secretsmanager_secret.this.arn}:MONGO_URL::"
-        },
-        {
           "name" : "CMA_URL",
           "valueFrom" : "${aws_secretsmanager_secret.this.arn}:CMA_URL::"
         },
