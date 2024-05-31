@@ -10,6 +10,20 @@ from itertools import chain
 from typing import Generator,Iterator
 
 
+def calculate_final_times(index:int, leg_etd:str, leg_tt:int, leg_transport:str, leg_from:dict,legs_to:dict, last_eta:str):
+    def format_datetime(dt):
+        return dt.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    default_offset = timedelta(days=leg_tt if leg_tt else 0.5)
+    if index == 1:
+        if leg_transport == 'TRUCK':
+            final_etd = format_datetime(datetime.strptime(leg_etd, "%Y-%m-%dT%H:%M:%S.000Z") - default_offset)
+        else:
+            final_etd = leg_etd
+        final_eta = legs_to.get('eta', format_datetime(datetime.strptime(final_etd, "%Y-%m-%dT%H:%M:%S.000Z") + default_offset))
+    else:
+        final_eta = legs_to.get('eta', last_eta)
+        final_etd = leg_from.get('etd', format_datetime(datetime.strptime(final_eta, "%Y-%m-%dT%H:%M:%S.000Z") - default_offset))
+    return final_etd, final_eta
 def process_response_data(task: dict, direct_only:bool |None,vessel_imo: str, service: str, tsp: str) -> Iterator:
     check_service_code:bool = any(service == service_leg['code'] for leg_service in task['leg'] if (service_leg:=leg_service.get('service'))) if service else True
     check_transshipment: bool = not task['direct']
@@ -29,12 +43,7 @@ def process_response_data(task: dict, direct_only:bool |None,vessel_imo: str, se
             leg_tt:int = legs.get('transitTime')
             leg_etd:str = legs['fromPoint'].get('etd', first_etd)
             if leg_pol != leg_pod:
-                if index == 1:
-                    final_etd: str = (datetime.strptime(leg_etd,"%Y-%m-%dT%H:%M:%S.000Z") - timedelta(days=leg_tt if leg_tt else 0.5)).strftime("%Y-%m-%dT%H:%M:%S.000Z") if leg_transport == 'TRUCK' else leg_etd
-                    final_eta: str = legs['toPoint'].get('eta',(datetime.strptime(final_etd, "%Y-%m-%dT%H:%M:%S.000Z") + timedelta(days=leg_tt if leg_tt else 0.5)).strftime("%Y-%m-%dT%H:%M:%S.000Z"))
-                else:
-                    final_eta: str = legs['toPoint'].get('eta', last_eta)
-                    final_etd: str = legs['fromPoint'].get('etd', (datetime.strptime(final_eta,"%Y-%m-%dT%H:%M:%S.000Z") + timedelta(days=-(leg_tt if leg_tt else 0.5))).strftime("%Y-%m-%dT%H:%M:%S.000Z"))
+                final_etd, final_eta = calculate_final_times(index=index, leg_etd=leg_etd, leg_tt=leg_tt, leg_transport=leg_transport,leg_from=legs['fromPoint'], legs_to=legs['toPoint'], last_eta=last_eta)
                 leg_transit_time:int = leg_tt if leg_tt else ((datetime.fromisoformat(final_eta[:10]) - datetime.fromisoformat(final_etd[:10])).days)
                 leg_list.append(schema_response.Leg.model_construct(
                     pointFrom={'locationName': legs['fromPoint']['location']['name'],'locationCode': leg_pol,

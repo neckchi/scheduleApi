@@ -119,7 +119,7 @@ class HTTPXClientWrapper(httpx.AsyncClient):
 
     def gen_all_valid_schedules(self,matrix:Generator,product_id:UUID,point_from:str,point_to:str,background_tasks:BackgroundTasks,task_exception:bool):
         flat_list:Generator = (item for row in matrix if not isinstance(row, Exception) and row is not None for item in row)
-        sorted_schedules:list = sorted(flat_list, key=lambda tt: (tt['etd'][:10], tt['transitTime']))
+        sorted_schedules:list = sorted(flat_list, key=lambda tt: (tt['etd'], tt['transitTime']))
         count_schedules:int = len(sorted_schedules)
         if count_schedules == 0:
             final_result = JSONResponse(status_code=status.HTTP_404_NOT_FOUND,content=jsonable_encoder(schema_response.Error(id=product_id,detail=f"{point_from}-{point_to} schedule not found")))

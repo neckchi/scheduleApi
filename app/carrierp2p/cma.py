@@ -6,15 +6,14 @@ from datetime import datetime
 from typing import Generator,Iterator,AsyncIterator
 
 
-carrier_code: dict = {'0001': 'CMDU', '0002': 'ANNU', '0011': 'CHNL', '0015': 'APLU'}
-
+CARRIER_CODE: dict = {'0001': 'CMDU', '0002': 'ANNU', '0011': 'CHNL', '0015': 'APLU'}
+DEFAULT_ETD_ETA = datetime.now().astimezone().replace(microsecond=0).isoformat()
 def process_response_data(task: dict) -> Iterator:
-    default_etd_eta = datetime.now().astimezone().replace(microsecond=0).isoformat()
     transit_time:int = task['transitTime']
     first_point_from:str = task['routingDetails'][0]['pointFrom']['location']['internalCode']
     last_point_to:str = task['routingDetails'][-1]['pointTo']['location']['internalCode']
-    first_etd = next((ed['pointFrom']['departureDateLocal'] for ed in task['routingDetails'] if ed['pointFrom'].get('departureDateLocal')), default_etd_eta)
-    last_eta = next((ea['pointTo']['arrivalDateLocal'] for ea in task['routingDetails'][::-1] if ea['pointTo'].get('arrivalDateLocal')), default_etd_eta)
+    first_etd = next((ed['pointFrom']['departureDateLocal'] for ed in task['routingDetails'] if ed['pointFrom'].get('departureDateLocal')), DEFAULT_ETD_ETA)
+    last_eta = next((ea['pointTo']['arrivalDateLocal'] for ea in task['routingDetails'][::-1] if ea['pointTo'].get('arrivalDateLocal')), DEFAULT_ETD_ETA)
     check_transshipment:bool = len(task['routingDetails']) > 1
     leg_list: list = [schema_response.Leg.model_construct(
         pointFrom={'locationName': leg['pointFrom']['location']['name'],
@@ -25,8 +24,8 @@ def process_response_data(task: dict) -> Iterator:
                  'locationCode': leg['pointTo']['location']['internalCode'],
                  'terminalName': deepget(leg['pointTo']['location'], 'facility', 'name'),
                  'terminalCode':check_pod_terminal[0].get('codification') if (check_pod_terminal := deepget(leg['pointTo']['location'], 'facility','facilityCodifications')) else None},
-        etd=leg['pointFrom'].get('departureDateLocal', default_etd_eta),
-        eta=leg['pointTo'].get('arrivalDateLocal', default_etd_eta),
+        etd=leg['pointFrom'].get('departureDateLocal', DEFAULT_ETD_ETA),
+        eta=leg['pointTo'].get('arrivalDateLocal', DEFAULT_ETD_ETA),
         transitTime=leg.get('legTransitTime', 0),
         transportations={'transportType': str(leg['transportation']['meanOfTransport']).title(),
                          'transportName': deepget(leg['transportation'], 'vehicule', 'vehiculeName'),
@@ -37,10 +36,11 @@ def process_response_data(task: dict) -> Iterator:
         cutoffs={'docCutoffDate':deepget(leg['pointFrom']['cutOff'], 'shippingInstructionAcceptance','local'),
                  'cyCutoffDate':deepget(leg['pointFrom']['cutOff'], 'portCutoff', 'local'),
                  'vgmCutoffDate':deepget(leg['pointFrom']['cutOff'], 'vgm', 'local')} if leg['pointFrom'].get('cutOff') else None) for leg in task['routingDetails']]
-    schedule_body: dict = schema_response.Schedule.model_construct(scac=carrier_code.get(task['shippingCompany']), pointFrom=first_point_from,
+    schedule_body: dict = schema_response.Schedule.model_construct(scac=CARRIER_CODE.get(task['shippingCompany']), pointFrom=first_point_from,
                                                                    pointTo=last_point_to, etd=first_etd,eta=last_eta,
                                                                    transitTime=transit_time,transshipment=check_transshipment,
                                                                    legs=leg_list).model_dump(warnings=False)
+    print(schedule_body)
     yield schedule_body
 
 async def get_all_schedule(client:HTTPXClientWrapper,cma_list:list,url:str,headers:dict,params:dict,extra_condition:bool) ->AsyncIterator:
@@ -65,8 +65,7 @@ async def get_all_schedule(client:HTTPXClientWrapper,cma_list:list,url:str,heade
 
 async def get_cma_p2p(client:HTTPXClientWrapper,url: str, pw: str, pol: str, pod: str, search_range: int, direct_only: bool | None,tsp: str | None = None,vessel_imo:str | None = None,
                           departure_date: datetime.date = None,arrival_date: datetime.date = None, scac: str | None = None, service: str | None = None) -> Generator:
-
-    api_carrier_code: str = next(k for k, v in carrier_code.items() if v == scac.upper()) if scac else None
+    api_carrier_code: str = next(k for k, v in CARRIER_CODE.items() if v == scac.upper()) if scac else None
     headers: dict = {'keyID': pw}
     params: dict = {'placeOfLoading': pol, 'placeOfDischarge': pod,'departureDate': departure_date,'arrivalDate': arrival_date, 'searchRange': search_range,
                     'maxTs': 3 if direct_only in (False,None) else 0,'polVesselIMO':vessel_imo,'polServiceCode': service, 'tsPortCode': tsp}
