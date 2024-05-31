@@ -6,7 +6,6 @@ resource "aws_secretsmanager_secret" "this" {
 resource "aws_secretsmanager_secret_version" "this" {
   secret_id = aws_secretsmanager_secret.this.id
   secret_string = jsonencode({
-    MONGO_URL          = data.sops_file.sops-secret.data["MONGO_URL"]
     CMA_URL            = data.sops_file.sops-secret.data["CMA_URL"]
     CMA_TOKEN          = data.sops_file.sops-secret.data["CMA_TOKEN"]
     SUDU_URL           = data.sops_file.sops-secret.data["SUDU_URL"]
