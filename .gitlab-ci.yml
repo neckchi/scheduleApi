@@ -132,10 +132,18 @@ PublishRC:
       --build-arg NO_PROXY=$NO_PROXY
       --dockerfile Dockerfile
       --destination $REPO_URL/$PROJECT_NAME:$ReleaseRC
+    - echo "ReleaseRC=$ReleaseRC" >> release.env
+  artifacts:
+    reports:
+      dotenv: release.env
 
 ## Terraform
 Validate:
   stage: Checks
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   image:
     *terraform_image
   tags:
@@ -151,15 +159,18 @@ PlanDev:
   stage: PlanDev
   image:
     *terraform_image
-  needs:
-    - Validate
   tags:
     - dev
   before_script:
     *before_script_terraform
   script:
+    - echo $ReleaseRC
     - terraform -chdir=cicd init -backend-config=environments/dev/backend.conf
     - terraform -chdir=cicd plan -var-file=environments/dev/dev.tfvars -var="image_tag=$ReleaseRC"
+    - echo "ReleaseRC=$ReleaseRC" >> release.env
+  artifacts:
+    reports:
+      dotenv: release.env
 
 ApplyDev:
   stage: ApplyDev
@@ -176,8 +187,13 @@ ApplyDev:
   before_script:
     *before_script_terraform
   script:
+    - echo $ReleaseRC
     - terraform -chdir=cicd init -backend-config=environments/dev/backend.conf
     - terraform -chdir=cicd apply -var-file=environments/dev/dev.tfvars -var="image_tag=$ReleaseRC" -auto-approve
+    - echo "ReleaseRC=$ReleaseRC" >> release.env
+  artifacts:
+    reports:
+      dotenv: release.env
   allow_failure: false
 
 ## UAT
@@ -198,6 +214,10 @@ PlanUat:
   script:
     - terraform -chdir=cicd init -backend-config=environments/uat/backend.conf
     - terraform -chdir=cicd plan -var-file=environments/uat/uat.tfvars -var="image_tag=$ReleaseRC"
+    - echo "ReleaseRC=$ReleaseRC" >> release.env
+  artifacts:
+    reports:
+      dotenv: release.env
 
 ApplyUat:
   stage: ApplyUat
@@ -215,6 +235,7 @@ ApplyUat:
   before_script:
     *before_script_terraform
   script:
+    - echo $ReleaseRC
     - terraform -chdir=cicd init -backend-config=environments/uat/backend.conf
     - terraform -chdir=cicd apply -var-file=environments/uat/uat.tfvars -var="image_tag=$ReleaseRC" -auto-approve
   allow_failure: true
@@ -283,6 +304,10 @@ PublishRelease:
       --build-arg NO_PROXY=$NO_PROXY
       --dockerfile Dockerfile
       --destination $REPO_URL/$PROJECT_NAME:$Release
+    - echo "Release=$Release" >> release.env
+  artifacts:
+    reports:
+      dotenv: release.env
 
 ## PRD
 PlanPRD:
@@ -302,6 +327,10 @@ PlanPRD:
   script:
     - terraform -chdir=cicd init -backend-config=environments/prod/backend.conf
     - terraform -chdir=cicd plan -var-file=environments/prod/prod.tfvars -var="image_tag=$Release"
+    - echo "Release=$Release" >> release.env
+  artifacts:
+    reports:
+      dotenv: release.env
 
 ApplyPRD:
   stage: ApplyPRD
@@ -319,5 +348,6 @@ ApplyPRD:
   before_script:
     *before_script_terraform
   script:
+    - echo $Release
     - terraform -chdir=cicd init -backend-config=environments/prod/backend.conf
     - terraform -chdir=cicd apply -var-file=environments/prod/prod.tfvars -var="image_tag=$Release" --auto-approve
