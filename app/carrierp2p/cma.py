@@ -40,7 +40,6 @@ def process_response_data(task: dict) -> Iterator:
                                                                    pointTo=last_point_to, etd=first_etd,eta=last_eta,
                                                                    transitTime=transit_time,transshipment=check_transshipment,
                                                                    legs=leg_list).model_dump(warnings=False)
-    print(schedule_body)
     yield schedule_body
 
 async def get_all_schedule(client:HTTPXClientWrapper,cma_list:list,url:str,headers:dict,params:dict,extra_condition:bool) ->AsyncIterator:
