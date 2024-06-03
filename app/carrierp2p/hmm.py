@@ -10,9 +10,9 @@ CARRIER_CODE: str = 'HDMU'
 def process_response_data(task: dict, vessel_imo: str, service: str, tsp: str) -> Iterator:
     check_service_code: bool = any(services['vesselLoop'] == service for services in task['vessel'] if services.get('vesselDepartureDate')) if service else True
     check_vessel_imo: bool = any(imo for imo in task['vessel'] if imo.get('lloydRegisterNo') == vessel_imo) if vessel_imo else True
-    check_transshipment: bool = bool(task.get('transshipPortCode'))
-    first_pot_code: str = task.get('transshipPortCode')
-    if ((check_transshipment and tsp and first_pot_code) or not tsp) and check_service_code and check_vessel_imo:
+    check_transshipment: str|None = task.get('transshipPortCode')
+    transshipment_port_filter: bool = bool(check_transshipment == tsp) if check_transshipment and tsp else False
+    if (transshipment_port_filter or not tsp) and check_service_code and check_vessel_imo:
         transit_time: int = task.get('totalTransitDay')
         first_pol: str = task.get('loadingPortCode')
         first_point_from: str = task['outboundInland']['fromUnLocationCode'] if task.get('outboundInland') else first_pol
@@ -83,7 +83,7 @@ def process_response_data(task: dict, vessel_imo: str, service: str, tsp: str) -
                                                                        pointTo=last_point_to, etd=first_etd,
                                                                        eta=last_eta,
                                                                        transitTime=transit_time,
-                                                                       transshipment=check_transshipment,
+                                                                       transshipment=bool(check_transshipment),
                                                                        legs=leg_list).model_dump(warnings=False)
         yield schedule_body
 
