@@ -22,6 +22,7 @@ resource "aws_secretsmanager_secret_version" "this" {
     ONEY_URL           = data.sops_file.sops-secret.data["ONEY_URL"]
     ONEY_TURL          = data.sops_file.sops-secret.data["ONEY_TURL"]
     ONEY_TOKEN         = data.sops_file.sops-secret.data["ONEY_TOKEN"]
+    ONEY_AUTH          = data.sops_file.sops-secret.data["ONEY_AUTH"]
     ZIM_URL            = data.sops_file.sops-secret.data["ZIM_URL"]
     ZIM_TURL           = data.sops_file.sops-secret.data["ZIM_TURL"]
     ZIM_TOKEN          = data.sops_file.sops-secret.data["ZIM_TOKEN"]
