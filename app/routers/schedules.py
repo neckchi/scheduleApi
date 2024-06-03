@@ -5,7 +5,7 @@ from app.carrierp2p import cma, one, hmm, zim, maersk, msc, iqax,hlag
 from app.schemas import schema_response, schema_request
 from app.background_tasks import db
 from app.config import Settings,get_settings,load_yaml
-from app.routers.router_config import HTTPXClientWrapper,AsyncTaskManager
+from app.routers.router_config import HTTPXClientWrapper,AsyncTaskManager,get_httpx_client_wrapper
 from app.routers.security import basic_auth
 
 
@@ -31,7 +31,8 @@ async def get_schedules(background_tasks: BackgroundTasks,
                         settings: Settings = Depends(get_settings),
                         carrier_status = Depends(load_yaml),
                         credentials = Depends(basic_auth),
-                        client:HTTPXClientWrapper = Depends(HTTPXClientWrapper.get_httpx_client_wrapper)):
+                        # client:HTTPXClientWrapper = Depends(HTTPXClientWrapper.get_httpx_client_wrapper)
+                        client:HTTPXClientWrapper = Depends(get_httpx_client_wrapper)):
 
     """
     Search P2P Schedules with all the information:

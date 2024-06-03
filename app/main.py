@@ -4,10 +4,10 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from app.routers import schedules
-from app.background_tasks import db
 from app.config import log_queue_listener
+from app.routers.router_config import startup_event,shutdown_event
 import uvicorn
-import atexit
+
 
 
 queue_lister = log_queue_listener()
@@ -21,18 +21,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(schedules.router)
-
-
-
-# #👇 Initalize the MongoDB/Redis and Logging.Queue before starting the application
-@app.on_event('startup')
-async def startup():
-    queue_lister.start()
-    await db.initialize_database()
-
-@app.on_event("shutdown")
-def shutdown_event():
-    atexit.register(queue_lister.stop)
+app.add_event_handler("startup", startup_event)
+app.add_event_handler("shutdown", shutdown_event)
 
 @app.get("/docs", include_in_schema=False)
 def overridden_swagger():
@@ -69,6 +59,6 @@ app.openapi = custom_openapi
 
 if __name__ == "__main__":
 
-    uvicorn.run("app.main:app",host="0.0.0.0", port=8000, workers = 8)
+    uvicorn.run("app.main:app",host="0.0.0.0", port=8000,timeout_keep_alive=50)
 
     # uvicorn.run("main:app", port=8000, workers=4)
