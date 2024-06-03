@@ -182,6 +182,7 @@ module "ecs_service_task" {
   }
   depends_on = [
     module.ecs_cluster,
-    module.lb_target_group
+    module.lb_target_group,
+    aws_secretsmanager_secret.this
   ]
 }

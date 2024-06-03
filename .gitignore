@@ -26,6 +26,7 @@ verified network
 .log
 app/test_main.py
 app/carrierp2p/hamburgsud.py
+app/background_tasks/mongo_mgr.py
 # vim temporary files
 *~
 .*.sw?

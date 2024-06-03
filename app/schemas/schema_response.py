@@ -7,7 +7,7 @@ from typing_extensions import Literal
 from functools import lru_cache
 
 
-@lru_cache(maxsize=128)
+
 def convert_datetime_to_iso_8601(dt: datetime) -> str:
     return dt.strftime('%Y-%m-%dT%H:%M:%S')
 
@@ -81,14 +81,18 @@ class Leg(BaseModel):
     transportations: Transportation | None
     voyages: Voyage = Field(title="Voyage Number.Keep in mind that voyage number is mandatory")
     services: Service | None = Field(default=None, title="Service Loop")
+
     @model_validator(mode='after')
     def check_leg_details(self) -> 'Leg':
         if self.eta < self.etd  or self.etd > self.eta:
-            logging.error('ETA must be equal  or greater than ETD.vice versa')
-            raise ValueError(f'ETA must be equal  or greater than ETD.vice versa')
+            logging.error(f'The Leg ETA ({self.eta}) must be greater than ETD({self.etd}).vice versa')
+            raise ValueError(f'The Leg ETA ({self.eta}) must be greater than ETD({self.etd}).vice versa')
         return self
-
-
+    @model_validator(mode='after')
+    def check_cy_cut_off(self) -> 'Leg':
+        if self.cutoffs and self.cutoffs.cyCutoffDate and self.etd < self.cutoffs.cyCutoffDate:
+            self.cutoffs = None
+        return self
 
 class Schedule(BaseModel):
     model_config = ConfigDict(json_encoders={datetime: convert_datetime_to_iso_8601})
@@ -106,8 +110,8 @@ class Schedule(BaseModel):
     @model_validator(mode='after')
     def check_etd_eta(self) -> 'Schedule':
         if self.eta < self.etd  or self.etd > self.eta:
-            logging.error('ETA must be equal  or greater than ETD.vice versa')
-            raise ValueError(f'ETA must be equal  or greater than ETD.vice versa')
+            logging.error(f'The Schedule ETA ({self.eta}) must be greater than ETD({self.etd}).vice versa')
+            raise ValueError(f'The Schedule ETA ({self.eta}) must be greater than ETD({self.etd}).vice versa')
         return self
 
 
