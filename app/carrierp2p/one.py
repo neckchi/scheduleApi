@@ -24,7 +24,7 @@ def process_response_data(task: dict,vessel_imo: str, service: str, tsp: str) ->
         first_vessel_name: str = task['vesselName']
         first_imo: str = task['imoNumber']
         first_service_code: str = task['serviceCode']
-        first_service_name: str = task['serviceName']
+        first_service_name: str = task['serviceName'] if task['serviceName'] != '' else None
         first_etd: str = task['originDepartureDateEstimated']
         last_eta: str = task['destinationArrivalDateEstimated']
         first_cy_cutoff: str = task['terminalCutoff'] if task['terminalCutoff'] != '' else None
@@ -41,7 +41,7 @@ def process_response_data(task: dict,vessel_imo: str, service: str, tsp: str) ->
                 transportations={'transportType': 'Vessel', 'transportName': leg['transportName'],
                                  'referenceType': None if (transport_type := leg.get('transportID')) == 'UNKNOWN' else 'IMO',
                                  'reference': None if transport_type == 'UNKNOWN' else transport_type},
-                services={'serviceCode': service_code, 'serviceName': leg['serviceName']} if (service_code :=leg['serviceCode']) or leg['serviceName'] else None,
+                services={'serviceCode': service_code, 'serviceName': leg['serviceName']} if (service_code :=leg['serviceCode']) or (leg['serviceName'] and leg['serviceName'] !='') else None,
                 voyages={'internalVoyage': voyage_num if (voyage_num := leg.get('conveyanceNumber')) else None }) for index, leg in enumerate(task['legs'])]
         else:
             leg_list: list = [schema_response.Leg.model_construct(
