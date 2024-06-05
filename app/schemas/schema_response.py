@@ -4,7 +4,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field, PositiveInt,model_validator,ConfigDict
 from .schema_request import CarrierCode
 from typing_extensions import Literal
-from functools import lru_cache
+
 
 
 

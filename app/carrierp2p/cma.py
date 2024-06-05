@@ -8,7 +8,23 @@ from typing import Generator,Iterator,AsyncIterator
 
 CARRIER_CODE: dict = {'0001': 'CMDU', '0002': 'ANNU', '0011': 'CHNL', '0015': 'APLU'}
 DEFAULT_ETD_ETA = datetime.now().astimezone().replace(microsecond=0).isoformat()
+def extract_transportation(transportation:dict):
+    """Map the transportation Details"""
+    mean_of_transport:str = str(transportation['meanOfTransport']).title()
+    vehicule:dict = transportation.get('vehicule', {})
+    vessel_imo:str = vehicule.get('reference')
+    vehicule_type:str = vehicule.get('vehiculeType')
+    reference_type:str|None = None
+    reference:str|None = None
+    if vessel_imo and len(vessel_imo) < 9:
+        reference_type:str = 'IMO'
+        reference:str = vessel_imo
+    elif vehicule_type == 'Barge':
+        reference_type:str = 'IMO'
+        reference:str = '9'
+    yield {'transportType': mean_of_transport,'transportName': vehicule.get('vehiculeName'),'referenceType': reference_type,'reference': reference}
 def process_response_data(task: dict) -> Iterator:
+    """Map the schedule and leg body"""
     transit_time:int = task['transitTime']
     first_point_from:str = task['routingDetails'][0]['pointFrom']['location']['internalCode']
     last_point_to:str = task['routingDetails'][-1]['pointTo']['location']['internalCode']
@@ -27,10 +43,7 @@ def process_response_data(task: dict) -> Iterator:
         etd=leg['pointFrom'].get('departureDateLocal', DEFAULT_ETD_ETA),
         eta=leg['pointTo'].get('arrivalDateLocal', DEFAULT_ETD_ETA),
         transitTime=leg.get('legTransitTime', 0),
-        transportations={'transportType': str(leg['transportation']['meanOfTransport']).title(),
-                         'transportName': deepget(leg['transportation'], 'vehicule', 'vehiculeName'),
-                         'referenceType': 'IMO' if (vessel_imo := deepget(leg['transportation'], 'vehicule', 'reference')) and (len(vessel_imo) < 8 if vessel_imo else None) else None,
-                         'reference':vessel_imo if (len(vessel_imo) < 8 if vessel_imo else None) else None },
+        transportations=next(extract_transportation(leg['transportation'])),
         services={'serviceCode': service_name} if (service_name := deepget(leg['transportation'], 'voyage', 'service', 'code')) else None,
         voyages={'internalVoyage': voyage_num if (voyage_num := deepget(leg['transportation'], 'voyage', 'voyageReference')) else None},
         cutoffs={'docCutoffDate':deepget(leg['pointFrom']['cutOff'], 'shippingInstructionAcceptance','local'),
@@ -43,6 +56,8 @@ def process_response_data(task: dict) -> Iterator:
     yield schedule_body
 
 async def get_all_schedule(client:HTTPXClientWrapper,cma_list:list,url:str,headers:dict,params:dict,extra_condition:bool) ->AsyncIterator:
+    """each json response from CMA only contains 49 scehdule. if CAM can offer more schedule, the http sts will be 206.we can then adjust the 'range' to get more schedule
+    this function will extend the json response if http sts == 206 else will only return the first json response"""
     updated_params = lambda cma_internal_code: dict(params,**{'shippingCompany': cma_internal_code ,'specificRoutings': 'USGovernment' if cma_internal_code == '0015' and extra_condition else 'Commercial'})
     p2p_resp_tasks: list = [asyncio.create_task(anext(client.parse(method='GET', url=url,params= updated_params(cma_internal_code=cma_code),headers=headers))) for cma_code in cma_list]
     all_schedule:list = []
