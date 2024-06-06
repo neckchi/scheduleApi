@@ -32,6 +32,20 @@ async def shutdown_event():
     logging.info("HTTPX Client closed")
 
 
+"""Given that each of the 7000 employees performs 7000 searches per hour, this amounts to 7000×7000=49,000,000
+7000×7000=49,000,000 searches per hour. To break it down per second:49,000,000searches / 3600 seconds ≈ 13,611 searches per second
+
+However, this doesn't mean we need 13,611 connections simultaneously because these searches will be distributed over time and can reuse TCP connections and keep-alive.
+
+If we estimate that each search takes around 1 second, and considering we need to handle 13,611 searches per second, you'd start with a similar number for max connections. 
+However, given that not all searches will happen exactly at the same time and some connections can be reused, we can reduce this number.
+
+A good starting point is to use around 10-20% of the peak searches per second as concurrent connections.
+Therefor,  10% of 13,611 is approximately 1361 connections.
+We can adjust this number based on the actual performance and server capacity.
+Since KN employees are performing searches frequently (every hour), setting a higher keep-alive expiry can help reuse connections effectively."""
+
+
 SSL_CONTEXT = httpx.create_ssl_context()
 # KN_PROXY:httpx.Proxy = httpx.Proxy("http://zscaler.proxy.int.kn:80")
 KN_PROXY:httpx.Proxy = httpx.Proxy("http://proxy.eu-central-1.aws.int.kn:80")
@@ -65,8 +79,9 @@ class HTTPXClientWrapper(httpx.AsyncClient):
     #         logging.info(f'Client Session Closed - {standalone_client.session_id}')
 
 
-    async def parse(self,url: str, method: str = Literal['GET', 'POST'],params: dict = None, headers: dict = None, json: dict = None, token_key=None,
-                          data: dict = None, background_tasks: BackgroundTasks = None, expire=timedelta(hours = load_yaml()['data']['backgroundTasks']['scheduleExpiry']),stream: bool = False):
+    async def parse(self,url: str, method: str = Literal['GET', 'POST'],params: dict = None, headers: dict = None, json: dict = None, token_key=None,data: dict = None,
+                    background_tasks: BackgroundTasks = None, expire=timedelta(hours = load_yaml()['data']['backgroundTasks']['scheduleExpiry']),stream: bool = False):
+        """Fetch the file from carrier API and deserialize the json file """
         if not stream:
             response = await self.request(method=method, url=url, params=params, headers=headers, json=json,data=data)
             if response.status_code == 206: #only CMA returns 206 if the number of schedule is more than 49. That means we shouldnt deserialize the json response at the beginning coz there are more responses need to be fetched based on the header range.
@@ -97,11 +112,12 @@ class HTTPXClientWrapper(httpx.AsyncClient):
 
 
     def gen_all_valid_schedules(self,matrix:Generator,product_id:UUID,point_from:str,point_to:str,background_tasks:BackgroundTasks,task_exception:bool):
+        """Validate the schedule and serialize hte json file excluding the field without any value """
         flat_list:Generator = (item for row in matrix if not isinstance(row, Exception) and row is not None for item in row)
         sorted_schedules:list = sorted(flat_list, key=lambda tt: (tt['etd'], tt['transitTime']))
         count_schedules:int = len(sorted_schedules)
         if count_schedules == 0:
-            final_result = JSONResponse(status_code=status.HTTP_404_NOT_FOUND,content=jsonable_encoder(schema_response.Error(id=product_id,detail=f"{point_from}-{point_to} schedule not found")))
+            final_result = JSONResponse(status_code=status.HTTP_200_OK,content=jsonable_encoder(schema_response.Error(id=product_id,detail=f"{point_from}-{point_to} schedule not found")))
         else:
             final_result = schema_response.Product(
             productid=product_id,
@@ -114,6 +130,7 @@ class HTTPXClientWrapper(httpx.AsyncClient):
 
 #Global Client Setup
 async def get_httpx_client_wrapper() -> Generator[HTTPXClientWrapper, None, None]:
+    """Global ClientConnection Pool  Setup"""
     try:
         yield httpx_client
     except (ConnectionError, httpx.ConnectTimeout, httpx.ConnectError) as connect_error:
