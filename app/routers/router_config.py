@@ -1,7 +1,7 @@
 from app.background_tasks import db
 from app.schemas import schema_response
 from app.config import load_yaml,log_queue_listener
-from fastapi import status,HTTPException,BackgroundTasks
+from fastapi import status,HTTPException,BackgroundTasks,Response
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError,ResponseValidationError
@@ -111,19 +111,23 @@ class HTTPXClientWrapper(httpx.AsyncClient):
             else:yield None
 
 
-    def gen_all_valid_schedules(self,matrix:Generator,product_id:UUID,point_from:str,point_to:str,background_tasks:BackgroundTasks,task_exception:bool):
+    def gen_all_valid_schedules(self,response:Response,matrix:Generator,product_id:UUID,point_from:str,point_to:str,background_tasks:BackgroundTasks,task_exception:bool):
         """Validate the schedule and serialize hte json file excluding the field without any value """
         flat_list:Generator = (item for row in matrix if not isinstance(row, Exception) and row is not None for item in row)
         sorted_schedules:list = sorted(flat_list, key=lambda tt: (tt['etd'], tt['transitTime']))
         count_schedules:int = len(sorted_schedules)
         if count_schedules == 0:
-            final_result = JSONResponse(status_code=status.HTTP_200_OK,content=jsonable_encoder(schema_response.Error(id=product_id,detail=f"{point_from}-{point_to} schedule not found")))
+            headers:dict = {"X-Correlation-ID":str(product_id),"Pragma":"no-cache","Cache-Control":  "no-cache, no-store, max-age=0, must-revalidate"}
+            final_result = JSONResponse(headers=headers,status_code=status.HTTP_200_OK,content=jsonable_encoder(schema_response.Error(id=product_id,detail=f"{point_from}-{point_to} schedule not found")))
         else:
             final_result = schema_response.Product(
             productid=product_id,
             origin=point_from,
             destination=point_to, noofSchedule=count_schedules,
             schedules=sorted_schedules).model_dump(mode='json',exclude_none=True)
+            response.headers["X-Correlation-ID"] = str(product_id)
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Cache-Control"] = "private, max-age=7200"
             if not task_exception:
                 background_tasks.add_task(db.set,key=product_id,value=final_result)
         return final_result

@@ -39,7 +39,6 @@ async def get_schedules(background_tasks: BackgroundTasks,
     - **pointFrom/pointTo** : Provide either Point or Port in UNECE format
     """
     product_id:UUID = uuid5(NAMESPACE_DNS,f'{scac}-p2p-api-{point_from}{point_to}{start_date_type}{start_date}{search_range}{tsp}{direct_only}{vessel_imo}{service}')
-    response.headers["X-Correlation-ID"] = str(product_id)
     ttl_schedule = await db.get(key=product_id)
     if not ttl_schedule:
         # 👇 Having this allows for waiting for all our tasks with strong safety guarantees,logic around cancellation for failures,coroutine-safe and grouping of exceptions.
@@ -122,7 +121,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                           eta =start_date if start_date_type == 'Arrival' else None,
                                           direct_only=direct_only,
                                           vessel_flag = vessel_flag_code))
-        final_schedules = client.gen_all_valid_schedules(matrix=task_group.results,product_id=product_id,point_from=point_from,point_to=point_to,background_tasks=background_tasks,task_exception=task_group.error)
+        final_schedules = client.gen_all_valid_schedules(response=response,matrix=task_group.results,product_id=product_id,point_from=point_from,point_to=point_to,background_tasks=background_tasks,task_exception=task_group.error)
         return final_schedules
     else:
         return ttl_schedule

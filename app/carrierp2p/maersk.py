@@ -13,7 +13,6 @@ TRANSPORT_TYPE: dict = {'BAR': 'Barge', 'BCO': 'Barge', 'FEF': 'Feeder', 'FEO': 
                         'RCO': 'Rail', 'RR': 'Rail', 'TRK': 'Truck', 'VSF': 'Feeder', 'VSL': 'Feeder', 'VSM': 'Vessel'}
 def process_response_data(resp: dict,first_cut_off:dict, direct_only:bool |None,vessel_imo: str, service: str, tsp: str) -> Iterator:
     """Map the schedule and leg body"""
-    # BU only want the first leg having cut off date
     carrier_code: str = resp['vesselOperatorCarrierCode']
     for task in resp['transportSchedules']:
         check_service_code: bool = any(services['transport']['carrierServiceCode'] == service for services in task['transportLegs'] if services['transport'].get('carrierServiceCode')) if service else True
