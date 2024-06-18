@@ -122,7 +122,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                           etd= start_date if start_date_type == StartDateType.departure  else None ,
                                           eta =start_date if start_date_type == StartDateType.arrival else None,tsp=tsp,
                                           direct_only=direct_only))
-        final_schedules = client.gen_all_valid_schedules(matrix=task_group.results,product_id=product_id,point_from=point_from,point_to=point_to,background_tasks=background_tasks,task_exception=task_group.error)
+        final_schedules = client.gen_all_valid_schedules(response=response,matrix=task_group.results,product_id=product_id,point_from=point_from,point_to=point_to,background_tasks=background_tasks,task_exception=task_group.error)
         return final_schedules
     else:
         return ttl_schedule
