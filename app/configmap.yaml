@@ -5,6 +5,14 @@ metadata:
 data:
   backgroundTasks:
     scheduleExpiry: 6
+  connectionPoolSetting:
+    connectTimeOut: 60
+    elswhereTimeOut: 30
+    maxClientConnection: 1500
+    maxKeepAliveConnection: 750
+    keepAliveExpiry: 60
+    retryNumber: 3
+    asyncDefaultTimeOut: 20
   activeCarriers:
     cma:  True
     hlag: False
@@ -14,3 +22,4 @@ data:
     msc: True
     one: True
     zim: True
+

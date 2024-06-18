@@ -2,7 +2,8 @@ import datetime
 from uuid import uuid5,NAMESPACE_DNS,UUID
 from fastapi import APIRouter, Query, Depends,Header, BackgroundTasks,Response
 from app.carrierp2p import cma, one, hmm, zim, maersk, msc, iqax,hlag
-from app.schemas import schema_response, schema_request
+from app.schemas import schema_response
+from app.schemas.schema_request import CarrierCode,StartDateType,SearchRange
 from app.background_tasks import db
 from app.config import Settings,get_settings,load_yaml
 from app.routers.router_config import HTTPXClientWrapper,AsyncTaskManager,get_httpx_client_wrapper
@@ -19,10 +20,10 @@ async def get_schedules(background_tasks: BackgroundTasks,
                         X_Correlation_ID: str | None = Header(default=None),
                         point_from: str = Query(alias='pointFrom', default=..., max_length=5,regex=r"[A-Z]{2}[A-Z0-9]{3}",example='HKHKG',description='Search by either port or point of origin'),
                         point_to: str = Query(alias='pointTo', default=..., max_length=5, regex=r"[A-Z]{2}[A-Z0-9]{3}",example='DEHAM',description="Search by either port or point of destination"),
-                        start_date_type: schema_request.StartDateType = Query(alias='startDateType', default=...,description="Search by either ETD or ETA"),
+                        start_date_type:StartDateType = Query(alias='startDateType', default=...,description="Search by either ETD or ETA"),
                         start_date: datetime.date = Query(alias='startDate', default=...,example=datetime.datetime.now().strftime("%Y-%m-%d"),description='YYYY-MM-DD'),
-                        search_range: schema_request.SearchRange = Query(alias='searchRange',description='Search range based on start date and type,max 4 weeks',default=..., example=3),
-                        scac: list[schema_request.CarrierCode | None] = Query(default=[None],description='Prefer to search p2p schedule by scac.Empty means searching for all API schedules'),
+                        search_range: SearchRange = Query(alias='searchRange',description='Search range based on start date and type,max 4 weeks',default=..., example=3),
+                        scac: list[CarrierCode | None] = Query(default=[None],description='Prefer to search p2p schedule by scac.Empty means searching for all API schedules'),
                         direct_only: bool | None = Query(alias='directOnly', default=None,description='Direct means only show direct schedule Else show both(direct/transshipment)type of schedule'),
                         tsp: str | None = Query(default=None, alias='transhipmentPort', max_length=5,regex=r"[A-Z]{2}[A-Z0-9]{3}",description="Filter By Transshipment Port"),
                         vessel_imo:str|None = Query(alias='vesselIMO', default=None,description='Restricts the search to a particular vessel IMO lloyds code on port of loading', max_length=7),
@@ -39,6 +40,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
     - **pointFrom/pointTo** : Provide either Point or Port in UNECE format
     """
     product_id:UUID = uuid5(NAMESPACE_DNS,f'{scac}-p2p-api-{point_from}{point_to}{start_date_type}{start_date}{search_range}{tsp}{direct_only}{vessel_imo}{service}')
+    response.headers["X-Correlation-ID"] = str(product_id)
     ttl_schedule = await db.get(key=product_id)
     if not ttl_schedule:
         # 👇 Having this allows for waiting for all our tasks with strong safety guarantees,logic around cancellation for failures,coroutine-safe and grouping of exceptions.
@@ -47,15 +49,15 @@ async def get_schedules(background_tasks: BackgroundTasks,
                 if carrier_status['data']['activeCarriers']['cma'] and (carriers in {'CMDU', 'ANNU', 'APLU', 'CHNL'} or carriers is None):
                     task_group.create_task(name=f'CMA_task' if carriers is None else f'{carriers}_task',coro=lambda cma_scac=carriers :cma.get_cma_p2p(client=client, url=settings.cma_url, scac=cma_scac, pol=point_from,
                                         pod=point_to,
-                                        departure_date=start_date if start_date_type == 'Departure' else None,
-                                        arrival_date=start_date if start_date_type == 'Arrival'else None,
+                                        departure_date=start_date if start_date_type == StartDateType.departure else None,
+                                        arrival_date=start_date if start_date_type == StartDateType.arrival else None,
                                         search_range=search_range.duration, direct_only=direct_only,vessel_imo = vessel_imo,
                                         tsp=tsp,
                                         service=service, pw=settings.cma_token.get_secret_value()))
 
                 if carrier_status['data']['activeCarriers']['one'] and (carriers == 'ONEY' or carriers is None):
                     task_group.create_task(name='ONE_task',coro=lambda :one.get_one_p2p(client=client,background_task = background_tasks, url=settings.oney_url, turl=settings.oney_turl,
-                                        pol=point_from, pod=point_to,start_date_type='BY_DEPARTURE_DATE' if start_date_type == 'Departure' else 'BY_ARRIVAL_DATE',start_date=start_date,
+                                        pol=point_from, pod=point_to,start_date_type='BY_DEPARTURE_DATE' if start_date_type == StartDateType.departure else 'BY_ARRIVAL_DATE',start_date=start_date,
                                         direct_only=direct_only,
                                         search_range=int(search_range.value), tsp=tsp,vessel_imo = vessel_imo,
                                         service=service, auth=settings.oney_auth.get_secret_value(),
@@ -86,7 +88,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                               search_range=search_range.value, scac=maersk_scac,
                                               direct_only=direct_only, tsp=tsp,
                                               vessel_flag=vessel_flag_code,vessel_imo=vessel_imo,
-                                              date_type='D' if start_date_type == 'Departure' else 'A',
+                                              date_type='D' if start_date_type == StartDateType.departure else 'A',
                                               service=service, pw=settings.maeu_token.get_secret_value(),
                                               pw2=settings.maeu_token2.get_secret_value()))
 
@@ -95,7 +97,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                         aud=settings.mscu_aud, pol=point_from, pod=point_to,
                                         start_date=start_date, search_range=search_range.duration,
                                         direct_only=direct_only,
-                                        start_date_type='POL' if start_date_type == 'Departure' else 'POD',
+                                        start_date_type='POL' if start_date_type == StartDateType.departure else 'POD',
                                         service=service, tsp=tsp,vessel_imo=vessel_imo,
                                         pw=settings.mscu_rsa_key.get_secret_value(),
                                         msc_client=settings.mscu_client.get_secret_value(),
@@ -105,8 +107,8 @@ async def get_schedules(background_tasks: BackgroundTasks,
                 if carrier_status['data']['activeCarriers']['iqax'] and (carriers in {'OOLU', 'COSU'} or carriers is None):
                     task_group.create_task(name=f'IQAX_task' if carriers is None else f'{carriers}_task',coro=lambda cosco_scac = carriers :iqax.get_iqax_p2p(client=client, background_task = background_tasks,url=settings.iqax_url, pol=point_from,
                                           pod=point_to,
-                                          departure_date=start_date if start_date_type == 'Departure' else None,
-                                          arrival_date=start_date if start_date_type == 'Arrival' else None,
+                                          departure_date=start_date if start_date_type == StartDateType.departure else None,
+                                          arrival_date=start_date if start_date_type == StartDateType.arrival else None,
                                           search_range=search_range.value, direct_only=direct_only,
                                           tsp=tsp,vessel_imo=vessel_imo,
                                           scac=cosco_scac, service=service,
@@ -117,11 +119,10 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                           client_id= settings.hlcu_client_id.get_secret_value(),client_secret=settings.hlcu_client_secret.get_secret_value(),
                                           user= settings.hlcu_user_id.get_secret_value(),pw= settings.hlcu_password.get_secret_value(),
                                           pol=point_from,pod=point_to,search_range= search_range.duration,
-                                          etd= start_date if start_date_type == 'Departure' else None ,
-                                          eta =start_date if start_date_type == 'Arrival' else None,
-                                          direct_only=direct_only,
-                                          vessel_flag = vessel_flag_code))
-        final_schedules = client.gen_all_valid_schedules(response=response,matrix=task_group.results,product_id=product_id,point_from=point_from,point_to=point_to,background_tasks=background_tasks,task_exception=task_group.error)
+                                          etd= start_date if start_date_type == StartDateType.departure  else None ,
+                                          eta =start_date if start_date_type == StartDateType.arrival else None,tsp=tsp,
+                                          direct_only=direct_only))
+        final_schedules = client.gen_all_valid_schedules(matrix=task_group.results,product_id=product_id,point_from=point_from,point_to=point_to,background_tasks=background_tasks,task_exception=task_group.error)
         return final_schedules
     else:
         return ttl_schedule

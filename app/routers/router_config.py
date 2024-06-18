@@ -49,8 +49,9 @@ Since KN employees are performing searches frequently (every hour), setting a hi
 SSL_CONTEXT = httpx.create_ssl_context()
 # KN_PROXY:httpx.Proxy = httpx.Proxy("http://zscaler.proxy.int.kn:80")
 KN_PROXY:httpx.Proxy = httpx.Proxy("http://proxy.eu-central-1.aws.int.kn:80")
-HTTPX_TIMEOUT = httpx.Timeout(30.0, connect=65.0)
-HTTPX_LIMITS = httpx.Limits(max_connections=1500,max_keepalive_connections=750,keepalive_expiry=50)
+HTTPX_TIMEOUT = httpx.Timeout(load_yaml()['data']['connectionPoolSetting']['elswhereTimeOut'], connect=load_yaml()['data']['connectionPoolSetting']['connectTimeOut'])
+HTTPX_LIMITS = httpx.Limits(max_connections=load_yaml()['data']['connectionPoolSetting']['maxClientConnection'],
+                            max_keepalive_connections=load_yaml()['data']['connectionPoolSetting']['maxKeepAliveConnection'],keepalive_expiry=load_yaml()['data']['connectionPoolSetting']['keepAliveExpiry'])
 HTTPX_ASYNC_HTTP = httpx.AsyncHTTPTransport(retries=3,proxy=KN_PROXY,verify=SSL_CONTEXT,limits=HTTPX_LIMITS)
 class HTTPXClientWrapper(httpx.AsyncClient):
     __slots__ = ('session_id')
@@ -84,14 +85,14 @@ class HTTPXClientWrapper(httpx.AsyncClient):
         """Fetch the file from carrier API and deserialize the json file """
         if not stream:
             response = await self.request(method=method, url=url, params=params, headers=headers, json=json,data=data)
-            if response.status_code == 206: #only CMA returns 206 if the number of schedule is more than 49. That means we shouldnt deserialize the json response at the beginning coz there are more responses need to be fetched based on the header range.
+            if response.status_code == status.HTTP_206_PARTIAL_CONTENT: #only CMA returns 206 if the number of schedule is more than 49. That means we shouldnt deserialize the json response at the beginning coz there are more responses need to be fetched based on the header range.
                 yield response
-            if response.status_code == 200:
+            if response.status_code == status.HTTP_200_OK:
                 response_json = response.json()
                 if background_tasks:
                     background_tasks.add_task(db.set, key=token_key, value=response_json, expire=expire)
                 yield response_json
-            if response.status_code in (500,502):
+            if response.status_code in (status.HTTP_500_INTERNAL_SERVER_ERROR,status.HTTP_502_BAD_GATEWAY):
                 logging.critical(f'Unable to connect to {url}')
                 yield None
             else:yield None
@@ -101,8 +102,8 @@ class HTTPXClientWrapper(httpx.AsyncClient):
             """
             client_request = self.build_request(method=method, url=url, params=params, headers=headers, data=data)
             stream_request = await self.send(client_request, stream=True)
-            if stream_request.status_code == 200:
-                result = StreamingResponse(stream_request.aiter_lines(),status_code=200, background=BackgroundTask(stream_request.aclose))
+            if stream_request.status_code == status.HTTP_200_OK:
+                result = StreamingResponse(stream_request.aiter_lines(),status_code=status.HTTP_200_OK, background=BackgroundTask(stream_request.aclose))
                 async for data in result.body_iterator:
                     response = orjson.loads(data)
                     if background_tasks:
@@ -157,7 +158,7 @@ async def get_httpx_client_wrapper() -> Generator[HTTPXClientWrapper, None, None
 class AsyncTaskManager:
     """Currently there is no built in  python class and method that we can prevent it from cancelling all conroutine tasks if one of the tasks is cancelled
     From BU perspective, all those carrier schedules are independent from one antoher so we shouldnt let a failed task to cancel all other successful tasks"""
-    def __init__(self,default_timeout=20,max_retries=3):
+    def __init__(self,default_timeout=load_yaml()['data']['connectionPoolSetting']['asyncDefaultTimeOut'],max_retries=load_yaml()['data']['connectionPoolSetting']['retryNumber']):
         self.__tasks:dict = dict()
         self.error:bool = False
         self.default_timeout:int = default_timeout

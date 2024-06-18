@@ -62,7 +62,7 @@ class ClientSideCache:
             except Exception as find_error:
                 retries -= 1
                 if retries == 0:
-                    raise ConnectionError(f'Unable to connect to RedisDB and retrieve cache from MongoDB')
+                    raise ConnectionError(f'Unable to connect to RedisDB and retrieve cache from Redis')
                 else:
                     logging.critical(f'Unable to retrieve cache from RedisDB due to {find_error}')
                     await self.initialize_database()
