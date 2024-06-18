@@ -9,10 +9,10 @@ from fastapi import BackgroundTasks
 from itertools import chain
 from typing import Generator,Iterator,AsyncIterator
 
-transport_type: dict = {'BAR': 'Barge', 'BCO': 'Barge', 'FEF': 'Feeder', 'FEO': 'Feeder', 'MVS': 'Vessel',
+TRANSPORT_TYPE: dict = {'BAR': 'Barge', 'BCO': 'Barge', 'FEF': 'Feeder', 'FEO': 'Feeder', 'MVS': 'Vessel',
                         'RCO': 'Rail', 'RR': 'Rail', 'TRK': 'Truck', 'VSF': 'Feeder', 'VSL': 'Feeder', 'VSM': 'Vessel'}
 def process_response_data(resp: dict,first_cut_off:dict, direct_only:bool |None,vessel_imo: str, service: str, tsp: str) -> Iterator:
-    # BU only want the first leg having cut off date
+    """Map the schedule and leg body"""
     carrier_code: str = resp['vesselOperatorCarrierCode']
     for task in resp['transportSchedules']:
         check_service_code: bool = any(services['transport']['carrierServiceCode'] == service for services in task['transportLegs'] if services['transport'].get('carrierServiceCode')) if service else True
@@ -36,7 +36,7 @@ def process_response_data(resp: dict,first_cut_off:dict, direct_only:bool |None,
                 etd=(etd := leg['departureDateTime']),
                 eta=(eta := leg['arrivalDateTime']),
                 transitTime=int((datetime.fromisoformat(eta) - datetime.fromisoformat(etd)).days),
-                transportations={'transportType': transport_type.get(leg['transport']['transportMode']),
+                transportations={'transportType': TRANSPORT_TYPE.get(leg['transport']['transportMode']),
                                  'transportName': deepget(leg['transport'], 'vessel', 'vesselName'),
                                  'referenceType': 'IMO' if (imo_code := str(deepget(leg['transport'], 'vessel', 'vesselIMONumber'))) and imo_code not in ('9999999', 'None') else None,
                                  'reference': imo_code if imo_code not in ('9999999', 'None', '') else None},
@@ -52,6 +52,7 @@ def process_response_data(resp: dict,first_cut_off:dict, direct_only:bool |None,
             yield schedule_body
 
 async def get_cutoff_first_leg(client:HTTPXClientWrapper,cut_off_url:str,cut_off_pw:str,response_data:list) -> AsyncIterator:
+    """According to the BU requirment, we have to get the first leg from Maersk P2P schedule and map the cutOffDate for the first leg only"""
     get_all_first_leg: list[dict] = [{'country': leg['transportLegs'][0]['facilities']['startLocation']['countryCode'],
                                       'pol': leg['transportLegs'][0]['facilities']['startLocation']['cityName'],'imo': imo, 'voyage': leg['transportLegs'][0]['transport'].get('carrierDepartureVoyageNumber')}
                                      for schedule in response_data for leg in schedule['transportSchedules'] if (imo := deepget(leg['transportLegs'][0]['transport'], 'vessel','vesselIMONumber'))
@@ -63,6 +64,7 @@ async def get_cutoff_first_leg(client:HTTPXClientWrapper,cut_off_url:str,cut_off
     yield first_cut_off
 
 async def get_maersk_cutoff(client:HTTPXClientWrapper, url: str, headers: dict, country: str, pol: str, imo: str, voyage: str)-> AsyncIterator:
+    """this is the Maersk API to get the cutOffDate """
     params: dict = {'ISOCountryCode': country, 'portOfLoad': pol, 'vesselIMONumber': imo, 'voyage': voyage}
     async for response_json in client.parse(url=url,method ='GET',stream=True,headers=headers, params=params):
         if response_json:

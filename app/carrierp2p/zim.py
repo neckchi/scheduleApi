@@ -13,6 +13,7 @@ CARRIER_CODE: str = 'ZIMU'
 
 @lru_cache(maxsize=None)
 def map_imo(leg_imo:str|None, vessel_name:str|None,line:str|None, transport:str) ->str:
+    """Map the transportation Details"""
     if leg_imo and vessel_name != 'TO BE NAMED' and transport != 'Truck':
         return leg_imo
     elif (line == 'UNK' and leg_imo is None and transport != 'Truck') or transport == 'Feeder':
@@ -22,7 +23,7 @@ def map_imo(leg_imo:str|None, vessel_name:str|None,line:str|None, transport:str)
     else:
         return '1'
 def process_response_data(task: dict, direct_only:bool |None,vessel_imo: str, service: str, tsp: str) -> Iterator:
-    # Additional check on service code/name in order to fullfill business requirment(query the result by service code)
+    """Map the schedule and leg body"""
     check_service_code: bool = any(service == services['line'] for services in task['routeLegs'] if services.get('voyage')) if service else True
     check_transshipment: bool = task['routeLegCount'] > 1
     check_vessel_imo: bool = any(imo for imo in task['routeLegs'] if imo.get('lloydsCode') == vessel_imo) if vessel_imo else True
@@ -51,7 +52,8 @@ def process_response_data(task: dict, direct_only:bool |None,vessel_imo: str, se
                                                      services={'serviceCode': leg['line']} if (voyage_num := leg.get('voyage')) else None,
                                                      cutoffs={'cyCutoffDate': cyoff,'docCutoffDate': leg.get('docClosingDate'),
                                                               'vgmCutoffDate': leg.get('vgmClosingDate')} if (cyoff := leg.get('containerClosingDate')) or leg.get('docClosingDate') or leg.get('vgmClosingDate') else None,
-                                                     voyages={'internalVoyage': voyage_num + leg['leg'] if voyage_num else None,'externalVoyage': leg.get('consortSailingNumber')}) for leg in task['routeLegs'] if leg['legOrder'] >= check_nearest_pol_etd[0]]).model_dump(warnings=False)
+                                                     voyages={'internalVoyage': voyage_num + leg['leg'] if voyage_num else None,'externalVoyage': leg.get('consortSailingNumber')})
+                   for leg in task['routeLegs'] if leg['legOrder'] >= check_nearest_pol_etd[0]]).model_dump(warnings=False)
         yield schedule_body
 
 

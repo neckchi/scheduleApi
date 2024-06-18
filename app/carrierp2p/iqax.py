@@ -11,6 +11,7 @@ from typing import Generator,Iterator
 
 
 def calculate_final_times(index:int, leg_etd:str, leg_tt:int, leg_transport:str, leg_from:dict,legs_to:dict, last_eta:str):
+    """Calculate the correct etd eta for each leg """
     def format_datetime(dt):
         return dt.strftime("%Y-%m-%dT%H:%M:%S.000Z")
     default_offset = timedelta(days=leg_tt if leg_tt else 0.5)
@@ -25,6 +26,7 @@ def calculate_final_times(index:int, leg_etd:str, leg_tt:int, leg_transport:str,
         final_etd = leg_from.get('etd', format_datetime(datetime.strptime(final_eta, "%Y-%m-%dT%H:%M:%S.000Z") - default_offset))
     yield final_etd, final_eta
 def process_response_data(task: dict, direct_only:bool |None,vessel_imo: str, service: str, tsp: str) -> Iterator:
+    """Map the schedule and leg body"""
     check_service_code:bool = any(service == service_leg['code'] for leg_service in task['leg'] if (service_leg:=leg_service.get('service'))) if service else True
     check_transshipment: bool = not task['direct']
     transshipment_port:bool = any(tsport['fromPoint']['location']['unlocode'] == tsp for tsport in task['leg'][1:]) if check_transshipment and tsp else False

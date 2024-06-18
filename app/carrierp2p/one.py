@@ -6,6 +6,7 @@ from datetime import timedelta,datetime
 from fastapi import BackgroundTasks
 from typing import Generator,Iterator,AsyncIterator
 def process_response_data(task: dict,vessel_imo: str, service: str, tsp: str) -> Iterator:
+    """Map the schedule and leg body"""
     service_code: str = task['serviceCode']
     service_name: str = task['serviceName']
     # Additional check on service code/name in order to fullfill business requirment(query the result by service code)
