@@ -8,9 +8,8 @@ from datetime import timedelta,datetime
 from fastapi import BackgroundTasks
 from itertools import chain
 from typing import Generator,Iterator,AsyncIterator
+from app.schemas.schema_request import TRANSPORT_TYPE
 
-TRANSPORT_TYPE: dict = {'BAR': 'Barge', 'BCO': 'Barge', 'FEF': 'Feeder', 'FEO': 'Feeder', 'MVS': 'Vessel',
-                        'RCO': 'Rail', 'RR': 'Rail', 'TRK': 'Truck', 'VSF': 'Feeder', 'VSL': 'Feeder', 'VSM': 'Vessel'}
 def process_response_data(resp: dict,first_cut_off:dict, direct_only:bool |None,vessel_imo: str, service: str, tsp: str) -> Iterator:
     """Map the schedule and leg body"""
     carrier_code: str = resp['vesselOperatorCarrierCode']

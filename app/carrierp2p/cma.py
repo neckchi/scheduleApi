@@ -4,9 +4,10 @@ from app.routers.router_config import HTTPXClientWrapper
 from app.schemas import schema_response
 from datetime import datetime
 from typing import Generator,Iterator,AsyncIterator
+from app.schemas.schema_request import CMA_GROUP
 
 
-CARRIER_CODE: dict = {'0001': 'CMDU', '0002': 'ANNU', '0011': 'CHNL', '0015': 'APLU'}
+
 DEFAULT_ETD_ETA = datetime.now().astimezone().replace(microsecond=0).isoformat()
 def extract_transportation(transportation:dict):
     """Map the transportation Details"""
@@ -50,7 +51,7 @@ def process_response_data(task: dict,direct_only:bool |None,) -> Iterator:
             cutoffs={'docCutoffDate':deepget(leg['pointFrom']['cutOff'], 'shippingInstructionAcceptance','local'),
                      'cyCutoffDate':deepget(leg['pointFrom']['cutOff'], 'portCutoff', 'local'),
                      'vgmCutoffDate':deepget(leg['pointFrom']['cutOff'], 'vgm', 'local')} if leg['pointFrom'].get('cutOff') else None) for leg in task['routingDetails']]
-        schedule_body: dict = schema_response.Schedule.model_construct(scac=CARRIER_CODE.get(task['shippingCompany']), pointFrom=first_point_from,
+        schedule_body: dict = schema_response.Schedule.model_construct(scac=CMA_GROUP.get(task['shippingCompany']), pointFrom=first_point_from,
                                                                        pointTo=last_point_to, etd=first_etd,eta=last_eta,
                                                                        transitTime=transit_time,transshipment=check_transshipment,
                                                                        legs=leg_list).model_dump(warnings=False)
@@ -80,7 +81,7 @@ async def get_all_schedule(client:HTTPXClientWrapper,cma_list:list,url:str,heade
 
 async def get_cma_p2p(client:HTTPXClientWrapper,url: str, pw: str, pol: str, pod: str, search_range: int, direct_only: bool | None,tsp: str | None = None,vessel_imo:str | None = None,
                           departure_date: datetime.date = None,arrival_date: datetime.date = None, scac: str | None = None, service: str | None = None) -> Generator:
-    api_carrier_code: str = next(k for k, v in CARRIER_CODE.items() if v == scac.upper()) if scac else None
+    api_carrier_code: str = next(k for k, v in CMA_GROUP.items() if v == scac.upper()) if scac else None
     headers: dict = {'keyID': pw}
     params: dict = {'placeOfLoading': pol, 'placeOfDischarge': pod,'departureDate': departure_date,'arrivalDate': arrival_date, 'searchRange': search_range,'polVesselIMO':vessel_imo,'polServiceCode': service, 'tsPortCode': tsp}
     extra_condition: bool = True if pol.startswith('US') and pod.startswith('US') else False

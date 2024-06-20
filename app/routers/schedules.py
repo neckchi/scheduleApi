@@ -6,7 +6,7 @@ from app.schemas import schema_response
 from app.schemas.schema_request import CarrierCode,StartDateType,SearchRange
 from app.background_tasks import db
 from app.config import Settings,get_settings,load_yaml
-from app.routers.router_config import HTTPXClientWrapper,AsyncTaskManager,get_httpx_client_wrapper
+from app.routers.router_config import HTTPXClientWrapper,AsyncTaskManager,get_global_httpx_client_wrapper
 from app.routers.security import basic_auth
 
 
@@ -32,15 +32,14 @@ async def get_schedules(background_tasks: BackgroundTasks,
                         settings: Settings = Depends(get_settings),
                         carrier_status = Depends(load_yaml),
                         credentials = Depends(basic_auth),
-                        # client:HTTPXClientWrapper = Depends(HTTPXClientWrapper.get_httpx_client_wrapper)
-                        client:HTTPXClientWrapper = Depends(get_httpx_client_wrapper)):
+                        # client:HTTPXClientWrapper = Depends(HTTPXClientWrapper.get_individual_httpx_client_wrapper)):
+                        client:HTTPXClientWrapper = Depends(get_global_httpx_client_wrapper)):
 
     """
     Search P2P Schedules with all the information:
     - **pointFrom/pointTo** : Provide either Point or Port in UNECE format
     """
     product_id:UUID = uuid5(NAMESPACE_DNS,f'{scac}-p2p-api-{point_from}{point_to}{start_date_type}{start_date}{search_range}{tsp}{direct_only}{vessel_imo}{service}')
-    response.headers["X-Correlation-ID"] = str(product_id)
     ttl_schedule = await db.get(key=product_id)
     if not ttl_schedule:
         # 👇 Having this allows for waiting for all our tasks with strong safety guarantees,logic around cancellation for failures,coroutine-safe and grouping of exceptions.
@@ -122,7 +121,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                           etd= start_date if start_date_type == StartDateType.departure  else None ,
                                           eta =start_date if start_date_type == StartDateType.arrival else None,tsp=tsp,
                                           direct_only=direct_only))
-        final_schedules = client.gen_all_valid_schedules(response=response,matrix=task_group.results,product_id=product_id,point_from=point_from,point_to=point_to,background_tasks=background_tasks,task_exception=task_group.error)
+        final_schedules = client.gen_all_valid_schedules(response=response,correlation=X_Correlation_ID,matrix=task_group.results,product_id=product_id,point_from=point_from,point_to=point_to,background_tasks=background_tasks,task_exception=task_group.error)
         return final_schedules
     else:
         return ttl_schedule

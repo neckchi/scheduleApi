@@ -11,7 +11,7 @@ from fastapi import BackgroundTasks
 from base64 import b64decode
 from typing import Generator,Iterator,AsyncIterator
 
-CARRIER_CODE: str = 'MSCU'
+
 def process_response_data(task: dict, direct_only:bool |None,vessel_imo: str, service: str, tsp: str) -> Iterator:
     """Map the schedule and leg body"""
     check_service_code: bool = any(service_desc.get('Service') and service_desc['Service']['Description'] == service for service_desc in task['Schedules']) if service else True
@@ -43,7 +43,7 @@ def process_response_data(task: dict, direct_only:bool |None,vessel_imo: str, se
                              'reference': imo_code if imo_code != '' else None},
             services={'serviceCode': leg['Service']['Description']} if leg.get('Service') else None,
             voyages={'internalVoyage': leg['Voyages'][0]['Description'] if leg.get('Voyages') else None}) for leg in task['Schedules']]
-        schedule_body: dict = schema_response.Schedule.model_construct(scac=CARRIER_CODE,
+        schedule_body: dict = schema_response.Schedule.model_construct(scac='MSCU',
                                                                        pointFrom=first_point_from,
                                                                        pointTo=last_point_to, etd=first_etd,
                                                                        eta=last_eta,

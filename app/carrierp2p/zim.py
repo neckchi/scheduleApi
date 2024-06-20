@@ -5,11 +5,12 @@ from app.schemas import schema_response
 from uuid import uuid5,NAMESPACE_DNS,UUID
 from fastapi import BackgroundTasks
 from typing import Generator,Iterator,AsyncIterator
+from app.schemas.schema_request import TRANSPORT_TYPE
 from functools import lru_cache
 
 
-TRANSPORT_TYPE: dict = {'Land Trans': 'Truck', 'Feeder': 'Feeder', 'TO BE NAMED': 'Vessel'}
-CARRIER_CODE: str = 'ZIMU'
+
+
 
 @lru_cache(maxsize=None)
 def map_imo(leg_imo:str|None, vessel_name:str|None,line:str|None, transport:str) ->str:
@@ -34,7 +35,7 @@ def process_response_data(task: dict, direct_only:bool |None,vessel_imo: str, se
         check_nearest_pol_etd:tuple = next((leg['legOrder'],leg['departureDate']) for leg in task['routeLegs'][::-1] if leg['departurePort'] == first_point_from)
         last_point_to: str = task['arrivalPort']
         last_eta: str = task['arrivalDate']
-        schedule_body: dict = schema_response.Schedule.model_construct(scac=CARRIER_CODE,pointFrom=first_point_from,pointTo=last_point_to, etd=check_nearest_pol_etd[1],
+        schedule_body: dict = schema_response.Schedule.model_construct(scac='ZIMU',pointFrom=first_point_from,pointTo=last_point_to, etd=check_nearest_pol_etd[1],
            eta=last_eta,
            transitTime=transit_time,
            transshipment=check_transshipment,

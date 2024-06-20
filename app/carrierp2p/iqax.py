@@ -77,7 +77,8 @@ async def get_iqax_p2p(client:HTTPXClientWrapper,background_task:BackgroundTasks
     iqax_response_uuid = lambda scac: uuid5(NAMESPACE_DNS,f'iqax-{params}{direct_only}{vessel_imo}{service}{tsp}{scac}')
     response_cache:list = await asyncio.gather(*(db.get(key=iqax_response_uuid(scac=sub_iqax)) for sub_iqax in iqax_list))
     check_cache: bool = any(item is None for item in response_cache)
-    p2p_resp_tasks: set = {asyncio.create_task(anext(client.parse(background_tasks =background_task,token_key=iqax_response_uuid(scac=iqax),method='GET', url=url.format(iqax),params=dict(params, **{'vesselOperatorCarrierCode': iqax})))) for iqax,cache in zip(iqax_list,response_cache) if cache is None } if check_cache else...
+    p2p_resp_tasks: set = {asyncio.create_task(anext(client.parse(background_tasks =background_task,token_key=iqax_response_uuid(scac=iqax),method='GET', url=url.format(iqax),params=params)))
+                           for iqax,cache in zip(iqax_list,response_cache) if cache is None } if check_cache else...
     for response in (chain(asyncio.as_completed(p2p_resp_tasks),[item for item in response_cache if item is not None]) if check_cache else response_cache):
         response_json:dict = await response if check_cache and not isinstance(response, dict) else response
         if response_json:
