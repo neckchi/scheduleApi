@@ -10,7 +10,6 @@ import uvicorn
 
 
 
-queue_lister = log_queue_listener()
 app = FastAPI(docs_url=None, redoc_url=None)
 app.add_middleware(GZipMiddleware, minimum_size=2000)
 app.add_middleware(

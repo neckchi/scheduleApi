@@ -24,12 +24,12 @@ async def startup_event():
     # Global Client Setup
     global httpx_client
     httpx_client = HTTPXClientWrapper()
-    logging.info("HTTPX Client initialized")
+    logging.info("HTTPX Client initialized",extra={'custom_attribute':None})
 
 async def shutdown_event():
     atexit.register(httpx_client.aclose)
     atexit.register(QUEUE_LISTENER.stop)
-    logging.info("HTTPX Client closed")
+    logging.info("HTTPX Client closed",extra={'custom_attribute':None})
 
 
 """Given that each of the 7000 employees performs 7000 searches per hour, this amounts to 7000×7000=49,000,000
@@ -54,6 +54,8 @@ HTTPX_LIMITS = httpx.Limits(max_connections=load_yaml()['data']['connectionPoolS
                             max_keepalive_connections=load_yaml()['data']['connectionPoolSetting']['maxKeepAliveConnection'],keepalive_expiry=load_yaml()['data']['connectionPoolSetting']['keepAliveExpiry'])
 # HTTPX_ASYNC_HTTP = httpx.AsyncHTTPTransport(retries=3,proxy=KN_PROXY,verify=SSL_CONTEXT,limits=HTTPX_LIMITS)
 HTTPX_ASYNC_HTTP = httpx.AsyncHTTPTransport(retries=3,proxy = KN_PROXY,verify=False,limits=HTTPX_LIMITS)
+
+
 class HTTPXClientWrapper(httpx.AsyncClient):
     __slots__ = ('session_id')
     def __init__(self):
@@ -84,6 +86,8 @@ class HTTPXClientWrapper(httpx.AsyncClient):
     async def parse(self,url: str, method: str = Literal['GET', 'POST'],params: dict = None, headers: dict = None, json: dict = None, token_key=None,data: dict = None,
                     background_tasks: BackgroundTasks = None, expire=timedelta(hours = load_yaml()['data']['backgroundTasks']['scheduleExpiry']),stream: bool = False):
         """Fetch the file from carrier API and deserialize the json file """
+
+
         if not stream:
             response = await self.request(method=method, url=url, params=params, headers=headers, json=json,data=data)
             if response.status_code == status.HTTP_206_PARTIAL_CONTENT: #only CMA returns 206 if the number of schedule is more than 49. That means we shouldnt deserialize the json response at the beginning coz there are more responses need to be fetched based on the header range.
@@ -117,7 +121,7 @@ class HTTPXClientWrapper(httpx.AsyncClient):
         """Validate the schedule and serialize hte json file excluding the field without any value """
         flat_list:list = [item for row in matrix if not isinstance(row, Exception) and row is not None for item in row]
         count_schedules:int = len(flat_list)
-        logging.info(f'X-Correlation-ID:{correlation}')
+
         if count_schedules == 0:
             headers:dict = {"X-Correlation-ID":str(correlation),"Pragma":"no-cache","Cache-Control":  "no-cache, no-store, max-age=0, must-revalidate"}
             final_result = JSONResponse(headers=headers,status_code=status.HTTP_200_OK,content=jsonable_encoder(schema_response.Error(id=product_id,detail=f"{point_from}-{point_to} schedule not found")))
@@ -135,8 +139,10 @@ class HTTPXClientWrapper(httpx.AsyncClient):
                 background_tasks.add_task(db.set,key=product_id,value=final_result)
         return final_result
 
+
 #Global Client Setup
 async def get_global_httpx_client_wrapper() -> Generator[HTTPXClientWrapper, None, None]:
+
     """Global ClientConnection Pool  Setup"""
     try:
         yield httpx_client

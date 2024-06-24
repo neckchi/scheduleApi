@@ -68,7 +68,7 @@ def load_yaml() -> dict:
         config = yaml.load(yml_file,Loader=yaml.FullLoader)
     return config
 
-
+# Define a function to add extra information to the log records
 def log_queue_listener() -> QueueListener:
     log_file_path = path.join(path.dirname(path.abspath(__file__)), 'logging.ini')
     logging.config.fileConfig(log_file_path, disable_existing_loggers=False)
@@ -78,3 +78,13 @@ def log_queue_listener() -> QueueListener:
     logger = logging.getLogger(__name__)
     logger.addHandler(queue_handler)
     return listener
+
+
+old_factory = logging.getLogRecordFactory()
+def log_correlation(correlation:str |None = None):
+    def record_factory(*args, **kwargs):
+        record = old_factory(*args, **kwargs)
+        record.custom_attribute = correlation
+        return record
+    return record_factory
+
