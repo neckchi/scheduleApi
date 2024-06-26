@@ -21,7 +21,7 @@ class ClientSideCache:
             try:
                 self._pool = await Redis(connection_pool=self.__pool)
                 await self._pool.ping()
-                logging.info(f'Connected To Redis - {self._pool.connection_pool}')
+                logging.info(f'Connected To Redis - {self._pool.connection_pool}',extra={'custom_attribute':None})
                 return self
             except Exception as disconnect:
                 retries -= 1
@@ -29,7 +29,7 @@ class ClientSideCache:
                     raise ConnectionError(f'Unable to connect to RedisDB after retries ')
                 else:
                     time.sleep(3)
-                    logging.critical(f'Retry - Unable to connect to the RedisDB - {disconnect}')
+                    logging.critical(f'Retry - Unable to connect to the RedisDB - {disconnect}',extra={'custom_attribute':None})
 
     async def set(self, key:uuid.UUID, value: JSONResponse,expire:int = timedelta(hours = load_yaml()['data']['backgroundTasks']['scheduleExpiry'])):
         async with self._pool.pipeline(transaction=True) as pipe:

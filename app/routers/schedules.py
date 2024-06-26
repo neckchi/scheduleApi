@@ -1,7 +1,9 @@
 import datetime
+import logging
 from uuid import uuid5,NAMESPACE_DNS,UUID
 from fastapi import APIRouter, Query, Depends,Header, BackgroundTasks,Response
 from app.carrierp2p import cma, one, hmm, zim, maersk, msc, iqax,hlag
+from app.config import log_correlation
 from app.schemas import schema_response
 from app.schemas.schema_request import CarrierCode,StartDateType,SearchRange
 from app.background_tasks import db
@@ -39,6 +41,8 @@ async def get_schedules(background_tasks: BackgroundTasks,
     Search P2P Schedules with all the information:
     - **pointFrom/pointTo** : Provide either Point or Port in UNECE format
     """
+
+    logging.setLogRecordFactory(log_correlation(correlation=X_Correlation_ID))
     product_id:UUID = uuid5(NAMESPACE_DNS,f'{scac}-p2p-api-{point_from}{point_to}{start_date_type}{start_date}{search_range}{tsp}{direct_only}{vessel_imo}{service}')
     ttl_schedule = await db.get(key=product_id)
     if not ttl_schedule:
