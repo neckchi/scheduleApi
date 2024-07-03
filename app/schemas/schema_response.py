@@ -132,3 +132,6 @@ class Product(BaseModel):
 class Error(BaseModel):
     id: UUID
     detail: str
+class HealthCheck(BaseModel):
+    """Response model to validate and return when performing a health check."""
+    status: str = "OK"
