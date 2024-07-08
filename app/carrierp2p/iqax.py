@@ -83,7 +83,8 @@ async def get_iqax_p2p(client:HTTPXClientWrapper,background_task:BackgroundTasks
     for response in (chain(asyncio.as_completed(p2p_resp_tasks),[item for item in response_cache if item is not None]) if check_cache else response_cache):
         response_json:dict = await response if check_cache and not isinstance(response, dict) else response
         if response_json:
-            p2p_schedule: Generator = (schedule_result for schedule_list in response_json.get('routeGroupsList', []) for task in schedule_list['route'] for schedule_result in process_response_data(task=task,direct_only=direct_only, vessel_imo=vessel_imo, service=service,tsp=tsp))
-            combined_p2p_schedule.extend(p2p_schedule)
-    return combined_p2p_schedule
+            combined_p2p_schedule.extend(response_json.get('routeGroupsList', []))
+    p2p_schedule: Generator = (schedule_result for schedule_list in combined_p2p_schedule for task in schedule_list['route']
+                               for schedule_result in process_response_data(task=task,direct_only=direct_only, vessel_imo=vessel_imo, service=service,tsp=tsp))
+    return p2p_schedule
 
