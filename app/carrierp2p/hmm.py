@@ -28,63 +28,62 @@ def process_response_data(task: dict, vessel_imo: str, service: str, tsp: str) -
         first_cy_cutoff: str = task.get('cargoCutOffTime')
         first_doc_cutoff: str = task.get('docuCutOffTime')
         # outbound
-        leg_list: list = [schema_response.Leg.model_construct(
-            pointFrom={'locationName': task['outboundInland']['fromLocationName'],
+        leg_list: list = [schema_response.LEG_ADAPTER.dump_python({
+            'pointFrom':{'locationName': task['outboundInland']['fromLocationName'],
                        'locationCode': first_point_from,
                        'terminalName': task['porFacilityName'],
                        'terminalCode': task['porFacilityCode']},
-            pointTo={'locationName': task['outboundInland']['toLocationName'],
+            'pointTo':{'locationName': task['outboundInland']['toLocationName'],
                      'locationCode': first_pol,
                      'terminalName': first_pol_terminal_name,
                      'terminalCode': first_pol_terminal_code},
-            etd=(outbound_etd := task['outboundInland']['fromLocationDepatureDate']),
-            eta=(outbound_eta := task['outboundInland']['toLocationArrivalDate']),
-            transitTime=int((datetime.datetime.fromisoformat(outbound_eta) - datetime.datetime.fromisoformat(outbound_etd)).days),
-            transportations={'transportType': task['outboundInland']['transMode']},
-            voyages={'internalVoyage': 'NA'})] if task.get('outboundInland') else []
+            'etd':(outbound_etd := task['outboundInland']['fromLocationDepatureDate']),
+            'eta':(outbound_eta := task['outboundInland']['toLocationArrivalDate']),
+            'transitTime':int((datetime.datetime.fromisoformat(outbound_eta) - datetime.datetime.fromisoformat(outbound_etd)).days),
+            'transportations':{'transportType': task['outboundInland']['transMode']},
+            'voyages':{'internalVoyage': 'NA'}},warnings=False)] if task.get('outboundInland') else []
         # main routing
-        leg_list += [schema_response.Leg.model_construct(
-            pointFrom={'locationName': legs['loadPort'],
+        leg_list += [schema_response.LEG_ADAPTER.dump_python({
+            'pointFrom':{'locationName': legs['loadPort'],
                        'locationCode': legs['loadPortCode'],
                        'terminalName': first_pol_terminal_name if legs['vesselSequence'] == 1 else first_pot_terminal_name,
                        'terminalCode': first_pol_terminal_code if legs['vesselSequence'] == 1 else first_pot_terminal_code},
-            pointTo={'locationName': legs['dischargePort'],
-                     'locationCode': legs['dischargePortCode'],
+            'pointTo':{'locationName': legs['dischargePort'],
+                     'locationCode': legs.get('dischargePortCode') or last_point_to,
                      'terminalName': first_pot_terminal_name if check_transshipment and legs['vesselSequence'] == 1 else last_pod_terminal_name,
                      'terminalCode': first_pot_terminal_code if check_transshipment and legs['vesselSequence'] == 1 else last_pod_terminal_code},
-            etd=etd,
-            eta=(eta := legs.get('vesselArrivalDate')),
-            cutoffs={'cyCutoffDate': first_cy_cutoff, 'docCutoffDate': first_doc_cutoff} if index == 0 and (first_cy_cutoff or first_doc_cutoff) else None,
-            transitTime=int((datetime.datetime.fromisoformat(eta) - datetime.datetime.fromisoformat(etd)).days),
-            transportations={'transportType': 'Vessel' if (vessel_name := legs.get('vesselName')) else 'Feeder',
+            'etd':etd,
+            'eta':(eta := legs.get('vesselArrivalDate')),
+            'cutoffs':{'cyCutoffDate': first_cy_cutoff, 'docCutoffDate': first_doc_cutoff} if index == 0 and (first_cy_cutoff or first_doc_cutoff) else None,
+            'transitTime':int((datetime.datetime.fromisoformat(eta) - datetime.datetime.fromisoformat(etd)).days),
+            'transportations':{'transportType': 'Vessel' if (vessel_name := legs.get('vesselName')) else 'Feeder',
                              'transportName': vessel_name,
                              'referenceType': 'IMO' if (imo_code := legs.get('lloydRegisterNo')) else None,
                              'reference': imo_code},
-            services={'serviceCode': check_service} if (check_service := legs.get('vesselLoop')) else None,
-            voyages={'internalVoyage': internal_voy if (internal_voy := legs.get('voyageNumber')) else None})
-            for index, legs in enumerate(task['vessel']) if (etd := legs.get('vesselDepartureDate'))]
+            'services':{'serviceCode': check_service} if (check_service := legs.get('vesselLoop')) else None,
+            'voyages':{'internalVoyage': internal_voy if (internal_voy := legs.get('voyageNumber')) else None}},warnings=False)for index, legs in enumerate(task['vessel']) if (etd := legs.get('vesselDepartureDate'))]
         # inbound
-        leg_list += [schema_response.Leg.model_construct(
-            pointFrom={'locationName': task['inboundInland']['fromLocationName'],
+        leg_list += [schema_response.LEG_ADAPTER.dump_python({
+            'pointFrom':{'locationName': task['inboundInland']['fromLocationName'],
                        'locationCode': last_point_to,
                        'terminalName': last_pod_terminal_name,
                        'terminalCode': last_pod_terminal_code},
-            pointTo={'locationName': task['inboundInland']['toLocationName'],
+            'pointTo':{'locationName': task['inboundInland']['toLocationName'],
                      'locationCode': task['inboundInland']['toUnLocationCode'],
                      'terminalName': task['deliveryFacilityName'],
                      'terminalCode': task['deliveryFaciltyCode']},
-            etd=(inbound_etd := task['inboundInland']['fromLocationDepatureDate']),
-            eta=(inbound_eta := task['inboundInland']['toLocationArrivalDate']),
-            transitTime=int((datetime.datetime.fromisoformat(inbound_eta) - datetime.datetime.fromisoformat(inbound_etd)).days),
-            transportations={'transportType': task['inboundInland']['transMode']},
-            voyages={'internalVoyage': 'NA'})] if task.get('inboundInland') else []
-        schedule_body: dict = schema_response.Schedule.model_construct(scac='HDMU',
-                                                                       pointFrom=first_point_from,
-                                                                       pointTo=last_point_to, etd=first_etd,
-                                                                       eta=last_eta,
-                                                                       transitTime=transit_time,
-                                                                       transshipment=bool(check_transshipment),
-                                                                       legs=leg_list).model_dump(warnings=False)
+            'etd':(inbound_etd := task['inboundInland']['fromLocationDepatureDate']),
+            'eta':(inbound_eta := task['inboundInland']['toLocationArrivalDate']),
+            'transitTime':int((datetime.datetime.fromisoformat(inbound_eta) - datetime.datetime.fromisoformat(inbound_etd)).days),
+            'transportations':{'transportType': task['inboundInland']['transMode']},
+            'voyages':{'internalVoyage': 'NA'}},warnings=False)] if task.get('inboundInland') else []
+        schedule_body: dict = schema_response.SCHEDULE_ADAPTER.dump_python({'scac':'HDMU',
+                                                                       'pointFrom':first_point_from,
+                                                                       'pointTo':last_point_to, 'etd':first_etd,
+                                                                       'eta':last_eta,
+                                                                       'transitTime':transit_time,
+                                                                       'transshipment':bool(check_transshipment),
+                                                                       'legs':leg_list},warnings=False)
         yield schedule_body
 
 

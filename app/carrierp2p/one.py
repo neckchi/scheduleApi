@@ -32,40 +32,35 @@ def process_response_data(task: dict,vessel_imo: str, service: str, tsp: str) ->
         first_doc_cutoff: str = task['docCutoff'] if task['docCutoff'] != '' else None
         first_vgm_cutoff: str = task['vgmCutoff'] if task['vgmCutoff'] != '' else None
         if check_transshipment:
-            leg_list: list = [schema_response.Leg.model_construct(
-                pointFrom={'locationCode': leg['departureUnloc'], 'terminalName': leg['departureTerminal']},
-                pointTo={'locationCode': leg['arrivalUnloc'], 'terminalName': leg['arrivalTerminal']},
-                etd=leg['departureDateEstimated'],
-                eta=leg['arrivalDateEstimated'],
-                transitTime=round(leg['transitDurationHrsUtc'] / 24),
-                cutoffs={'cyCutoffDate': first_cy_cutoff, 'docCutoffDate': first_doc_cutoff,'vgmCutOffDate':first_vgm_cutoff} if index == 0 and (first_cy_cutoff or first_doc_cutoff or first_vgm_cutoff) else None,
-                transportations={'transportType': 'Vessel', 'transportName': leg['transportName'],
+            leg_list: list = [schema_response.LEG_ADAPTER.dump_python({
+                'pointFrom':{'locationCode': leg['departureUnloc'], 'terminalName': leg['departureTerminal']},
+                'pointTo':{'locationCode': leg['arrivalUnloc'], 'terminalName': leg['arrivalTerminal']},
+                'etd':leg['departureDateEstimated'],
+                'eta':leg['arrivalDateEstimated'],
+                'transitTime':round(leg['transitDurationHrsUtc'] / 24),
+                'cutoffs':{'cyCutoffDate': first_cy_cutoff, 'docCutoffDate': first_doc_cutoff,'vgmCutOffDate':first_vgm_cutoff} if index == 0 and (first_cy_cutoff or first_doc_cutoff or first_vgm_cutoff) else None,
+                'transportations':{'transportType': 'Vessel', 'transportName': leg['transportName'],
                                  'referenceType': None if (transport_type := leg.get('transportID')) == 'UNKNOWN' else 'IMO',
                                  'reference': None if transport_type == 'UNKNOWN' else transport_type},
-                services={'serviceCode': service_code, 'serviceName': leg['serviceName']} if (service_code :=leg['serviceCode']) or (leg['serviceName'] and leg['serviceName'] !='') else None,
-                voyages={'internalVoyage': voyage_num if (voyage_num := leg.get('conveyanceNumber')) else None }) for index, leg in enumerate(task['legs'])]
+                'services':{'serviceCode': service_code, 'serviceName': leg['serviceName']} if (service_code :=leg['serviceCode']) or (leg['serviceName'] and leg['serviceName'] !='') else None,
+                'voyages':{'internalVoyage': voyage_num if (voyage_num := leg.get('conveyanceNumber')) else None }},warnings=False) for index, leg in enumerate(task['legs'])]
         else:
-            leg_list: list = [schema_response.Leg.model_construct(
-                pointFrom={'locationCode': first_point_from, 'terminalName': first_origin_terminal},
-                pointTo={'locationCode': last_point_to, 'terminalName': last_destination_terminal},
-                etd=first_etd,
-                eta=last_eta,
-                transitTime=transit_time,
-                cutoffs={'cyCutoffDate': first_cy_cutoff, 'docCutoffDate': first_doc_cutoff,
+            leg_list: list = [schema_response.LEG_ADAPTER.dump_python({
+                'pointFrom':{'locationCode': first_point_from, 'terminalName': first_origin_terminal},
+                'pointTo':{'locationCode': last_point_to, 'terminalName': last_destination_terminal},
+                'etd':first_etd,
+                'eta':last_eta,
+                'transitTime':transit_time,
+                'cutoffs':{'cyCutoffDate': first_cy_cutoff, 'docCutoffDate': first_doc_cutoff,
                          'vgmCutoffDate': first_vgm_cutoff} if first_cy_cutoff or first_doc_cutoff or first_vgm_cutoff else None,
-                transportations={'transportType': 'Vessel', 'transportName': first_vessel_name,
+                'transportations':{'transportType': 'Vessel', 'transportName': first_vessel_name,
                                  'referenceType': None if first_imo == 'UNKNOWN' else 'IMO',
                                  'reference': None if first_imo == 'UNKNOWN' else first_imo},
-                services={'serviceCode': first_service_code,
+                'services':{'serviceCode': first_service_code,
                           'serviceName': first_service_name} if first_service_code or first_service_name else None,
-                voyages={'internalVoyage': first_voyage if first_voyage else None})]
-        schedule_body: dict = schema_response.Schedule.model_construct(scac=carrier_code,
-                                                                       pointFrom=first_point_from,
-                                                                       pointTo=last_point_to, etd=first_etd,
-                                                                       eta=last_eta,
-                                                                       transitTime=transit_time,
-                                                                       transshipment=check_transshipment,
-                                                                       legs=leg_list).model_dump(warnings=False)
+                'voyages':{'internalVoyage': first_voyage if first_voyage else None}},warnings=False)]
+        schedule_body: dict = schema_response.SCHEDULE_ADAPTER.dump_python({'scac':carrier_code,'pointFrom' : first_point_from,'pointTo' : last_point_to, 'etd' : first_etd,
+                                                                            'eta' : last_eta,'transitTime' : transit_time,'transshipment' : check_transshipment,'legs' : leg_list},warnings=False)
         yield schedule_body
 async def get_one_access_token(client:HTTPXClientWrapper,background_task:BackgroundTasks, url: str, auth: str, api_key: str)->AsyncIterator[str]:
     one_token_key:UUID = uuid5(NAMESPACE_DNS, 'one-token-uuid-kuehne-nagel')

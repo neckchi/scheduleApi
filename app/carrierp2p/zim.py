@@ -9,9 +9,6 @@ from app.schemas.schema_request import TRANSPORT_TYPE
 from functools import lru_cache
 
 
-
-
-
 @lru_cache(maxsize=None)
 def map_imo(leg_imo:str|None, vessel_name:str|None,line:str|None, transport:str) ->str:
     """Map the transportation Details"""
@@ -35,26 +32,22 @@ def process_response_data(task: dict, direct_only:bool |None,vessel_imo: str, se
         check_nearest_pol_etd:tuple = next((leg['legOrder'],leg['departureDate']) for leg in task['routeLegs'][::-1] if leg['departurePort'] == first_point_from)
         last_point_to: str = task['arrivalPort']
         last_eta: str = task['arrivalDate']
-        schedule_body: dict = schema_response.Schedule.model_construct(scac='ZIMU',pointFrom=first_point_from,pointTo=last_point_to, etd=check_nearest_pol_etd[1],
-           eta=last_eta,
-           transitTime=transit_time,
-           transshipment=check_transshipment,
-           legs = [schema_response.Leg.model_construct(pointFrom={'locationName': leg['departurePortName'],
-                                                                'locationCode': leg['departurePort']},
-                                                     pointTo={'locationName': leg['arrivalPortName'],
-                                                              'locationCode': leg['arrivalPort']},
-                                                     etd=(etd := leg['departureDate']),
-                                                     eta=(eta := leg['arrivalDate']),
-                                                     transitTime=int((datetime.datetime.fromisoformat(eta) - datetime.datetime.fromisoformat(etd)).days),
-                                                     transportations={'transportType': (transport:=TRANSPORT_TYPE.get(leg['vesselName'],'Vessel')),
+        schedule_body: dict = schema_response.SCHEDULE_ADAPTER.dump_python({'scac':'ZIMU','pointFrom':first_point_from,'pointTo':last_point_to, 'etd':check_nearest_pol_etd[1],'eta':last_eta,
+           'transitTime':transit_time,'transshipment':check_transshipment,
+           'legs': [schema_response.LEG_ADAPTER.dump_python({'pointFrom':{'locationName': leg['departurePortName'],'locationCode': leg['departurePort']},
+                                                     'pointTo':{'locationName': leg['arrivalPortName'],'locationCode': leg['arrivalPort']},
+                                                     'etd':(etd := leg['departureDate']),
+                                                     'eta':(eta := leg['arrivalDate']),
+                                                     'transitTime':int((datetime.datetime.fromisoformat(eta) - datetime.datetime.fromisoformat(etd)).days),
+                                                     'transportations':{'transportType': (transport:=TRANSPORT_TYPE.get(leg['vesselName'],'Vessel')),
                                                                       'transportName': (vessel_name :=leg['vesselName']),
                                                                       'referenceType': 'IMO',
                                                                       'reference':  map_imo(leg_imo = leg.get('lloydsCode'),vessel_name = vessel_name,line=leg.get('line'),transport=transport )},
-                                                     services={'serviceCode': leg['line']} if (voyage_num := leg.get('voyage')) else None,
-                                                     cutoffs={'cyCutoffDate': cyoff,'docCutoffDate': leg.get('docClosingDate'),
-                                                              'vgmCutoffDate': leg.get('vgmClosingDate')} if (cyoff := leg.get('containerClosingDate')) or leg.get('docClosingDate') or leg.get('vgmClosingDate') else None,
-                                                     voyages={'internalVoyage': voyage_num + leg['leg'] if voyage_num else None,'externalVoyage': leg.get('consortSailingNumber')})
-                   for leg in task['routeLegs'] if leg['legOrder'] >= check_nearest_pol_etd[0]]).model_dump(warnings=False)
+                                                     'services':{'serviceCode': leg['line']} if (voyage_num := leg.get('voyage')) else None,
+                                                     'cutoffs':{'cyCutoffDate': cyoff,'docCutoffDate': leg.get('docClosingDate'),'vgmCutoffDate': leg.get('vgmClosingDate')}
+                                                     if (cyoff := leg.get('containerClosingDate')) or leg.get('docClosingDate') or leg.get('vgmClosingDate') else None,
+                                                     'voyages':{'internalVoyage': voyage_num + leg['leg'] if voyage_num else None,'externalVoyage': leg.get('consortSailingNumber')}},warnings=False)
+                   for leg in task['routeLegs'] if leg['legOrder'] >= check_nearest_pol_etd[0]]},warnings=False)
         yield schedule_body
 
 

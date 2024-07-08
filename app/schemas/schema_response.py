@@ -1,10 +1,9 @@
 import logging
 from uuid import UUID
 from datetime import datetime
-from pydantic import BaseModel, Field, PositiveInt,model_validator,ConfigDict
+from pydantic import BaseModel, Field, PositiveInt,model_validator,ConfigDict,TypeAdapter
 from .schema_request import CarrierCode
 from typing_extensions import Literal
-
 
 
 
@@ -54,8 +53,8 @@ class Transportation(BaseModel):
 
 
 class Voyage(BaseModel):
-    internalVoyage: str | None = Field(default=None,max_length=10, example='126W')
-    externalVoyage: str | None = Field(default=None,max_length=10, example='126W')
+    internalVoyage: str | None = Field(default=None,max_length=20, example='126W')
+    externalVoyage: str | None = Field(default=None,max_length=20, example='126W')
     @model_validator(mode='after')
     def check_voyage(self) -> 'Voyage':
         if self.internalVoyage is None:
@@ -128,6 +127,9 @@ class Product(BaseModel):
     schedules: list[Schedule] | None = Field(default=None, title='Number Of Schedules',
                                              description="The number of p2p schedule offered by carrier")
 
+PRODUCT_ADAPTER = TypeAdapter(Product)
+SCHEDULE_ADAPTER = TypeAdapter(Schedule)
+LEG_ADAPTER = TypeAdapter(Leg)
 
 class Error(BaseModel):
     id: UUID
@@ -135,3 +137,5 @@ class Error(BaseModel):
 class HealthCheck(BaseModel):
     """Response model to validate and return when performing a health check."""
     status: str = "OK"
+
+

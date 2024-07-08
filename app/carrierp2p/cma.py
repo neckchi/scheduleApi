@@ -27,34 +27,32 @@ def extract_transportation(transportation:dict):
 def process_response_data(task: dict,direct_only:bool |None,) -> Iterator:
     """Map the schedule and leg body"""
     transit_time:int = task['transitTime']
-    first_point_from:str = task['routingDetails'][0]['pointFrom']['location']['internalCode']
-    last_point_to:str = task['routingDetails'][-1]['pointTo']['location']['internalCode']
+    first_point_from:str = task['routingDetails'][0]['pointFrom']['location'].get('internalCode') or task['routingDetails'][0]['pointFrom']['location']['locationCodifications'][0]['codification']
+    last_point_to:str = task['routingDetails'][-1]['pointTo']['location'].get('internalCode') or  task['routingDetails'][-1]['pointTo']['location']['locationCodifications'][0]['codification']
     first_etd = next((ed['pointFrom']['departureDateLocal'] for ed in task['routingDetails'] if ed['pointFrom'].get('departureDateLocal')), DEFAULT_ETD_ETA)
     last_eta = next((ea['pointTo']['arrivalDateLocal'] for ea in task['routingDetails'][::-1] if ea['pointTo'].get('arrivalDateLocal')), DEFAULT_ETD_ETA)
     check_transshipment:bool = len(task['routingDetails']) > 1
     if (direct_only is None or direct_only != check_transshipment):
-        leg_list: list = [schema_response.Leg.model_construct(
-            pointFrom={'locationName': leg['pointFrom']['location']['name'],
-                       'locationCode': leg['pointFrom']['location']['internalCode'],
+        leg_list: list = [schema_response.LEG_ADAPTER.dump_python({
+            'pointFrom':{'locationName': leg['pointFrom']['location']['name'],
+                       'locationCode': leg['pointFrom']['location'].get('internalCode') or leg['pointFrom']['location']['locationCodifications'][0]['codification'],
                        'terminalName': deepget(leg['pointFrom']['location'], 'facility', 'name'),
                        'terminalCode':check_pol_terminal[0].get('codification') if (check_pol_terminal := deepget(leg['pointFrom']['location'], 'facility','facilityCodifications')) else None},
-            pointTo={'locationName': leg['pointTo']['location']['name'],
-                     'locationCode': leg['pointTo']['location']['internalCode'],
+            'pointTo':{'locationName': leg['pointTo']['location']['name'],
+                     'locationCode': leg['pointTo']['location'].get('internalCode') or leg['pointTo']['location']['locationCodifications'][0]['codification'],
                      'terminalName': deepget(leg['pointTo']['location'], 'facility', 'name'),
                      'terminalCode':check_pod_terminal[0].get('codification') if (check_pod_terminal := deepget(leg['pointTo']['location'], 'facility','facilityCodifications')) else None},
-            etd=leg['pointFrom'].get('departureDateLocal', DEFAULT_ETD_ETA),
-            eta=leg['pointTo'].get('arrivalDateLocal', DEFAULT_ETD_ETA),
-            transitTime=leg.get('legTransitTime', 0),
-            transportations=next(extract_transportation(leg['transportation'])),
-            services={'serviceCode': service_name} if (service_name := deepget(leg['transportation'], 'voyage', 'service', 'code')) else None,
-            voyages={'internalVoyage': voyage_num if (voyage_num := deepget(leg['transportation'], 'voyage', 'voyageReference')) else None},
-            cutoffs={'docCutoffDate':deepget(leg['pointFrom']['cutOff'], 'shippingInstructionAcceptance','local'),
+            'etd':leg['pointFrom'].get('departureDateLocal', DEFAULT_ETD_ETA),
+            'eta':leg['pointTo'].get('arrivalDateLocal', DEFAULT_ETD_ETA),
+            'transitTime':leg.get('legTransitTime', 0),
+            'transportations':next(extract_transportation(leg['transportation'])),
+            'services':{'serviceCode': service_name} if (service_name := deepget(leg['transportation'], 'voyage', 'service', 'code')) else None,
+            'voyages':{'internalVoyage': voyage_num if (voyage_num := deepget(leg['transportation'], 'voyage', 'voyageReference')) else None},
+            'cutoffs':{'docCutoffDate':deepget(leg['pointFrom']['cutOff'], 'shippingInstructionAcceptance','local'),
                      'cyCutoffDate':deepget(leg['pointFrom']['cutOff'], 'portCutoff', 'local'),
-                     'vgmCutoffDate':deepget(leg['pointFrom']['cutOff'], 'vgm', 'local')} if leg['pointFrom'].get('cutOff') else None) for leg in task['routingDetails']]
-        schedule_body: dict = schema_response.Schedule.model_construct(scac=CMA_GROUP.get(task['shippingCompany']), pointFrom=first_point_from,
-                                                                       pointTo=last_point_to, etd=first_etd,eta=last_eta,
-                                                                       transitTime=transit_time,transshipment=check_transshipment,
-                                                                       legs=leg_list).model_dump(warnings=False)
+                     'vgmCutoffDate':deepget(leg['pointFrom']['cutOff'], 'vgm', 'local')} if leg['pointFrom'].get('cutOff') else None},warnings=False) for leg in task['routingDetails']]
+        schedule_body: dict = schema_response.SCHEDULE_ADAPTER.dump_python({'scac':CMA_GROUP.get(task['shippingCompany']), 'pointFrom':first_point_from,'pointTo':last_point_to, 'etd':first_etd,'eta':last_eta,
+                                                                       'transitTime':transit_time,'transshipment':check_transshipment,'legs':leg_list},warnings=False)
         yield schedule_body
 
 async def get_all_schedule(client:HTTPXClientWrapper,cma_list:list,url:str,headers:dict,params:dict,extra_condition:bool) ->AsyncIterator:

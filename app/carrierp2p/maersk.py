@@ -25,29 +25,26 @@ def process_response_data(resp: dict,first_cut_off:dict, direct_only:bool |None,
             last_point_to: str = task['facilities']['deliveryDestination']['UNLocationCode']
             first_etd:str = task['departureDateTime']
             last_eta:str = task['arrivalDateTime']
-            leg_list: list = [schema_response.Leg.model_construct(
-                pointFrom={'locationName': (pol_name := leg['facilities']['startLocation']['cityName']),
+            leg_list: list = [schema_response.LEG_ADAPTER.dump_python({
+                'pointFrom':{'locationName': (pol_name := leg['facilities']['startLocation']['cityName']),
                            'locationCode': leg['facilities']['startLocation']['UNLocationCode'],
                            'terminalName': leg['facilities']['startLocation']['locationName']},
-                pointTo={'locationName': leg['facilities']['endLocation']['cityName'],
+                'pointTo':{'locationName': leg['facilities']['endLocation']['cityName'],
                          'locationCode': leg['facilities']['endLocation']['UNLocationCode'],
                          'terminalName': leg['facilities']['endLocation']['locationName']},
-                etd=(etd := leg['departureDateTime']),
-                eta=(eta := leg['arrivalDateTime']),
-                transitTime=int((datetime.fromisoformat(eta) - datetime.fromisoformat(etd)).days),
-                transportations={'transportType': TRANSPORT_TYPE.get(leg['transport']['transportMode']),
+                'etd':(etd := leg['departureDateTime']),
+                'eta':(eta := leg['arrivalDateTime']),
+                'transitTime':int((datetime.fromisoformat(eta) - datetime.fromisoformat(etd)).days),
+                'transportations':{'transportType': TRANSPORT_TYPE.get(leg['transport']['transportMode']),
                                  'transportName': deepget(leg['transport'], 'vessel', 'vesselName'),
                                  'referenceType': 'IMO' if (imo_code := str(deepget(leg['transport'], 'vessel', 'vesselIMONumber'))) and imo_code not in ('9999999', 'None') else None,
                                  'reference': imo_code if imo_code not in ('9999999', 'None', '') else None},
-                services={'serviceCode': service_name} if (service_name := leg['transport'].get('carrierServiceName',leg['transport'].get('carrierServiceCode'))) else None,
-                voyages={'internalVoyage': voyage_num if (voyage_num := leg['transport'].get('carrierDepartureVoyageNumber')) else None},
-                cutoffs=first_cut_off.get(hash(leg['facilities']['startLocation']['countryCode'] + pol_name + imo_code + voyage_num)) if pol_name and imo_code and voyage_num else None).model_dump(warnings=False) for leg in task['transportLegs']]
-            schedule_body: dict = schema_response.Schedule.model_construct(scac=carrier_code,
-                                                                           pointFrom=first_point_from,
-                                                                           pointTo=last_point_to, etd=first_etd,
-                                                                           eta=last_eta, transitTime=transit_time,
-                                                                           transshipment=check_transshipment,
-                                                                           legs=sorted(leg_list, key=lambda d: d['etd']) if check_transshipment else leg_list).model_dump(warnings=False)
+                'services':{'serviceCode': service_name} if (service_name := leg['transport'].get('carrierServiceName',leg['transport'].get('carrierServiceCode'))) else None,
+                'voyages':{'internalVoyage': voyage_num if (voyage_num := leg['transport'].get('carrierDepartureVoyageNumber')) else None},
+                'cutoffs':first_cut_off.get(hash(leg['facilities']['startLocation']['countryCode'] + pol_name + imo_code + voyage_num)) if pol_name and imo_code and voyage_num else None},warnings=False) for leg in task['transportLegs']]
+            schedule_body: dict = schema_response.SCHEDULE_ADAPTER.dump_python({'scac':carrier_code,'pointFrom':first_point_from,'pointTo':last_point_to, 'etd':first_etd,
+                                                                           'eta':last_eta, 'transitTime':transit_time,'transshipment':check_transshipment,
+                                                                           'legs':sorted(leg_list, key=lambda d: d['etd']) if check_transshipment else leg_list},warnings=False)
             yield schedule_body
 
 async def get_cutoff_first_leg(client:HTTPXClientWrapper,cut_off_url:str,cut_off_pw:str,response_data:list) -> AsyncIterator:

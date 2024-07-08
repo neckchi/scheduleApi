@@ -10,7 +10,7 @@ data:
     elswhereTimeOut: 30
     maxClientConnection: 1500
     maxKeepAliveConnection: 750
-    keepAliveExpiry: 60
+    keepAliveExpiry: 30
     retryNumber: 3
     asyncDefaultTimeOut: 20
   activeCarriers:

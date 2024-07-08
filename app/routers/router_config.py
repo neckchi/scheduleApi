@@ -46,21 +46,20 @@ We can adjust this number based on the actual performance and server capacity.
 Since KN employees are performing searches frequently (every hour), setting a higher keep-alive expiry can help reuse connections effectively."""
 
 
-# SSL_CONTEXT = httpx.create_ssl_context()
-# KN_PROXY:httpx.Proxy = httpx.Proxy("http://zscaler.proxy.int.kn:80")
-KN_PROXY:httpx.Proxy = httpx.Proxy("http://proxy.eu-central-1.aws.int.kn:80")
-HTTPX_TIMEOUT = httpx.Timeout(load_yaml()['data']['connectionPoolSetting']['elswhereTimeOut'], connect=load_yaml()['data']['connectionPoolSetting']['connectTimeOut'])
+HTTPX_TIMEOUT = httpx.Timeout(load_yaml()['data']['connectionPoolSetting']['elswhereTimeOut'],pool=load_yaml()['data']['connectionPoolSetting']['connectTimeOut'], connect=load_yaml()['data']['connectionPoolSetting']['connectTimeOut'])
 HTTPX_LIMITS = httpx.Limits(max_connections=load_yaml()['data']['connectionPoolSetting']['maxClientConnection'],
                             max_keepalive_connections=load_yaml()['data']['connectionPoolSetting']['maxKeepAliveConnection'],keepalive_expiry=load_yaml()['data']['connectionPoolSetting']['keepAliveExpiry'])
-# HTTPX_ASYNC_HTTP = httpx.AsyncHTTPTransport(retries=3,proxy=KN_PROXY,verify=SSL_CONTEXT,limits=HTTPX_LIMITS)
-HTTPX_ASYNC_HTTP = httpx.AsyncHTTPTransport(retries=3,proxy = KN_PROXY,verify=False,limits=HTTPX_LIMITS)
+HTTPX_ASYNC_HTTP = httpx.AsyncHTTPTransport(retries=3,verify=False,limits=HTTPX_LIMITS)
 
 
 class HTTPXClientWrapper(httpx.AsyncClient):
     __slots__ = ('session_id')
+
     def __init__(self):
         super().__init__(timeout=HTTPX_TIMEOUT, transport=HTTPX_ASYNC_HTTP)
         self.session_id: str = str(uuid4())
+
+
 
 #Individual Client Session Setup
     @classmethod
@@ -125,11 +124,9 @@ class HTTPXClientWrapper(httpx.AsyncClient):
             final_result = JSONResponse(headers=headers,status_code=status.HTTP_200_OK,content=jsonable_encoder(schema_response.Error(id=product_id,detail=f"{point_from}-{point_to} schedule not found")))
         else:
             sorted_schedules: list = sorted(flat_list, key=lambda tt: (tt['etd'], tt['transitTime']))
-            final_result = schema_response.Product(
-            productid=product_id,
-            origin=point_from,
-            destination=point_to, noofSchedule=count_schedules,
-            schedules=sorted_schedules).model_dump(mode='json',exclude_none=True)
+            final_set:dict = {'productid':product_id,'origin':point_from,'destination':point_to, 'noofSchedule':count_schedules,'schedules':sorted_schedules}
+            final_validation = schema_response.PRODUCT_ADAPTER.validate_python(final_set)
+            final_result = schema_response.PRODUCT_ADAPTER.dump_python(final_validation,mode='json',exclude_none=True)
             response.headers["X-Correlation-ID"] = str(correlation)
             response.headers["Pragma"] = "no-cache"
             response.headers["Cache-Control"] = "public, max-age=7200"
@@ -140,7 +137,6 @@ class HTTPXClientWrapper(httpx.AsyncClient):
 
 #Global Client Setup
 async def get_global_httpx_client_wrapper() -> Generator[HTTPXClientWrapper, None, None]:
-
     """Global ClientConnection Pool  Setup"""
     try:
         yield httpx_client
@@ -158,8 +154,7 @@ async def get_global_httpx_client_wrapper() -> Generator[HTTPXClientWrapper, Non
                             detail=f'{response_error.__class__.__name__}:{response_error}')
     except Exception as eg:
         logging.error(f'{eg.__class__.__name__}:{eg.args}')
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                            detail=f'An error occurred while creating the client - {eg.args}')
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f'An error occurred while creating the client - {eg.args}')
 
 class AsyncTaskManager():
     """Currently there is no built in  python class and method that we can prevent it from cancelling all conroutine tasks if one of the tasks is cancelled

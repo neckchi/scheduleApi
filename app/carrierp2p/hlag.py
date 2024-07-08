@@ -18,28 +18,28 @@ def process_response_data(task: dict, service: str, tsp: str) -> Iterator:
     check_transshipment: bool = len(task['legs']) > 1
     transshipment_port: bool = any(tsport['departure']['location']['UNLocationCode'] == tsp for tsport in task['legs']) if check_transshipment and tsp else False
     if (transshipment_port or not tsp) and (check_service_code or not service) :
-        leg_list: list = [schema_response.Leg.model_construct(
-            pointFrom={'locationName': leg['departure']['location']['locationName'],
+        leg_list: list = [schema_response.LEG_ADAPTER.dump_python({
+            'pointFrom':{'locationName': leg['departure']['location']['locationName'],
                        'locationCode': leg['departure']['location']['UNLocationCode'],
                        'terminalCode': leg['departure']['location'].get('facilitySMDGCode')},
-            pointTo={'locationName': leg['arrival']['location']['locationName'],
+            'pointTo':{'locationName': leg['arrival']['location']['locationName'],
                      'locationCode': leg['arrival']['location']['UNLocationCode'],
                      'terminalCode': leg['arrival']['location'].get('facilitySMDGCode')},
-            etd=(etd := leg['departure']['dateTime']),
-            eta=(eta := leg['arrival']['dateTime']),
-            transitTime=int((datetime.fromisoformat(eta) - datetime.fromisoformat(etd)).days),
-            transportations={'transportType': str(leg.get('modeOfTransport')).title(),
+            'etd':(etd := leg['departure']['dateTime']),
+            'eta':(eta := leg['arrival']['dateTime']),
+            'transitTime':int((datetime.fromisoformat(eta) - datetime.fromisoformat(etd)).days),
+            'transportations':{'transportType': str(leg.get('modeOfTransport')).title(),
                              'transportName': leg['vesselName'] if (vessel_imo := leg.get('vesselIMONumber')) else None,
                              'referenceType': 'IMO' if vessel_imo and vessel_imo != '0000000' else None,
                              'reference': vessel_imo if vessel_imo != '0000000' else None},
-            services={'serviceCode':check_service_code, 'serviceName': leg.get('carrierServiceName')} if (check_service_code := leg.get('carrierServiceCode')) else None,
-            voyages={'internalVoyage': internal_voy if (internal_voy := leg.get('universalExportVoyageReference')) else None}) for leg in task['legs']]
-        schedule_body: dict = schema_response.Schedule.model_construct(scac='HLCU', pointFrom=first_point_from,
-                                                                       pointTo=last_point_to, etd=first_etd,
-                                                                       eta=last_eta,
-                                                                       transitTime=transit_time,
-                                                                       transshipment=check_transshipment,
-                                                                       legs=leg_list).model_dump(warnings=False)
+            'services':{'serviceCode':check_service_code, 'serviceName': leg.get('carrierServiceName')} if (check_service_code := leg.get('carrierServiceCode')) else None,
+            'voyages':{'internalVoyage': internal_voy if (internal_voy := leg.get('universalExportVoyageReference')) else None}},warnings=False) for leg in task['legs']]
+        schedule_body: dict = schema_response.SCHEDULE_ADAPTER.dump_python({'scac': 'HLCU', 'pointFrom': first_point_from,
+                                                                        'pointTo': last_point_to, 'etd': first_etd,
+                                                                        'eta': last_eta,
+                                                                        'transitTime': transit_time,
+                                                                        'transshipment': check_transshipment,
+                                                                        'legs': leg_list},warnings=False)
         yield schedule_body
 async def get_hlag_access_token(client:HTTPXClientWrapper,background_task, url: str,pw:str,user:str, client_id: str,client_secret:str) -> AsyncIterator[str]:
     hlcu_token_key:UUID = uuid5(NAMESPACE_DNS, 'hlcu-token-uuid-kuehne-nagel')

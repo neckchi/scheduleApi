@@ -24,32 +24,28 @@ def process_response_data(task: dict, direct_only:bool |None,vessel_imo: str, se
         first_etd: str = next(ed['CallDateTime'] for ed in task['Schedules'][0]['Calls'][0]['CallDates'] if ed['Type'] == 'ETD')
         last_eta: str = next(ed['CallDateTime'] for ed in task['Schedules'][-1]['Calls'][-1]['CallDates'] if ed['Type'] == 'ETA')
         transit_time:int = int((datetime.fromisoformat(last_eta) - datetime.fromisoformat(first_etd)).days)
-        leg_list: list = [schema_response.Leg.model_construct(
-            pointFrom={'locationName': leg['Calls'][0]['Name'], 'locationCode': leg['Calls'][0]['Code'],
+        leg_list: list = [schema_response.LEG_ADAPTER.dump_python({
+            'pointFrom':{'locationName': leg['Calls'][0]['Name'], 'locationCode': leg['Calls'][0]['Code'],
                        'terminalName': leg['Calls'][0]['EHF']['Description'],
                        'terminalCode': leg['Calls'][0]['DepartureEHFSMDGCode'] if leg['Calls'][0]['DepartureEHFSMDGCode'] != '' else None},
-            pointTo={'locationName': leg['Calls'][-1]['Name'], 'locationCode': leg['Calls'][-1]['Code'],
+            'pointTo':{'locationName': leg['Calls'][-1]['Name'], 'locationCode': leg['Calls'][-1]['Code'],
                      'terminalName': leg['Calls'][-1]['EHF']['Description'],
                      'terminalCode': leg['Calls'][-1]['ArrivalEHFSMDGCode'] if leg['Calls'][-1]['ArrivalEHFSMDGCode'] != '' else None},
-            etd=(etd := next(led['CallDateTime'] for led in leg['Calls'][0]['CallDates'] if led['Type'] == 'ETD')),
-            eta=(eta := next(lea['CallDateTime'] for lea in leg['Calls'][-1]['CallDates'] if lea['Type'] == 'ETA')),
-            transitTime=int((datetime.fromisoformat(eta) - datetime.fromisoformat(etd)).days),
-            cutoffs={'docCutoffDate': si_cutoff,
+            'etd':(etd := next(led['CallDateTime'] for led in leg['Calls'][0]['CallDates'] if led['Type'] == 'ETD')),
+            'eta':(eta := next(lea['CallDateTime'] for lea in leg['Calls'][-1]['CallDates'] if lea['Type'] == 'ETA')),
+            'transitTime':int((datetime.fromisoformat(eta) - datetime.fromisoformat(etd)).days),
+            'cutoffs':{'docCutoffDate': si_cutoff,
                      'cyCutoffDate': next((led['CallDateTime'] for led in leg['Calls'][0]['CallDates'] if led.get('CallDateTime') and led['Type'] == 'CYCUTOFF'), None),
                      'vgmCutoffDate': next((led['CallDateTime'] for led in leg['Calls'][0]['CallDates'] if led.get('CallDateTime') and led['Type'] == 'VGM'), None)}
             if (si_cutoff := next((led['CallDateTime'] for led in leg['Calls'][0]['CallDates'] if led['Type'] == 'SI' and led.get('CallDateTime')), None)) else None,
-            transportations={'transportType': 'Vessel', 'transportName': leg.get('TransportationMeansName'),
+            'transportations':{'transportType': 'Vessel', 'transportName': leg.get('TransportationMeansName'),
                              'referenceType': 'IMO' if (imo_code := leg.get('IMONumber')) and imo_code != '' else None,
                              'reference': imo_code if imo_code != '' else None},
-            services={'serviceCode': leg['Service']['Description']} if leg.get('Service') else None,
-            voyages={'internalVoyage': leg['Voyages'][0]['Description'] if leg.get('Voyages') else None}) for leg in task['Schedules']]
-        schedule_body: dict = schema_response.Schedule.model_construct(scac='MSCU',
-                                                                       pointFrom=first_point_from,
-                                                                       pointTo=last_point_to, etd=first_etd,
-                                                                       eta=last_eta,
-                                                                       transitTime=transit_time,
-                                                                       transshipment=check_transshipment,
-                                                                       legs=leg_list).model_dump(warnings=False)
+            'services':{'serviceCode': leg['Service']['Description']} if leg.get('Service') else None,
+            'voyages':{'internalVoyage': leg['Voyages'][0]['Description'] if leg.get('Voyages') else None}},warnings=False) for leg in task['Schedules']]
+        schedule_body: dict = schema_response.SCHEDULE_ADAPTER.dump_python({'scac': 'MSCU','pointFrom': first_point_from,'pointTo': last_point_to, 'etd' : first_etd,'eta':last_eta,'transitTime': transit_time,
+                                                                            'transshipment': check_transshipment,
+                                                                            'legs': leg_list},warnings=False)
         yield schedule_body
 
 
