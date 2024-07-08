@@ -25,6 +25,7 @@ def calculate_final_times(index:int, leg_etd:str, leg_tt:int, leg_transport:str,
         final_eta = legs_to.get('eta', last_eta)
         final_etd = leg_from.get('etd', format_datetime(datetime.strptime(final_eta, "%Y-%m-%dT%H:%M:%S.000Z") - default_offset))
     yield final_etd, final_eta
+
 def process_response_data(task: dict, direct_only:bool |None,vessel_imo: str, service: str, tsp: str) -> Iterator:
     """Map the schedule and leg body"""
     check_service_code:bool = any(service == service_leg['code'] for leg_service in task['leg'] if (service_leg:=leg_service.get('service'))) if service else True
@@ -77,10 +78,12 @@ async def get_iqax_p2p(client:HTTPXClientWrapper,background_task:BackgroundTasks
     response_cache:list = await asyncio.gather(*(db.get(key=iqax_response_uuid(scac=sub_iqax)) for sub_iqax in iqax_list))
     check_cache: bool = any(item is None for item in response_cache)
     p2p_resp_tasks: set = {asyncio.create_task(anext(client.parse(background_tasks =background_task,token_key=iqax_response_uuid(scac=iqax),method='GET', url=url.format(iqax),params=params)))
-                           for iqax,cache in zip(iqax_list,response_cache) if cache is None } if check_cache else...
+                           for iqax,cache in zip(iqax_list,response_cache) if cache is None} if check_cache else...
+    combined_p2p_schedule:list = []
     for response in (chain(asyncio.as_completed(p2p_resp_tasks),[item for item in response_cache if item is not None]) if check_cache else response_cache):
         response_json:dict = await response if check_cache and not isinstance(response, dict) else response
         if response_json:
             p2p_schedule: Generator = (schedule_result for schedule_list in response_json.get('routeGroupsList', []) for task in schedule_list['route'] for schedule_result in process_response_data(task=task,direct_only=direct_only, vessel_imo=vessel_imo, service=service,tsp=tsp))
-            return p2p_schedule
+            combined_p2p_schedule.extend(p2p_schedule)
+    return combined_p2p_schedule
 
