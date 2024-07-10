@@ -4,12 +4,48 @@ from app.schemas import schema_response
 from uuid import uuid5,NAMESPACE_DNS,UUID
 from datetime import timedelta,datetime
 from fastapi import BackgroundTasks
-from typing import Generator,Iterator,AsyncIterator
+from typing import Generator,Iterator
+
+
+def process_leg_data(check_transshipment:bool,first_point_from:str,last_point_to:str,first_etd:str,last_eta:str,transit_time:int,schedule_task:dict) -> list:
+    first_origin_terminal: str = schedule_task['originTerminal']
+    last_destination_terminal: str = schedule_task['destinationTerminal']
+    first_voyage: str = schedule_task['voyageNumber']
+    first_vessel_name: str = schedule_task['vesselName']
+    first_imo: str = schedule_task['imoNumber']
+    first_service_code: str = schedule_task['serviceCode']
+    first_service_name: str|None = schedule_task['serviceName'] if schedule_task['serviceName'] != '' else None
+    first_cy_cutoff: str|None = schedule_task['terminalCutoff'] if schedule_task['terminalCutoff'] != '' else None
+    first_doc_cutoff: str|None = schedule_task['docCutoff'] if schedule_task['docCutoff'] != '' else None
+    first_vgm_cutoff: str|None = schedule_task['vgmCutoff'] if schedule_task['vgmCutoff'] != '' else None
+    if check_transshipment:
+        leg_list: list = [schema_response.LEG_ADAPTER.dump_python({
+            'pointFrom': {'locationCode': leg['departureUnloc'], 'terminalName': leg['departureTerminal']},
+            'pointTo': {'locationCode': leg['arrivalUnloc'], 'terminalName': leg['arrivalTerminal']},
+            'etd': leg['departureDateEstimated'],
+            'eta': leg['arrivalDateEstimated'],
+            'transitTime': round(leg['transitDurationHrsUtc'] / 24),
+            'cutoffs': {'cyCutoffDate': first_cy_cutoff, 'docCutoffDate': first_doc_cutoff,'vgmCutOffDate': first_vgm_cutoff} if index == 0 and (first_cy_cutoff or first_doc_cutoff or first_vgm_cutoff) else None,
+            'transportations': {'transportType': 'Vessel', 'transportName': leg['transportName'],'referenceType': None if (transport_type := leg.get('transportID')) == 'UNKNOWN' else 'IMO','reference': None if transport_type == 'UNKNOWN' else transport_type},
+            'services': {'serviceCode': service_code, 'serviceName': leg['serviceName']} if (service_code := leg['serviceCode']) or (leg['serviceName'] and leg['serviceName'] != '') else None,
+            'voyages': {'internalVoyage': voyage_num if (voyage_num := leg.get('conveyanceNumber')) else None}},warnings=False) for index, leg in enumerate(schedule_task['legs'])]
+    else:
+        leg_list: list = [schema_response.LEG_ADAPTER.dump_python({
+            'pointFrom': {'locationCode': first_point_from, 'terminalName': first_origin_terminal},
+            'pointTo': {'locationCode': last_point_to, 'terminalName': last_destination_terminal},
+            'etd': first_etd,
+            'eta': last_eta,
+            'transitTime': transit_time,
+            'cutoffs': {'cyCutoffDate': first_cy_cutoff, 'docCutoffDate': first_doc_cutoff,'vgmCutoffDate': first_vgm_cutoff} if first_cy_cutoff or first_doc_cutoff or first_vgm_cutoff else None,
+            'transportations': {'transportType': 'Vessel', 'transportName': first_vessel_name,'referenceType': None if first_imo == 'UNKNOWN' else 'IMO','reference': None if first_imo == 'UNKNOWN' else first_imo},
+            'services': {'serviceCode': first_service_code,'serviceName': first_service_name} if first_service_code or first_service_name else None,
+            'voyages': {'internalVoyage': first_voyage if first_voyage else None}}, warnings=False)]
+    return leg_list
+
 def process_response_data(task: dict,vessel_imo: str, service: str, tsp: str) -> Iterator:
     """Map the schedule and leg body"""
     service_code: str = task['serviceCode']
     service_name: str = task['serviceName']
-    # Additional check on service code/name in order to fullfill business requirment(query the result by service code)
     check_service: bool = service_code == service or service_name == service if service else True
     check_transshipment: bool = len(task['legs']) > 1
     transshipment_port: bool = any(tsport['departureUnloc'] == tsp for tsport in task['legs'][1:]) if check_transshipment and tsp else False
@@ -18,57 +54,21 @@ def process_response_data(task: dict,vessel_imo: str, service: str, tsp: str) ->
         carrier_code: str = task['scac']
         transit_time: int = round(task['transitDurationHrsUtc'] / 24)
         first_point_from: str = task['originUnloc']
-        first_origin_terminal: str = task['originTerminal']
         last_point_to: str = task['destinationUnloc']
-        last_destination_terminal: str = task['destinationTerminal']
-        first_voyage: str = task['voyageNumber']
-        first_vessel_name: str = task['vesselName']
-        first_imo: str = task['imoNumber']
-        first_service_code: str = task['serviceCode']
-        first_service_name: str = task['serviceName'] if task['serviceName'] != '' else None
         first_etd: str = task['originDepartureDateEstimated']
         last_eta: str = task['destinationArrivalDateEstimated']
-        first_cy_cutoff: str = task['terminalCutoff'] if task['terminalCutoff'] != '' else None
-        first_doc_cutoff: str = task['docCutoff'] if task['docCutoff'] != '' else None
-        first_vgm_cutoff: str = task['vgmCutoff'] if task['vgmCutoff'] != '' else None
-        if check_transshipment:
-            leg_list: list = [schema_response.LEG_ADAPTER.dump_python({
-                'pointFrom':{'locationCode': leg['departureUnloc'], 'terminalName': leg['departureTerminal']},
-                'pointTo':{'locationCode': leg['arrivalUnloc'], 'terminalName': leg['arrivalTerminal']},
-                'etd':leg['departureDateEstimated'],
-                'eta':leg['arrivalDateEstimated'],
-                'transitTime':round(leg['transitDurationHrsUtc'] / 24),
-                'cutoffs':{'cyCutoffDate': first_cy_cutoff, 'docCutoffDate': first_doc_cutoff,'vgmCutOffDate':first_vgm_cutoff} if index == 0 and (first_cy_cutoff or first_doc_cutoff or first_vgm_cutoff) else None,
-                'transportations':{'transportType': 'Vessel', 'transportName': leg['transportName'],
-                                 'referenceType': None if (transport_type := leg.get('transportID')) == 'UNKNOWN' else 'IMO',
-                                 'reference': None if transport_type == 'UNKNOWN' else transport_type},
-                'services':{'serviceCode': service_code, 'serviceName': leg['serviceName']} if (service_code :=leg['serviceCode']) or (leg['serviceName'] and leg['serviceName'] !='') else None,
-                'voyages':{'internalVoyage': voyage_num if (voyage_num := leg.get('conveyanceNumber')) else None }},warnings=False) for index, leg in enumerate(task['legs'])]
-        else:
-            leg_list: list = [schema_response.LEG_ADAPTER.dump_python({
-                'pointFrom':{'locationCode': first_point_from, 'terminalName': first_origin_terminal},
-                'pointTo':{'locationCode': last_point_to, 'terminalName': last_destination_terminal},
-                'etd':first_etd,
-                'eta':last_eta,
-                'transitTime':transit_time,
-                'cutoffs':{'cyCutoffDate': first_cy_cutoff, 'docCutoffDate': first_doc_cutoff,
-                         'vgmCutoffDate': first_vgm_cutoff} if first_cy_cutoff or first_doc_cutoff or first_vgm_cutoff else None,
-                'transportations':{'transportType': 'Vessel', 'transportName': first_vessel_name,
-                                 'referenceType': None if first_imo == 'UNKNOWN' else 'IMO',
-                                 'reference': None if first_imo == 'UNKNOWN' else first_imo},
-                'services':{'serviceCode': first_service_code,
-                          'serviceName': first_service_name} if first_service_code or first_service_name else None,
-                'voyages':{'internalVoyage': first_voyage if first_voyage else None}},warnings=False)]
         schedule_body: dict = schema_response.SCHEDULE_ADAPTER.dump_python({'scac':carrier_code,'pointFrom' : first_point_from,'pointTo' : last_point_to, 'etd' : first_etd,
-                                                                            'eta' : last_eta,'transitTime' : transit_time,'transshipment' : check_transshipment,'legs' : leg_list},warnings=False)
+                                                                            'eta' : last_eta,'transitTime' : transit_time,'transshipment' : check_transshipment,
+                                                                            'legs' : process_leg_data(check_transshipment=check_transshipment,schedule_task=task,first_point_from= first_point_from,last_point_to=last_point_to,
+                                                                                                           first_etd=first_etd,last_eta=last_eta,transit_time=transit_time)},warnings=False)
         yield schedule_body
-async def get_one_access_token(client:HTTPXClientWrapper,background_task:BackgroundTasks, url: str, auth: str, api_key: str)->AsyncIterator[str]:
+async def get_one_access_token(client:HTTPXClientWrapper,background_task:BackgroundTasks, url: str, auth: str, api_key: str) -> str:
     one_token_key:UUID = uuid5(NAMESPACE_DNS, 'one-token-uuid-kuehne-nagel')
     response_token:dict = await db.get(key=one_token_key)
     if response_token is None:
         headers: dict = {'apikey': api_key,'Authorization': auth,'Accept': 'application/json'}
         response_token:dict = await anext(client.parse(method='POST',background_tasks=background_task,url=url, headers=headers,token_key=one_token_key,expire=timedelta(minutes=55)))
-    yield response_token['access_token']
+    return response_token['access_token']
 
 async def get_one_p2p(client:HTTPXClientWrapper, background_task:BackgroundTasks,url: str, turl: str, pw: str, auth: str, pol: str, pod: str, search_range: int,
                       direct_only: bool|None,start_date_type: str,start_date: datetime.date, service: str | None = None,vessel_imo: str | None = None, tsp: str | None = None) -> Generator:
@@ -80,7 +80,7 @@ async def get_one_p2p(client:HTTPXClientWrapper, background_task:BackgroundTasks
     if response_cache:
         p2p_schedule: Generator = generate_schedule(data= response_cache)
         return p2p_schedule
-    token:str = await anext(get_one_access_token(client=client,background_task=background_task, url=turl, auth=auth, api_key=pw))
+    token:str = await get_one_access_token(client=client,background_task=background_task, url=turl, auth=auth, api_key=pw)
     headers: dict = {'apikey': pw, 'Authorization': f'Bearer {token}', 'Accept': 'application/json'}
     response_json:dict = await anext(client.parse(method='GET', url=url, params=params,headers=headers))
     if response_json and response_json.get('errorMessages') is None:

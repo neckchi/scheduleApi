@@ -11,20 +11,8 @@ from fastapi import BackgroundTasks
 from base64 import b64decode
 from typing import Generator,Iterator,AsyncIterator
 
-
-def process_response_data(task: dict, direct_only:bool |None,vessel_imo: str, service: str, tsp: str) -> Iterator:
-    """Map the schedule and leg body"""
-    check_service_code: bool = any(service_desc.get('Service') and service_desc['Service']['Description'] == service for service_desc in task['Schedules']) if service else True
-    check_transshipment: bool = len(task.get('Schedules')) > 1
-    transshipment_port = any(tsport['Calls'][0]['Code'] == tsp for tsport in task['Schedules'][1:]) if check_transshipment and tsp else False
-    check_vessel_imo: bool = any( imo for imo in task['Schedules'] if imo.get('IMONumber') == vessel_imo) if vessel_imo else True
-    if (transshipment_port or not tsp) and (direct_only is None or check_transshipment != direct_only) and check_service_code and check_vessel_imo:
-        first_point_from: str = task['Schedules'][0]['Calls'][0]['Code']
-        last_point_to: str = task['Schedules'][-1]['Calls'][-1]['Code']
-        first_etd: str = next(ed['CallDateTime'] for ed in task['Schedules'][0]['Calls'][0]['CallDates'] if ed['Type'] == 'ETD')
-        last_eta: str = next(ed['CallDateTime'] for ed in task['Schedules'][-1]['Calls'][-1]['CallDates'] if ed['Type'] == 'ETA')
-        transit_time:int = int((datetime.fromisoformat(last_eta) - datetime.fromisoformat(first_etd)).days)
-        leg_list: list = [schema_response.LEG_ADAPTER.dump_python({
+def process_leg_data(leg_task:list)->list:
+    leg_list: list = [schema_response.LEG_ADAPTER.dump_python({
             'pointFrom':{'locationName': leg['Calls'][0]['Name'], 'locationCode': leg['Calls'][0]['Code'],
                        'terminalName': leg['Calls'][0]['EHF']['Description'],
                        'terminalCode': leg['Calls'][0]['DepartureEHFSMDGCode'] if leg['Calls'][0]['DepartureEHFSMDGCode'] != '' else None},
@@ -42,10 +30,26 @@ def process_response_data(task: dict, direct_only:bool |None,vessel_imo: str, se
                              'referenceType': 'IMO' if (imo_code := leg.get('IMONumber')) and imo_code != '' else None,
                              'reference': imo_code if imo_code != '' else None},
             'services':{'serviceCode': leg['Service']['Description']} if leg.get('Service') else None,
-            'voyages':{'internalVoyage': leg['Voyages'][0]['Description'] if leg.get('Voyages') else None}},warnings=False) for leg in task['Schedules']]
+            'voyages':{'internalVoyage': leg['Voyages'][0]['Description'] if leg.get('Voyages') else None}},warnings=False) for leg in leg_task]
+    return leg_list
+
+
+
+def process_schedule_data(task: dict, direct_only:bool |None,vessel_imo: str, service: str, tsp: str) -> Iterator:
+    """Map the schedule and leg body"""
+    check_service_code: bool = any(service_desc.get('Service') and service_desc['Service']['Description'] == service for service_desc in task['Schedules']) if service else True
+    check_transshipment: bool = len(task.get('Schedules')) > 1
+    transshipment_port = any(tsport['Calls'][0]['Code'] == tsp for tsport in task['Schedules'][1:]) if check_transshipment and tsp else False
+    check_vessel_imo: bool = any( imo for imo in task['Schedules'] if imo.get('IMONumber') == vessel_imo) if vessel_imo else True
+    if (transshipment_port or not tsp) and (direct_only is None or check_transshipment != direct_only) and check_service_code and check_vessel_imo:
+        first_point_from: str = task['Schedules'][0]['Calls'][0]['Code']
+        last_point_to: str = task['Schedules'][-1]['Calls'][-1]['Code']
+        first_etd: str = next(ed['CallDateTime'] for ed in task['Schedules'][0]['Calls'][0]['CallDates'] if ed['Type'] == 'ETD')
+        last_eta: str = next(ed['CallDateTime'] for ed in task['Schedules'][-1]['Calls'][-1]['CallDates'] if ed['Type'] == 'ETA')
+        transit_time:int = int((datetime.fromisoformat(last_eta) - datetime.fromisoformat(first_etd)).days)
         schedule_body: dict = schema_response.SCHEDULE_ADAPTER.dump_python({'scac': 'MSCU','pointFrom': first_point_from,'pointTo': last_point_to, 'etd' : first_etd,'eta':last_eta,'transitTime': transit_time,
                                                                             'transshipment': check_transshipment,
-                                                                            'legs': leg_list},warnings=False)
+                                                                            'legs': process_leg_data(leg_task=task['Schedules'])},warnings=False)
         yield schedule_body
 
 
@@ -61,18 +65,18 @@ async def get_msc_token(client:HTTPXClientWrapper,background_task:BackgroundTask
         params: dict = {'scope': msc_scope,'client_id': msc_client,'client_assertion_type': 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer','grant_type': 'client_credentials', 'client_assertion': encoded}
         headers: dict = {'Content-Type': 'application/x-www-form-urlencoded'}
         response_token:dict = await anext(client.parse(background_tasks =background_task,method='POST',url=oauth, headers=headers, data=params,token_key=msc_token_key,expire = timedelta(minutes=40)))
-    yield response_token['access_token']
+    return response_token['access_token']
 
 async def get_msc_p2p(client:HTTPXClientWrapper, background_task:BackgroundTasks,url: str, oauth: str, aud: str, pw: str, msc_client: str, msc_scope: str,msc_thumbprint: str, pol: str, pod: str,
                       search_range: int, start_date_type: str,start_date: datetime.date, direct_only: bool |None, vessel_imo: str | None = None, service: str | None = None, tsp: str | None = None) -> Generator:
     params: dict = {'fromPortUNCode': pol, 'toPortUNCode': pod, 'fromDate': start_date,'toDate': (start_date + timedelta(days=search_range)).strftime("%Y-%m-%d"), 'datesRelated': start_date_type}
     msc_response_uuid: UUID = uuid5(NAMESPACE_DNS, 'msc-response-kuehne-nagel' + str(params) + str(direct_only) + str(vessel_imo) + str(service) + str(tsp))
     response_cache = await db.get(key=msc_response_uuid)
-    generate_schedule = lambda data:(schedule_result for task in data['MSCSchedule']['Transactions'] for schedule_result in process_response_data(task=task,direct_only=direct_only, vessel_imo=vessel_imo, service=service,tsp=tsp))
+    generate_schedule = lambda data:(schedule_result for task in data['MSCSchedule']['Transactions'] for schedule_result in process_schedule_data(task=task,direct_only=direct_only, vessel_imo=vessel_imo, service=service,tsp=tsp))
     if response_cache:
         p2p_schedule: Generator = generate_schedule(data=response_cache)
         return p2p_schedule
-    token = await anext(get_msc_token(client=client,background_task=background_task,oauth=oauth, aud=aud, rsa=pw, msc_client=msc_client, msc_scope=msc_scope,msc_thumbprint=msc_thumbprint))
+    token = await get_msc_token(client=client,background_task=background_task,oauth=oauth, aud=aud, rsa=pw, msc_client=msc_client, msc_scope=msc_scope,msc_thumbprint=msc_thumbprint)
     headers: dict = {'Authorization': f'Bearer {token}'}
     response_json:dict = await anext(client.parse(method='GET', url=url, params=params, headers=headers))
     if response_json:
