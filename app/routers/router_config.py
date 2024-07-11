@@ -8,28 +8,30 @@ from fastapi.exceptions import RequestValidationError,ResponseValidationError
 from starlette.background import BackgroundTask
 from starlette.responses import StreamingResponse
 from uuid import UUID,uuid4
-from typing import Literal,Generator,Callable
+from typing import Literal,Generator,Callable,AsyncGenerator,Dict,Any
 from datetime import timedelta
 import httpx
 import logging
 import orjson
 import asyncio
-import atexit
 
 
 QUEUE_LISTENER = log_queue_listener()
 async def startup_event():
-    QUEUE_LISTENER.start()
-    await db.initialize_database()
     # Global Client Setup
     global httpx_client
+    QUEUE_LISTENER.start()
+    await db.initialize_database()
     httpx_client = HTTPXClientWrapper()
     logging.info("HTTPX Client initialized",extra={'custom_attribute':None})
 
 async def shutdown_event():
-    atexit.register(httpx_client.aclose)
-    atexit.register(QUEUE_LISTENER.stop)
-    logging.info("HTTPX Client closed",extra={'custom_attribute':None})
+    global httpx_client
+    if httpx_client:
+        await httpx_client.aclose()
+        logging.info("HTTPX Client closed", extra={'custom_attribute': None})
+    QUEUE_LISTENER.stop()
+
 
 
 """Given that each of the 7000 employees performs 7000 searches per hour, this amounts to 7000×7000=49,000,000
@@ -46,14 +48,10 @@ We can adjust this number based on the actual performance and server capacity.
 Since KN employees are performing searches frequently (every hour), setting a higher keep-alive expiry can help reuse connections effectively."""
 
 
-# SSL_CONTEXT = httpx.create_ssl_context()
-# KN_PROXY:httpx.Proxy = httpx.Proxy("http://zscaler.proxy.int.kn:80")
-KN_PROXY:httpx.Proxy = httpx.Proxy("http://proxy.eu-central-1.aws.int.kn:80")
-HTTPX_TIMEOUT = httpx.Timeout(load_yaml()['data']['connectionPoolSetting']['elswhereTimeOut'], connect=load_yaml()['data']['connectionPoolSetting']['connectTimeOut'])
+HTTPX_TIMEOUT = httpx.Timeout(load_yaml()['data']['connectionPoolSetting']['elswhereTimeOut'],pool=load_yaml()['data']['connectionPoolSetting']['connectTimeOut'], connect=load_yaml()['data']['connectionPoolSetting']['connectTimeOut'])
 HTTPX_LIMITS = httpx.Limits(max_connections=load_yaml()['data']['connectionPoolSetting']['maxClientConnection'],
                             max_keepalive_connections=load_yaml()['data']['connectionPoolSetting']['maxKeepAliveConnection'],keepalive_expiry=load_yaml()['data']['connectionPoolSetting']['keepAliveExpiry'])
-# HTTPX_ASYNC_HTTP = httpx.AsyncHTTPTransport(retries=3,proxy=KN_PROXY,verify=SSL_CONTEXT,limits=HTTPX_LIMITS)
-HTTPX_ASYNC_HTTP = httpx.AsyncHTTPTransport(retries=3,proxy = KN_PROXY,verify=False,limits=HTTPX_LIMITS)
+HTTPX_ASYNC_HTTP = httpx.AsyncHTTPTransport(retries=3,verify=False,limits=HTTPX_LIMITS)
 
 
 class HTTPXClientWrapper(httpx.AsyncClient):
@@ -82,54 +80,55 @@ class HTTPXClientWrapper(httpx.AsyncClient):
                 raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f'An error occurred while creating the client - {eg.args}')
             logging.info(f'Client Session Closed - {standalone_client.session_id}')
 
-
-    async def parse(self,url: str, method: str = Literal['GET', 'POST'],params: dict = None, headers: dict = None, json: dict = None, token_key=None,data: dict = None,
-                    background_tasks: BackgroundTasks = None, expire=timedelta(hours = load_yaml()['data']['backgroundTasks']['scheduleExpiry']),stream: bool = False):
+    async def parse(self, url: str, method: Literal['GET', 'POST'] = 'GET', params: dict = None, headers: dict = None,json: dict = None, token_key: str|UUID = None, data: dict = None,
+                    background_tasks: BackgroundTasks = None,expire: timedelta = timedelta(hours=load_yaml()['data']['backgroundTasks']['scheduleExpiry']),stream: bool = False) -> AsyncGenerator[Dict[str, Any], None]:
         """Fetch the file from carrier API and deserialize the json file """
         if not stream:
-            response = await self.request(method=method, url=url, params=params, headers=headers, json=json,data=data)
-            if response.status_code == status.HTTP_206_PARTIAL_CONTENT: #only CMA returns 206 if the number of schedule is more than 49. That means we shouldnt deserialize the json response at the beginning coz there are more responses need to be fetched based on the header range.
+            async for response in self.handle_standard_response(url, method, params, headers, json, data, token_key,background_tasks, expire):
                 yield response
-            if response.status_code == status.HTTP_200_OK:
-                response_json = response.json()
-                if background_tasks:
-                    background_tasks.add_task(db.set, key=token_key, value=response_json, expire=expire)
-                yield response_json
-            if response.status_code in (status.HTTP_500_INTERNAL_SERVER_ERROR,status.HTTP_502_BAD_GATEWAY):
-                logging.critical(f'Unable to connect to {url}')
-                yield None
-            else:yield None
         else:
-            """
-            At the moment Only Maersk need consumer to stream the response
-            """
-            client_request = self.build_request(method=method, url=url, params=params, headers=headers, data=data)
-            stream_request = await self.send(client_request, stream=True)
-            if stream_request.status_code == status.HTTP_200_OK:
-                result = StreamingResponse(stream_request.aiter_lines(),status_code=status.HTTP_200_OK, background=BackgroundTask(stream_request.aclose))
-                async for data in result.body_iterator:
-                    response = orjson.loads(data)
-                    if background_tasks:
-                        background_tasks.add_task(db.set, key=token_key, value=response, expire=expire)
-                    yield response
-            else:yield None
+            async for response in self.handle_streaming_response(url, method, params, headers, data, token_key,background_tasks, expire):
+                yield response
 
+    async def handle_standard_response(self, url: str, method: str, params: dict, headers: dict, json: dict, data: dict, token_key: str, background_tasks: BackgroundTasks, expire: timedelta) -> AsyncGenerator[Dict[str,Any],None]:
+        response = await self.request(method=method, url=url, params=params, headers=headers, json=json, data=data)
+        if response.status_code == status.HTTP_206_PARTIAL_CONTENT:
+            yield response
+        elif response.status_code == status.HTTP_200_OK:
+            response_json = response.json()
+            if background_tasks:
+                background_tasks.add_task(db.set, key=token_key, value=response_json, expire=expire)
+            yield response_json
+        elif response.status_code in (status.HTTP_500_INTERNAL_SERVER_ERROR, status.HTTP_502_BAD_GATEWAY):
+            logging.critical(f'Unable to connect to {url}')
+            yield None
+        else:
+            yield None
 
+    async def handle_streaming_response(self, url: str, method: str, params: dict, headers: dict, data: dict,token_key: str, background_tasks: BackgroundTasks, expire: timedelta) -> AsyncGenerator[Dict[str, Any],None]:
+        client_request = self.build_request(method=method, url=url, params=params, headers=headers, data=data)
+        stream_request = await self.send(client_request, stream=True)
+        if stream_request.status_code == status.HTTP_200_OK:
+            result = StreamingResponse(stream_request.aiter_lines(), status_code=status.HTTP_200_OK,background=BackgroundTask(stream_request.aclose))
+            async for data in result.body_iterator:
+                response = orjson.loads(data)
+                if background_tasks:
+                    background_tasks.add_task(db.set, key=token_key, value=response, expire=expire)
+                yield response
+        else:
+            yield None
     def gen_all_valid_schedules(self,correlation:str|None,response:Response,product_id:UUID,matrix:Generator,point_from:str,point_to:str,background_tasks:BackgroundTasks,task_exception:bool):
         """Validate the schedule and serialize hte json file excluding the field without any value """
         flat_list:list = [item for row in matrix if not isinstance(row, Exception) and row is not None for item in row]
         count_schedules:int = len(flat_list)
-
         if count_schedules == 0:
             headers:dict = {"X-Correlation-ID":str(correlation),"Pragma":"no-cache","Cache-Control":  "no-cache, no-store, max-age=0, must-revalidate"}
             final_result = JSONResponse(headers=headers,status_code=status.HTTP_200_OK,content=jsonable_encoder(schema_response.Error(id=product_id,detail=f"{point_from}-{point_to} schedule not found")))
         else:
             sorted_schedules: list = sorted(flat_list, key=lambda tt: (tt['etd'], tt['transitTime']))
-            final_result = schema_response.Product(
-            productid=product_id,
-            origin=point_from,
-            destination=point_to, noofSchedule=count_schedules,
-            schedules=sorted_schedules).model_dump(mode='json',exclude_none=True)
+            final_set:dict = {'productid':product_id,'origin':point_from,'destination':point_to, 'noofSchedule':count_schedules,'schedules':sorted_schedules}
+            final_validation = schema_response.PRODUCT_ADAPTER.validate_python(final_set)
+            final_result = schema_response.PRODUCT_ADAPTER.dump_python(final_validation,mode='json',exclude_none=True)
             response.headers["X-Correlation-ID"] = str(correlation)
             response.headers["Pragma"] = "no-cache"
             response.headers["Cache-Control"] = "public, max-age=7200"
@@ -140,7 +139,6 @@ class HTTPXClientWrapper(httpx.AsyncClient):
 
 #Global Client Setup
 async def get_global_httpx_client_wrapper() -> Generator[HTTPXClientWrapper, None, None]:
-
     """Global ClientConnection Pool  Setup"""
     try:
         yield httpx_client
@@ -158,8 +156,7 @@ async def get_global_httpx_client_wrapper() -> Generator[HTTPXClientWrapper, Non
                             detail=f'{response_error.__class__.__name__}:{response_error}')
     except Exception as eg:
         logging.error(f'{eg.__class__.__name__}:{eg.args}')
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                            detail=f'An error occurred while creating the client - {eg.args}')
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f'An error occurred while creating the client - {eg.args}')
 
 class AsyncTaskManager():
     """Currently there is no built in  python class and method that we can prevent it from cancelling all conroutine tasks if one of the tasks is cancelled
