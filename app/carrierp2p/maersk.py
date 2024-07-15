@@ -70,7 +70,7 @@ async def get_maersk_cutoff(client:HTTPXClientWrapper, url: str, headers: dict, 
     """this is the Maersk API to get the cutOffDate """
     params: dict = {'ISOCountryCode': country, 'portOfLoad': pol, 'vesselIMONumber': imo, 'voyage': voyage}
     async for response_json in client.parse(url=url,method ='GET',stream=True,headers=headers, params=params):
-        if response_json[0]:
+        if response_json:
             lookup_key = hash(country+pol+imo+voyage)
             cut_off_body: dict = {}
             for cutoff in response_json[0]['shipmentDeadlines']['deadlines']:
