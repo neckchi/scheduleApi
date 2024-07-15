@@ -64,16 +64,17 @@ async def get_cutoff_first_leg(client:HTTPXClientWrapper,cut_off_url:str,cut_off
                          for index, leg in enumerate(get_all_first_leg) if leg not in get_all_first_leg[:index]]
     get_cut_offs = await asyncio.gather(*cut_off_leg)
     first_cut_off: dict = {key: value for cutoff in get_cut_offs if cutoff is not None for key, value in cutoff.items()}
+    print(first_cut_off)
     return first_cut_off
 
 async def get_maersk_cutoff(client:HTTPXClientWrapper, url: str, headers: dict, country: str, pol: str, imo: str, voyage: str)-> dict|None:
     """this is the Maersk API to get the cutOffDate """
     params: dict = {'ISOCountryCode': country, 'portOfLoad': pol, 'vesselIMONumber': imo, 'voyage': voyage}
     async for response_json in client.parse(url=url,method ='GET',stream=True,headers=headers, params=params):
-        if response_json[:1]:
+        if response_json[0]:
             lookup_key = hash(country+pol+imo+voyage)
             cut_off_body: dict = {}
-            for cutoff in response_json[:1]['shipmentDeadlines']['deadlines']:
+            for cutoff in response_json[0]['shipmentDeadlines']['deadlines']:
                 if cutoff.get('deadlineName') == 'Commercial Cargo Cutoff':
                     cut_off_body.update({'cyCutoffDate': cutoff.get('deadlineLocal')})
                 if cutoff.get('deadlineName') in ('Shipping Instructions Deadline','Shipping Instructions Deadline for Advance Manifest Cargo','Special Cargo Documentation Deadline'):
@@ -82,7 +83,6 @@ async def get_maersk_cutoff(client:HTTPXClientWrapper, url: str, headers: dict, 
                     cut_off_body.update({'vgmCutoffDate': cutoff.get('deadlineLocal')})
             return {lookup_key: cut_off_body}
         return None
-
 
 async def retrieve_geo_locations(client:HTTPXClientWrapper, background_task:BackgroundTasks, pol:str, pod:str, location_url:str, pw:str):
     maersk_uuid = lambda port: uuid5(NAMESPACE_DNS, f'maersk-loc-uuid-kuehne-nagel-{port}')
