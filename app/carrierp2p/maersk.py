@@ -64,7 +64,6 @@ async def get_cutoff_first_leg(client:HTTPXClientWrapper,cut_off_url:str,cut_off
                          for index, leg in enumerate(get_all_first_leg) if leg not in get_all_first_leg[:index]]
     get_cut_offs = await asyncio.gather(*cut_off_leg)
     first_cut_off: dict = {key: value for cutoff in get_cut_offs if cutoff is not None for key, value in cutoff.items()}
-    print(first_cut_off)
     return first_cut_off
 
 async def get_maersk_cutoff(client:HTTPXClientWrapper, url: str, headers: dict, country: str, pol: str, imo: str, voyage: str)-> dict|None:
