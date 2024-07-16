@@ -8,16 +8,16 @@ data:
   connectionPoolSetting:
     connectTimeOut: 90
     elswhereTimeOut: 30
-    maxClientConnection: 1500
+    maxClientConnection: 4500
     maxKeepAliveConnection: 750
-    keepAliveExpiry: 30
+    keepAliveExpiry: 10
     retryNumber: 3
     asyncDefaultTimeOut: 20
   activeCarriers:
     cma:  True
     hlag: False
     hmm: True
-    iqax: True
+    iqax: False
     maersk: True
     msc: True
     one: True
