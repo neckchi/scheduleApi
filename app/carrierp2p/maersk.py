@@ -14,10 +14,10 @@ from app.schemas.schema_request import TRANSPORT_TYPE
 def process_leg_data(leg_task:list,first_cut_off:dict):
     leg_list: list = [schema_response.LEG_ADAPTER.dump_python({
         'pointFrom': {'locationName': (pol_name := leg['facilities']['startLocation']['cityName']),
-                      'locationCode': leg['facilities']['startLocation']['UNLocationCode'],
+                      'locationCode': pol_code,
                       'terminalName': leg['facilities']['startLocation']['locationName']},
         'pointTo': {'locationName': leg['facilities']['endLocation']['cityName'],
-                    'locationCode': leg['facilities']['endLocation']['UNLocationCode'],
+                    'locationCode': pod_code,
                     'terminalName': leg['facilities']['endLocation']['locationName']},
         'etd': (etd := leg['departureDateTime']),
         'eta': (eta := leg['arrivalDateTime']),
@@ -28,7 +28,8 @@ def process_leg_data(leg_task:list,first_cut_off:dict):
                             'reference': imo_code if imo_code not in ('9999999', 'None', '') else None},
         'services': {'serviceCode': service_name} if (service_name := leg['transport'].get('carrierServiceName',leg['transport'].get('carrierServiceCode'))) else None,
         'voyages': {'internalVoyage': voyage_num if (voyage_num := leg['transport'].get('carrierDepartureVoyageNumber')) else None},
-        'cutoffs': first_cut_off.get(hash(leg['facilities']['startLocation']['countryCode'] + pol_name + imo_code + voyage_num)) if pol_name and imo_code and voyage_num else None},warnings=False) for leg in leg_task]
+        'cutoffs': first_cut_off.get(hash(leg['facilities']['startLocation']['countryCode'] + pol_name + imo_code + voyage_num)) if pol_name and imo_code and voyage_num else None},warnings=False) for leg in leg_task
+        if (pol_code:=leg['facilities']['startLocation']['UNLocationCode']) != (pod_code:=leg['facilities']['endLocation']['UNLocationCode'])]
     return leg_list
 
 
