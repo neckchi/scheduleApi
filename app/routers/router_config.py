@@ -5,8 +5,6 @@ from fastapi import status,HTTPException,BackgroundTasks,Response
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError,ResponseValidationError
-from starlette.background import BackgroundTask
-from starlette.responses import StreamingResponse
 from uuid import UUID,uuid4
 from typing import Literal,Generator,Callable,AsyncGenerator,Dict,Any
 from datetime import timedelta
@@ -14,6 +12,8 @@ import httpx
 import logging
 import orjson
 import asyncio
+import time
+
 
 
 QUEUE_LISTENER = log_queue_listener()
@@ -47,7 +47,7 @@ Therefor,  10% of 13,611 is approximately 1361 connections.
 We can adjust this number based on the actual performance and server capacity.
 Since KN employees are performing searches frequently (every hour), setting a higher keep-alive expiry can help reuse connections effectively."""
 
-
+logging.getLogger("httpx").setLevel(logging.WARNING)
 KN_PROXY:httpx.Proxy = httpx.Proxy("http://proxy.eu-central-1.aws.int.kn:80")
 HTTPX_TIMEOUT = httpx.Timeout(load_yaml()['data']['connectionPoolSetting']['elswhereTimeOut'],pool=load_yaml()['data']['connectionPoolSetting']['connectTimeOut'], connect=load_yaml()['data']['connectionPoolSetting']['connectTimeOut'])
 HTTPX_LIMITS = httpx.Limits(max_connections=load_yaml()['data']['connectionPoolSetting']['maxClientConnection'],
@@ -94,6 +94,7 @@ class HTTPXClientWrapper(httpx.AsyncClient):
 
     async def handle_standard_response(self, url: str, method: str, params: dict, headers: dict, json: dict, data: dict, token_key: str, background_tasks: BackgroundTasks, expire: timedelta) -> AsyncGenerator[Dict[str,Any],None]:
         response = await self.request(method=method, url=url, params=params, headers=headers, json=json, data=data)
+        logging.info(f'{method} {response.url} {response.http_version} {response.status_code} {response.reason_phrase} elapsed_time={response.elapsed.total_seconds()}s')
         if response.status_code == status.HTTP_206_PARTIAL_CONTENT:
             yield response
         elif response.status_code == status.HTTP_200_OK:
@@ -102,38 +103,48 @@ class HTTPXClientWrapper(httpx.AsyncClient):
                 background_tasks.add_task(db.set, key=token_key, value=response_json, expire=expire)
             yield response_json
         elif response.status_code in (status.HTTP_500_INTERNAL_SERVER_ERROR, status.HTTP_502_BAD_GATEWAY):
-            logging.critical(f'Unable to connect to {url}')
+            logging.critical(f'Unable to connect to {response.url}')
             yield None
         else:
             yield None
+
 
     async def handle_streaming_response(self, url: str, method: str, params: dict, headers: dict, data: dict,token_key: str, background_tasks: BackgroundTasks, expire: timedelta) -> AsyncGenerator[Dict[str, Any],None]:
         client_request = self.build_request(method=method, url=url, params=params, headers=headers, data=data)
         stream_request = await self.send(client_request, stream=True)
         if stream_request.status_code == status.HTTP_200_OK:
-            result = StreamingResponse(stream_request.aiter_lines(), status_code=status.HTTP_200_OK,background=BackgroundTask(stream_request.aclose))
-            async for data in result.body_iterator:
-                response = orjson.loads(data)
-                if background_tasks:
-                    background_tasks.add_task(db.set, key=token_key, value=response, expire=expire)
-                yield response
+            try:
+                async for data in stream_request.aiter_lines():
+                    response = orjson.loads(data)
+                    logging.info(f'{method} {stream_request.url} {stream_request.http_version} {stream_request.status_code} {stream_request.reason_phrase} elapsed_time={stream_request.elapsed.total_seconds()}s')
+                    if background_tasks:
+                        background_tasks.add_task(db.set, key=token_key, value=response, expire=expire)
+                    yield response
+
+            finally:
+                await stream_request.aclose()
         else:
             yield None
+
+
     def gen_all_valid_schedules(self,correlation:str|None,response:Response,product_id:UUID,matrix:Generator,point_from:str,point_to:str,background_tasks:BackgroundTasks,task_exception:bool):
         """Validate the schedule and serialize hte json file excluding the field without any value """
         flat_list:list = [item for row in matrix if not isinstance(row, Exception) and row is not None for item in row]
         count_schedules:int = len(flat_list)
+        response.headers.update({"X-Correlation-ID": str(correlation), "Cache-Control": "public, max-age=7200" if count_schedules >0 else "no-cache, no-store, max-age=0, must-revalidate",
+                                 "KN-Count-Schedules": str(count_schedules)})
         if count_schedules == 0:
-            headers:dict = {"X-Correlation-ID":str(correlation),"Pragma":"no-cache","Cache-Control":  "no-cache, no-store, max-age=0, must-revalidate"}
-            final_result = JSONResponse(headers=headers,status_code=status.HTTP_200_OK,content=jsonable_encoder(schema_response.Error(id=product_id,detail=f"{point_from}-{point_to} schedule not found")))
+            final_result = JSONResponse(status_code=status.HTTP_200_OK,content=jsonable_encoder(schema_response.Error(productid=product_id,details=f"{point_from}-{point_to} schedule not found")))
         else:
+            validation_start_time = time.time()
             sorted_schedules: list = sorted(flat_list, key=lambda tt: (tt['etd'], tt['transitTime']))
             final_set:dict = {'productid':product_id,'origin':point_from,'destination':point_to, 'noofSchedule':count_schedules,'schedules':sorted_schedules}
             final_validation = schema_response.PRODUCT_ADAPTER.validate_python(final_set)
+            logging.info(f'total_validation_time={time.time() - validation_start_time:.2f}s Validated the schedule ')
+
+            dump_start_time = time.time()
             final_result = schema_response.PRODUCT_ADAPTER.dump_python(final_validation,mode='json',exclude_none=True)
-            response.headers["X-Correlation-ID"] = str(correlation)
-            response.headers["Pragma"] = "no-cache"
-            response.headers["Cache-Control"] = "public, max-age=7200"
+            logging.info(f'serialization_time={time.time() - dump_start_time:.2f}s Dump json file excluding all the fields without value ')
             if not task_exception:
                 background_tasks.add_task(db.set,key=product_id,value=final_result)
         return final_result
@@ -169,10 +180,12 @@ class AsyncTaskManager():
         self.default_timeout:int = default_timeout
         self.max_retries:int = max_retries
     async def __aenter__(self):
+
+        logging.info('AsyncContextManger Started - Creating conroutine tasks for requested carriers')
         return self
     async def __aexit__(self, exc_type = None, exc = None, tb= None):
         self.results = await asyncio.gather(*self.__tasks.values(), return_exceptions=True)
-
+        logging.info('AsyncContextManger Closed - Gathering And Standardizing all the schedule files obtained from carriers')
     async def _timeout_wrapper(self, coro:Callable, task_name:str):
         """Wrap a coroutine with a timeout and retry logic."""
         retries:int = 0
@@ -195,4 +208,5 @@ class AsyncTaskManager():
         self.__tasks[name] = asyncio.create_task(self._timeout_wrapper(coro=coro,task_name=name))
 
     def results(self) -> Generator:
+        logging.info('Gathering and standarding the schedule format')
         return (result for result in self.results if not isinstance(result, Exception)) if self.error else self.results

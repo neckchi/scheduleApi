@@ -3,7 +3,7 @@ from uuid import UUID
 from datetime import datetime
 from pydantic import BaseModel, Field, PositiveInt,model_validator,ConfigDict,TypeAdapter
 from .schema_request import CarrierCode
-from typing_extensions import Literal
+from typing import Literal
 
 
 
@@ -127,15 +127,15 @@ class Product(BaseModel):
     schedules: list[Schedule] | None = Field(default=None, title='Number Of Schedules',
                                              description="The number of p2p schedule offered by carrier")
 
-PRODUCT_ADAPTER = TypeAdapter(Product)
-SCHEDULE_ADAPTER = TypeAdapter(Schedule)
-LEG_ADAPTER = TypeAdapter(Leg)
-
 class Error(BaseModel):
-    id: UUID
-    detail: str
+    productid: UUID
+    details: str
 class HealthCheck(BaseModel):
     """Response model to validate and return when performing a health check."""
     status: str = "OK"
+
+PRODUCT_ADAPTER = TypeAdapter(Product)
+SCHEDULE_ADAPTER = TypeAdapter(Schedule)
+LEG_ADAPTER = TypeAdapter(Leg)
 
 

@@ -1,5 +1,6 @@
 import datetime
 import logging
+import time
 from uuid import uuid5,NAMESPACE_DNS,UUID
 from fastapi import APIRouter, Query, Depends,Header, BackgroundTasks,Response
 from app.carrierp2p import cma, one, hmm, zim, maersk, msc, iqax,hlag
@@ -20,8 +21,8 @@ router = APIRouter(prefix='/schedules', tags=["API Point To Point Schedules"])
 async def get_schedules(background_tasks: BackgroundTasks,
                         response:Response,
                         X_Correlation_ID: str | None = Header(default=None),
-                        point_from: str = Query(alias='pointFrom', default=..., max_length=5,regex=r"[A-Z]{2}[A-Z0-9]{3}",example='HKHKG',description='Search by either port or point of origin'),
-                        point_to: str = Query(alias='pointTo', default=..., max_length=5, regex=r"[A-Z]{2}[A-Z0-9]{3}",example='DEHAM',description="Search by either port or point of destination"),
+                        point_from: str = Query(alias='pointFrom', default=..., max_length=5,pattern=r"[A-Z]{2}[A-Z0-9]{3}",example='HKHKG',description='Search by either port or point of origin'),
+                        point_to: str = Query(alias='pointTo', default=..., max_length=5, pattern=r"[A-Z]{2}[A-Z0-9]{3}",example='DEHAM',description="Search by either port or point of destination"),
                         start_date_type:StartDateType = Query(alias='startDateType', default=...,description="Search by either ETD or ETA"),
                         start_date: datetime.date = Query(alias='startDate', default=...,example=datetime.datetime.now().strftime("%Y-%m-%d"),description='YYYY-MM-DD'),
                         search_range: SearchRange = Query(alias='searchRange',description='Search range based on start date and type,max 4 weeks',default=..., example=3),
@@ -41,8 +42,10 @@ async def get_schedules(background_tasks: BackgroundTasks,
     Search P2P Schedules with all the information:
     - **pointFrom/pointTo** : Provide either Point or Port in UNECE format
     """
-
+    start_time = time.time()
     logging.setLogRecordFactory(log_correlation(correlation=X_Correlation_ID))
+    logging.info(f'Received a request with following parameters:pol={point_from} pod={point_to} start_date_type={start_date_type} start_date={start_date} search_range={search_range} scac={scac} direct_only={direct_only}' 
+                 f'tsp={tsp} vessel_imo={vessel_imo} vessel_flag_code={vessel_flag_code}')
     product_id:UUID = uuid5(NAMESPACE_DNS,f'{scac}-p2p-api-{point_from}{point_to}{start_date_type}{start_date}{search_range}{tsp}{direct_only}{vessel_imo}{service}')
     ttl_schedule = await db.get(key=product_id)
     if not ttl_schedule:
@@ -125,7 +128,10 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                           etd= start_date if start_date_type == StartDateType.departure  else None ,
                                           eta =start_date if start_date_type == StartDateType.arrival else None,tsp=tsp,
                                           direct_only=direct_only))
+
         final_schedules = client.gen_all_valid_schedules(response=response,correlation=X_Correlation_ID,matrix=task_group.results,product_id=product_id,point_from=point_from,point_to=point_to,background_tasks=background_tasks,task_exception=task_group.error)
+        process_time = time.time() - start_time
+        logging.info(f'total_processing_time={process_time:.2f}s total_results={response.headers.get("KN-Count-Schedules")}')
         return final_schedules
     else:
         return ttl_schedule
