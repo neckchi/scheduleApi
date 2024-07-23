@@ -9,7 +9,7 @@ from app.schemas import schema_response
 from app.schemas.schema_request import CarrierCode,StartDateType,SearchRange
 from app.background_tasks import db
 from app.config import Settings,get_settings,load_yaml
-from app.routers.router_config import HTTPXClientWrapper,AsyncTaskManager,get_global_httpx_client_wrapper
+from app.routers.router_config import HTTPXClientWrapper,AsyncTaskManager
 from app.routers.security import basic_auth
 
 
@@ -35,8 +35,8 @@ async def get_schedules(background_tasks: BackgroundTasks,
                         settings: Settings = Depends(get_settings),
                         carrier_status = Depends(load_yaml),
                         credentials = Depends(basic_auth),
-                        # client:HTTPXClientWrapper = Depends(HTTPXClientWrapper.get_individual_httpx_client_wrapper)):
-                        client:HTTPXClientWrapper = Depends(get_global_httpx_client_wrapper)):
+                        client:HTTPXClientWrapper = Depends(HTTPXClientWrapper.get_individual_httpx_client_wrapper)):
+                        # client:HTTPXClientWrapper = Depends(get_global_httpx_client_wrapper)):
 
     """
     Search P2P Schedules with all the information:
@@ -47,7 +47,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
     logging.info(f'Received a request with following parameters:pol={point_from} pod={point_to} start_date_type={start_date_type} start_date={start_date} search_range={search_range} scac={scac} direct_only={direct_only}' 
                  f'tsp={tsp} vessel_imo={vessel_imo} vessel_flag_code={vessel_flag_code}')
     product_id:UUID = uuid5(NAMESPACE_DNS,f'{scac}-p2p-api-{point_from}{point_to}{start_date_type}{start_date}{search_range}{tsp}{direct_only}{vessel_imo}{service}')
-    ttl_schedule = await db.get(key=product_id)
+    ttl_schedule = await db.get(key=product_id,log_component='the whole schedules')
     if not ttl_schedule:
         # 👇 Having this allows for waiting for all our tasks with strong safety guarantees,logic around cancellation for failures,coroutine-safe and grouping of exceptions.
         async with AsyncTaskManager() as task_group:

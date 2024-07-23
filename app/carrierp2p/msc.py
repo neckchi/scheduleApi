@@ -55,7 +55,7 @@ def process_schedule_data(task: dict, direct_only:bool |None,vessel_imo: str, se
 
 async def get_msc_token(client:HTTPXClientWrapper,background_task:BackgroundTasks, oauth: str, aud: str, rsa:str, msc_client: str, msc_scope: str, msc_thumbprint: str) ->AsyncIterator:
     msc_token_key:UUID = uuid5(NAMESPACE_DNS, 'msc-token-uuid-kuehne-nagel')
-    response_token:dict = await db.get(key=msc_token_key)
+    response_token:dict = await db.get(key=msc_token_key,log_component='msc token')
     if response_token is None:
         x5t: bytes = base64.b64encode(bytearray.fromhex(msc_thumbprint))
         payload_header: dict = {'x5t': x5t.decode(), 'typ': 'JWT'}
@@ -64,23 +64,22 @@ async def get_msc_token(client:HTTPXClientWrapper,background_task:BackgroundTask
         encoded: str = jwt.encode(headers=payload_header, payload=payload_data, key=private_rsa_key, algorithm='RS256')
         params: dict = {'scope': msc_scope,'client_id': msc_client,'client_assertion_type': 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer','grant_type': 'client_credentials', 'client_assertion': encoded}
         headers: dict = {'Content-Type': 'application/x-www-form-urlencoded'}
-        response_token:dict = await anext(client.parse(background_tasks =background_task,method='POST',url=oauth, headers=headers, data=params,token_key=msc_token_key,expire = timedelta(minutes=40)))
+        response_token:dict = await anext(client.parse(scac='msc',background_tasks =background_task,method='POST',url=oauth, headers=headers, data=params,token_key=msc_token_key,expire = timedelta(minutes=40)))
     return response_token['access_token']
 
 async def get_msc_p2p(client:HTTPXClientWrapper, background_task:BackgroundTasks,url: str, oauth: str, aud: str, pw: str, msc_client: str, msc_scope: str,msc_thumbprint: str, pol: str, pod: str,
                       search_range: int, start_date_type: str,start_date: datetime.date, direct_only: bool |None, vessel_imo: str | None = None, service: str | None = None, tsp: str | None = None) -> Generator:
     params: dict = {'fromPortUNCode': pol, 'toPortUNCode': pod, 'fromDate': start_date,'toDate': (start_date + timedelta(days=search_range)).strftime("%Y-%m-%d"), 'datesRelated': start_date_type}
-    msc_response_uuid: UUID = uuid5(NAMESPACE_DNS, 'msc-response-kuehne-nagel' + str(params) + str(direct_only) + str(vessel_imo) + str(service) + str(tsp))
-    response_cache = await db.get(key=msc_response_uuid)
     generate_schedule = lambda data:(schedule_result for task in data['MSCSchedule']['Transactions'] for schedule_result in process_schedule_data(task=task,direct_only=direct_only, vessel_imo=vessel_imo, service=service,tsp=tsp))
+    response_cache = await db.get(original_response=True, scac='mscu', params=str(params),log_component='msc original response')
     if response_cache:
         p2p_schedule: Generator = generate_schedule(data=response_cache)
         return p2p_schedule
     token = await get_msc_token(client=client,background_task=background_task,oauth=oauth, aud=aud, rsa=pw, msc_client=msc_client, msc_scope=msc_scope,msc_thumbprint=msc_thumbprint)
     headers: dict = {'Authorization': f'Bearer {token}'}
-    response_json:dict = await anext(client.parse(method='GET', url=url, params=params, headers=headers))
+    response_json:dict = await anext(client.parse(scac='msc',method='GET', url=url, params=params, headers=headers))
     if response_json:
         p2p_schedule: Generator = generate_schedule(data=response_json)
-        background_task.add_task(db.set, key=msc_response_uuid, value=response_json)
+        background_task.add_task(db.set, original_response=True,scac='mscu',params=str(params), value=response_json,log_component='msc original response file')
         return p2p_schedule
 

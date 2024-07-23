@@ -1,14 +1,12 @@
-import asyncio
-from fastapi import BackgroundTasks
 from app.carrierp2p.helpers import deepget
 from app.routers.router_config import HTTPXClientWrapper
 from app.schemas import schema_response
-from datetime import datetime,timedelta
-from uuid import uuid5,NAMESPACE_DNS
 from app.background_tasks import db
+from fastapi import BackgroundTasks
+from datetime import datetime,timedelta
 from itertools import chain
 from typing import Generator,Iterator
-
+import asyncio
 
 def calculate_final_times(index:int, leg_etd:str, leg_tt:int, leg_transport:str, leg_from:dict,legs_to:dict, last_eta:str):
     """Calculate the correct etd eta for each leg """
@@ -74,19 +72,17 @@ def process_schedule_data(task: dict, direct_only:bool |None,vessel_imo: str, se
 
 async def get_iqax_p2p(client:HTTPXClientWrapper,background_task:BackgroundTasks, url: str, pw: str, pol: str, pod: str, search_range: int, direct_only: bool |None ,
                        tsp: str | None = None, departure_date:datetime.date = None, arrival_date: datetime.date = None,vessel_imo:str|None = None,scac: str | None = None, service: str | None = None) -> Generator:
-    params: dict = {'appKey': pw, 'porID': pol, 'fndID': pod, 'departureFrom': departure_date,
-                    'arrivalFrom': arrival_date, 'searchDuration': search_range}
+    params: dict = {'appKey': pw, 'porID': pol, 'fndID': pod, 'departureFrom': departure_date,'arrivalFrom': arrival_date, 'searchDuration': search_range}
     iqax_list: list[str] = ['OOLU', 'COSU'] if scac is None else [scac]
-    iqax_response_uuid = lambda scac: uuid5(NAMESPACE_DNS,f'iqax-{params}{direct_only}{vessel_imo}{service}{tsp}{scac}')
-    response_cache:list = await asyncio.gather(*(db.get(key=iqax_response_uuid(scac=sub_iqax)) for sub_iqax in iqax_list))
+    response_cache:list = await asyncio.gather(*(db.get(scac=sub_iqax,params=params,original_response=True,log_component='iqax original response file') for sub_iqax in iqax_list))
     check_cache: bool = any(item is None for item in response_cache)
-    p2p_resp_tasks: set = {asyncio.create_task(anext(client.parse(background_tasks =background_task,token_key=iqax_response_uuid(scac=iqax),method='GET', url=url.format(iqax),params=params)))
-                           for iqax,cache in zip(iqax_list,response_cache) if cache is None} if check_cache else...
+    p2p_resp_tasks: set = {asyncio.create_task(anext(client.parse(scac='iqax',method='GET', url=url.format(iqax),params=params))) for iqax,cache in zip(iqax_list,response_cache) if cache is None} if check_cache else...
     combined_p2p_schedule:list = []
     for response in (chain(asyncio.as_completed(p2p_resp_tasks),[item for item in response_cache if item is not None]) if check_cache else response_cache):
         response_json:dict = await response if check_cache and not isinstance(response, dict) else response
-        if response_json:
-            combined_p2p_schedule.extend(response_json.get('routeGroupsList', []))
+        if (check_response:=response_json.get('routeGroupsList')):
+            combined_p2p_schedule.extend(check_response)
+            background_task.add_task(db.set,scac=check_response[0]['carrier']['scac'],params=params, original_response=True, value=response_json,log_component='iqax original response file')
     p2p_schedule: Generator = (schedule_result for schedule_list in combined_p2p_schedule for task in schedule_list['route']
                                for schedule_result in process_schedule_data(task=task,direct_only=direct_only, vessel_imo=vessel_imo, service=service,tsp=tsp))
     return p2p_schedule

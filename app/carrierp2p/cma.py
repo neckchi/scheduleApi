@@ -66,7 +66,7 @@ async def fetch_additional_schedules(client: HTTPXClientWrapper, url: str, heade
     cma_code_header:str = awaited_response.headers['X-Shipping-Company-Routings']
     check_header:bool = len(cma_code_header.split(',')) > 1
     updated_params = lambda cma_internal_code: dict(params, **{'shippingCompany': cma_internal_code, 'specificRoutings': 'Commercial'})
-    extra_tasks:list = [asyncio.create_task(anext(client.parse(method='GET',url=url,params=updated_params(cma_code_header) if not check_header else dict(params, **{'specificRoutings': 'Commercial'}),headers=dict(headers, **{'range': f'{num}-{49 + num}'}))))
+    extra_tasks:list = [asyncio.create_task(anext(client.parse(scac='cma',method='GET',url=url,params=updated_params(cma_code_header) if not check_header else dict(params, **{'specificRoutings': 'Commercial'}),headers=dict(headers, **{'range': f'{num}-{49 + num}'}))))
                    for num in range(page, last_page, page)]
     additional_schedules:list = []
     for extra_p2p in asyncio.as_completed(extra_tasks):
@@ -77,7 +77,7 @@ async def fetch_additional_schedules(client: HTTPXClientWrapper, url: str, heade
 async def fetch_initial_schedules(client: HTTPXClientWrapper, cma_list: list, url: str, headers: dict, params: dict, extra_condition: bool) -> list:
     """Fetch the initial set of schedules from CMA."""
     updated_params = lambda cma_internal_code: dict(params, **{'shippingCompany': cma_internal_code, 'specificRoutings': 'USGovernment' if cma_internal_code == '0015' and extra_condition else 'Commercial'})
-    p2p_resp_tasks:list = [asyncio.create_task(anext(client.parse(method='GET', url=url, params=updated_params(cma_code), headers=headers))) for cma_code in cma_list]
+    p2p_resp_tasks:list = [asyncio.create_task(anext(client.parse(scac='cma',method='GET', url=url, params=updated_params(cma_code), headers=headers))) for cma_code in cma_list]
     all_schedule:list = []
     for response in asyncio.as_completed(p2p_resp_tasks):
         awaited_response = await response

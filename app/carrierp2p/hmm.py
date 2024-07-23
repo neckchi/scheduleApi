@@ -1,5 +1,4 @@
 import datetime
-from uuid import uuid5,NAMESPACE_DNS,UUID
 from app.routers.router_config import HTTPXClientWrapper
 from app.schemas import schema_response
 from app.background_tasks import db
@@ -94,17 +93,16 @@ async def get_hmm_p2p(client:HTTPXClientWrapper, background_task:BackgroundTasks
                       start_date: datetime,tsp: str | None = None,vessel_imo:str | None = None, service: str | None = None) -> Generator:
     params: dict = {'fromLocationCode': pol, 'receiveTermCode': 'CY', 'toLocationCode': pod, 'deliveryTermCode': 'CY',
                     'periodDate': start_date.strftime("%Y%m%d"),'weekTerm': search_range, 'webSort': 'D','webPriority':'D' if direct_only is True else 'T' if direct_only is False else 'A'}
-    hmm_response_uuid: UUID = uuid5(NAMESPACE_DNS, 'hmm-response-kuehne-nagel' + str(params) + str(direct_only) + str(vessel_imo) + str(service) + str(tsp))
-    response_cache = await db.get(key=hmm_response_uuid)
+    response_cache = await db.get(scac='hdmu',params=params,original_response=True,log_component='hdmu original response file')
     generate_schedule = lambda data: (schedule_result for task in data.get('resultData') for schedule_result in process_schedule_data(task=task,vessel_imo=vessel_imo,service=service,tsp=tsp))
     if response_cache:
         p2p_schedule:Generator = generate_schedule(data=response_cache)
         return p2p_schedule
     headers: dict = {'x-Gateway-APIKey': pw}
-    response_json:dict = await anext(client.parse(method='POST', url=url, headers=headers,json=params))
+    response_json:dict = await anext(client.parse(scac='hmm',method='POST', url=url, headers=headers,json=params))
     if response_json and response_json.get('resultMessage') == 'Success':
         p2p_schedule:Generator = generate_schedule(data=response_json)
-        background_task.add_task(db.set, key=hmm_response_uuid, value=response_json)
+        background_task.add_task(db.set,scac='hdmu',params=params,original_response=True,value=response_json,log_component='hmm original response file')
         return p2p_schedule
 
 
