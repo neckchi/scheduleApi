@@ -45,7 +45,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
     start_time = time.time()
     logging.setLogRecordFactory(log_correlation(correlation=X_Correlation_ID))
     logging.info(f'Received a request with following parameters:pol={point_from} pod={point_to} start_date_type={start_date_type} start_date={start_date} search_range={search_range} scac={scac} direct_only={direct_only}' 
-                 f'tsp={tsp} vessel_imo={vessel_imo} vessel_flag_code={vessel_flag_code}')
+                 f' tsp={tsp} vessel_imo={vessel_imo} vessel_flag_code={vessel_flag_code}')
     product_id:UUID = uuid5(NAMESPACE_DNS,f'{scac}-p2p-api-{point_from}{point_to}{start_date_type}{start_date}{search_range}{tsp}{direct_only}{vessel_imo}{service}')
     ttl_schedule = await db.get(key=product_id)
     if not ttl_schedule:

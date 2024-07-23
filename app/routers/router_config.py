@@ -43,17 +43,17 @@ If we estimate that each search takes around 1 second, and considering we need t
 However, given that not all searches will happen exactly at the same time and some connections can be reused, we can reduce this number.
 
 A good starting point is to use around 10-20% of the peak searches per second as concurrent connections.
-Therefor,  10% of 13,611 is approximately 1361 connections.
+Therefore,  10% of 13,611 is approximately 1361 connections.
 We can adjust this number based on the actual performance and server capacity.
 Since KN employees are performing searches frequently (every hour), setting a higher keep-alive expiry can help reuse connections effectively."""
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
-KN_PROXY:httpx.Proxy = httpx.Proxy("http://proxy.eu-central-1.aws.int.kn:80")
+# KN_PROXY:httpx.Proxy = httpx.Proxy("http://proxy.eu-central-1.aws.int.kn:80")
 HTTPX_TIMEOUT = httpx.Timeout(load_yaml()['data']['connectionPoolSetting']['elswhereTimeOut'],pool=load_yaml()['data']['connectionPoolSetting']['connectTimeOut'], connect=load_yaml()['data']['connectionPoolSetting']['connectTimeOut'])
 HTTPX_LIMITS = httpx.Limits(max_connections=load_yaml()['data']['connectionPoolSetting']['maxClientConnection'],
                             max_keepalive_connections=load_yaml()['data']['connectionPoolSetting']['maxKeepAliveConnection'],keepalive_expiry=load_yaml()['data']['connectionPoolSetting']['keepAliveExpiry'])
-# HTTPX_ASYNC_HTTP = httpx.AsyncHTTPTransport(retries=3,verify=False,limits=HTTPX_LIMITS)
-HTTPX_ASYNC_HTTP = httpx.AsyncHTTPTransport(retries=3,proxy = KN_PROXY,verify=False,limits=HTTPX_LIMITS)
+HTTPX_ASYNC_HTTP = httpx.AsyncHTTPTransport(retries=3,verify=False,limits=HTTPX_LIMITS)
+# HTTPX_ASYNC_HTTP = httpx.AsyncHTTPTransport(retries=3,proxy = KN_PROXY,verify=False,limits=HTTPX_LIMITS)
 
 
 class HTTPXClientWrapper(httpx.AsyncClient):
@@ -94,7 +94,7 @@ class HTTPXClientWrapper(httpx.AsyncClient):
 
     async def handle_standard_response(self, url: str, method: str, params: dict, headers: dict, json: dict, data: dict, token_key: str, background_tasks: BackgroundTasks, expire: timedelta) -> AsyncGenerator[Dict[str,Any],None]:
         response = await self.request(method=method, url=url, params=params, headers=headers, json=json, data=data)
-        logging.info(f'{method} {response.url} {response.http_version} {response.status_code} {response.reason_phrase} elapsed_time={response.elapsed.total_seconds()}s')
+        logging.info(f'{method} Took {response.elapsed.total_seconds()}s to process the request {response.url} {response.http_version} {response.status_code} {response.reason_phrase}')
         if response.status_code == status.HTTP_206_PARTIAL_CONTENT:
             yield response
         elif response.status_code == status.HTTP_200_OK:
@@ -116,7 +116,7 @@ class HTTPXClientWrapper(httpx.AsyncClient):
             try:
                 async for data in stream_request.aiter_lines():
                     response = orjson.loads(data)
-                    logging.info(f'{method} {stream_request.url} {stream_request.http_version} {stream_request.status_code} {stream_request.reason_phrase} elapsed_time={stream_request.elapsed.total_seconds()}s')
+                    logging.info(f'{method} Took {stream_request.elapsed.total_seconds()}s to process the request {stream_request.url} {stream_request.http_version} {stream_request.status_code} {stream_request.reason_phrase}')
                     if background_tasks:
                         background_tasks.add_task(db.set, key=token_key, value=response, expire=expire)
                     yield response
@@ -181,7 +181,6 @@ class AsyncTaskManager():
         self.max_retries:int = max_retries
     async def __aenter__(self):
 
-        logging.info('AsyncContextManger Started - Creating conroutine tasks for requested carriers')
         return self
     async def __aexit__(self, exc_type = None, exc = None, tb= None):
         self.results = await asyncio.gather(*self.__tasks.values(), return_exceptions=True)
@@ -205,8 +204,9 @@ class AsyncTaskManager():
         return None
 
     def create_task(self, name:str,coro:Callable):
+        logging.info(f'Create {name} and Forward the request')
         self.__tasks[name] = asyncio.create_task(self._timeout_wrapper(coro=coro,task_name=name))
 
     def results(self) -> Generator:
-        logging.info('Gathering and standarding the schedule format')
+        logging.info('Gathering and Standarding the schedule format')
         return (result for result in self.results if not isinstance(result, Exception)) if self.error else self.results
