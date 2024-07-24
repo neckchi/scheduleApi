@@ -74,11 +74,12 @@ def log_queue_listener() -> QueueListener:
     logging.config.fileConfig(log_file_path, disable_existing_loggers=False)
     log_que = queue.Queue(-1)
     queue_handler = QueueHandler(log_que)
-    listener = QueueListener(log_que, *logging.getLogger().handlers, respect_handler_level=True)
+    stream_handler = logging.StreamHandler()
     logger = logging.getLogger(__name__)
+    logger.addHandler(stream_handler)
     logger.addHandler(queue_handler)
+    listener = QueueListener(log_que, *logger.handlers, respect_handler_level=True)
     return listener
-
 
 old_factory = logging.getLogRecordFactory()
 def log_correlation(correlation:str |None = None):

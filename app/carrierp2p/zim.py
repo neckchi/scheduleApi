@@ -56,28 +56,27 @@ def process_schedule_data(task: dict, direct_only:bool |None,vessel_imo: str, se
 
 async def get_zim_access_token(client:HTTPXClientWrapper,background_task:BackgroundTasks, url: str, api_key: str, client_id: str, secret: str) -> str:
     zim_token_key:UUID = uuid5(NAMESPACE_DNS, 'zim-token-uuid-kuehne-nagel2')
-    response_token:dict = await db.get(key=zim_token_key)
+    response_token:dict = await db.get(key=zim_token_key,log_component='zim token')
     if response_token is None:
         headers: dict = {'Ocp-Apim-Subscription-Key': api_key}
         params: dict = {'grant_type': 'client_credentials', 'client_id': client_id,'client_secret': secret, 'scope': 'Vessel Schedule'}
-        response_token:dict = await anext(client.parse(background_tasks=background_task,method='POST',url=url, headers=headers, data=params,token_key=zim_token_key,expire=datetime.timedelta(minutes=55)))
+        response_token:dict = await anext(client.parse(scac='zim',background_tasks=background_task,method='POST',url=url, headers=headers, data=params,token_key=zim_token_key,expire=datetime.timedelta(minutes=55)))
     return response_token['access_token']
 
 
 async def get_zim_p2p(client:HTTPXClientWrapper, background_task:BackgroundTasks,url: str, turl: str, pw: str, zim_client: str, zim_secret: str, pol: str, pod: str,
                       search_range: int,start_date_type: str,start_date: datetime.datetime.date, direct_only: bool |None,vessel_imo:str|None = None, service: str | None = None, tsp: str | None = None):
     params: dict = {'originCode': pol, 'destCode': pod, 'fromDate': start_date,'toDate': (start_date + datetime.timedelta(days=search_range)).strftime("%Y-%m-%d"), 'sortByDepartureOrArrival': start_date_type}
-    zim_response_uuid: UUID = uuid5(NAMESPACE_DNS,'zim-response-kuehne-nagel' + str(params) + str(direct_only) + str(vessel_imo) + str(service) + str(tsp))
-    response_cache = await db.get(key=zim_response_uuid)
+    response_cache = await db.get(scac='zimu',params=params,original_response=True,log_component='zim original response file')
     generate_schedule = lambda data: (result for task in data['response']['routes'] for result in process_schedule_data(task=task, direct_only=direct_only, vessel_imo=vessel_imo, service=service, tsp=tsp))
     if response_cache:
         p2p_schedule: Generator = generate_schedule(data=response_cache)
         return p2p_schedule
     token:str = await get_zim_access_token(client=client,background_task=background_task, url=turl, api_key=pw, client_id=zim_client, secret=zim_secret)
     headers: dict = {'Ocp-Apim-Subscription-Key': pw, 'Authorization': f'Bearer {token}','Accept': 'application/json'}
-    response_json:dict = await anext(client.parse(method='GET', url=url, params=params,headers=headers))
+    response_json:dict = await anext(client.parse(scac='zim',method='GET', url=url, params=params,headers=headers))
     if response_json:
         p2p_schedule: Generator =  generate_schedule(data=response_json)
-        background_task.add_task(db.set, key=zim_response_uuid,value=response_json)
+        background_task.add_task(db.set, scac='zimu',params=params,original_response=True,value=response_json,log_component='zim original response file')
         return p2p_schedule
 

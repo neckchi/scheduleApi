@@ -1,5 +1,5 @@
+from typing import Literal
 from enum import Enum,StrEnum
-from typing_extensions import Literal
 
 CarrierCode = Literal['MSCU', 'CMDU', 'ANNU', 'APLU', 'CHNL', 'ONEY','HDMU','ZIMU','MAEU','MAEI','OOLU','COSU','HLCU']
 

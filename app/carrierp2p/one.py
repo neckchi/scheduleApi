@@ -64,27 +64,26 @@ def process_response_data(task: dict,vessel_imo: str, service: str, tsp: str) ->
         yield schedule_body
 async def get_one_access_token(client:HTTPXClientWrapper,background_task:BackgroundTasks, url: str, auth: str, api_key: str) -> str:
     one_token_key:UUID = uuid5(NAMESPACE_DNS, 'one-token-uuid-kuehne-nagel')
-    response_token:dict = await db.get(key=one_token_key)
+    response_token:dict = await db.get(key=one_token_key,log_component='one token')
     if response_token is None:
         headers: dict = {'apikey': api_key,'Authorization': auth,'Accept': 'application/json'}
-        response_token:dict = await anext(client.parse(method='POST',background_tasks=background_task,url=url, headers=headers,token_key=one_token_key,expire=timedelta(minutes=55)))
+        response_token:dict = await anext(client.parse(scac='one',method='POST',background_tasks=background_task,url=url, headers=headers,token_key=one_token_key,expire=timedelta(minutes=55)))
     return response_token['access_token']
 
 async def get_one_p2p(client:HTTPXClientWrapper, background_task:BackgroundTasks,url: str, turl: str, pw: str, auth: str, pol: str, pod: str, search_range: int,
                       direct_only: bool|None,start_date_type: str,start_date: datetime.date, service: str | None = None,vessel_imo: str | None = None, tsp: str | None = None) -> Generator:
     params: dict = {'originPort': pol, 'destinationPort': pod, 'searchDate': start_date,'searchDateType': start_date_type, 'weeksOut': search_range,'directOnly': 'TRUE' if direct_only is True else 'FALSE'}
     # weekout:1 ≤ value ≤ 14
-    one_response_uuid: UUID = uuid5(NAMESPACE_DNS,'one-response-kuehne-nagel' + str(params) + str(direct_only) + str(vessel_imo) + str(service) + str(tsp))
-    response_cache = await db.get(key=one_response_uuid)
+    response_cache = await db.get(scac='oney',params=params,original_response=True,log_component='one original response file')
     generate_schedule = lambda data:(schedule_result for schedule_type in data for task in data[schedule_type] for schedule_result in process_response_data(task=task, vessel_imo=vessel_imo, service=service,tsp=tsp))
     if response_cache:
         p2p_schedule: Generator = generate_schedule(data= response_cache)
         return p2p_schedule
     token:str = await get_one_access_token(client=client,background_task=background_task, url=turl, auth=auth, api_key=pw)
     headers: dict = {'apikey': pw, 'Authorization': f'Bearer {token}', 'Accept': 'application/json'}
-    response_json:dict = await anext(client.parse(method='GET', url=url, params=params,headers=headers))
+    response_json:dict = await anext(client.parse(scac='one',method='GET', url=url, params=params,headers=headers))
     if response_json and response_json.get('errorMessages') is None:
         p2p_schedule: Generator = generate_schedule(data= response_json)
-        background_task.add_task(db.set, key=one_response_uuid, value=response_json)
+        background_task.add_task(db.set,scac='oney',params=params,original_response=True, value=response_json,log_component='one original response file')
         return p2p_schedule
 

@@ -60,7 +60,6 @@ def custom_openapi():
 app.openapi = custom_openapi
 
 if __name__ == "__main__":
-
-    uvicorn.run("app.main:app",host="0.0.0.0", port=8000,timeout_keep_alive=50)
+    uvicorn.run("app.main:app",host="0.0.0.0", port=8000,timeout_keep_alive=30)
 
     # uvicorn.run("main:app", port=8000, workers=4)
