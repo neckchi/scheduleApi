@@ -50,7 +50,7 @@ Since KN employees are performing searches frequently (every hour), setting a hi
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
 KN_PROXY:httpx.Proxy = httpx.Proxy("http://proxy.eu-central-1.aws.int.kn:80")
-HTTPX_TIMEOUT = httpx.Timeout(load_yaml()['data']['connectionPoolSetting']['elswhereTimeOut'],pool=load_yaml()['data']['connectionPoolSetting']['poolTimeout'], connect=load_yaml()['data']['connectionPoolSetting']['connectTimeOut'])
+HTTPX_TIMEOUT = httpx.Timeout(load_yaml()['data']['connectionPoolSetting']['elswhereTimeOut'],pool=load_yaml()['data']['connectionPoolSetting']['connectTimeOut'], connect=load_yaml()['data']['connectionPoolSetting']['connectTimeOut'])
 HTTPX_LIMITS = httpx.Limits(max_connections=load_yaml()['data']['connectionPoolSetting']['maxClientConnection'],max_keepalive_connections=load_yaml()['data']['connectionPoolSetting']['maxKeepAliveConnection'],
                             keepalive_expiry=load_yaml()['data']['connectionPoolSetting']['keepAliveExpiry'])
 # HTTPX_ASYNC_HTTP = httpx.AsyncHTTPTransport(retries=3,verify=False,limits=HTTPX_LIMITS)
