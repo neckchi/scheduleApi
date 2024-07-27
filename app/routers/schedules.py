@@ -2,14 +2,14 @@ import datetime
 import logging
 import time
 from uuid import uuid5,NAMESPACE_DNS,UUID
+
 from fastapi import APIRouter, Query, Depends,Header, BackgroundTasks,Response
-from app.carrierp2p import cma, one, hmm, zim, maersk, msc, iqax,hlag
-from app.config import log_correlation
-from app.schemas import schema_response
-from app.schemas.schema_request import CarrierCode,StartDateType,SearchRange
 from app.background_tasks import db
-from app.config import Settings,get_settings,load_yaml
-from app.routers.router_config import HTTPXClientWrapper,AsyncTaskManager
+from app.schemas import schema_response
+from app.carrierp2p import cma, one, hmm, zim, maersk, msc, iqax,hlag
+from app.config import log_correlation,Settings,get_settings,load_yaml
+from app.schemas.schema_request import CarrierCode,StartDateType,SearchRange
+from app.routers.router_config import AsyncTaskManager,HTTPXClientWrapper,get_global_httpx_client_wrapper
 from app.routers.security import basic_auth
 
 
@@ -35,8 +35,8 @@ async def get_schedules(background_tasks: BackgroundTasks,
                         settings: Settings = Depends(get_settings),
                         carrier_status = Depends(load_yaml),
                         credentials = Depends(basic_auth),
-                        client:HTTPXClientWrapper = Depends(HTTPXClientWrapper.get_individual_httpx_client_wrapper)):
-                        # client:HTTPXClientWrapper = Depends(get_global_httpx_client_wrapper)):
+                        # client:HTTPXClientWrapper = Depends(HTTPXClientWrapper.get_individual_httpx_client_wrapper)):
+                        client:HTTPXClientWrapper = Depends(get_global_httpx_client_wrapper)):
 
     """
     Search P2P Schedules with all the information:
@@ -128,7 +128,6 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                           etd= start_date if start_date_type == StartDateType.departure  else None ,
                                           eta =start_date if start_date_type == StartDateType.arrival else None,tsp=tsp,
                                           direct_only=direct_only))
-
         final_schedules = client.gen_all_valid_schedules(response=response,correlation=X_Correlation_ID,matrix=task_group.results,product_id=product_id,point_from=point_from,point_to=point_to,background_tasks=background_tasks,task_exception=task_group.error)
         process_time = time.time() - start_time
         logging.info(f'total_processing_time={process_time:.2f}s total_results={response.headers.get("KN-Count-Schedules")}')

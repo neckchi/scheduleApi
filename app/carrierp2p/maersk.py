@@ -29,7 +29,8 @@ def process_leg_data(leg_task:list,first_cut_off:dict):
         'services': {'serviceCode': service_name} if (service_name := leg['transport'].get('carrierServiceName',leg['transport'].get('carrierServiceCode'))) else None,
         'voyages': {'internalVoyage': voyage_num if (voyage_num := leg['transport'].get('carrierDepartureVoyageNumber')) else None},
         'cutoffs': first_cut_off.get(hash(leg['facilities']['startLocation']['countryCode'] + pol_name + imo_code + voyage_num)) if pol_name and imo_code and voyage_num else None},warnings=False) for leg in leg_task
-        if (pol_code:=leg['facilities']['startLocation']['UNLocationCode']) != (pod_code:=leg['facilities']['endLocation']['UNLocationCode'])]
+        if (pol_code:=leg['facilities']['startLocation'].get('cityUNLocationCode') or leg['facilities']['startLocation'].get('siteUNLocationCode')) !=
+           (pod_code:=leg['facilities']['endLocation'].get('cityUNLocationCode') or leg['facilities']['endLocation'].get('siteUNLocationCode'))]
     return leg_list
 
 
@@ -44,8 +45,8 @@ def process_schedule_data(resp: dict,first_cut_off:dict, direct_only:bool |None,
         check_vessel_imo: bool = any(imo for imo in task['transportLegs'] if deepget(imo['transport'], 'vessel','vesselIMONumber') == vessel_imo) if vessel_imo else True
         if (transshipment_port or not tsp) and (direct_only is None or check_transshipment != direct_only) and (check_service_code or check_service_name) and check_vessel_imo:
             transit_time: int = round(int(task['transitTime']) / 1400)
-            first_point_from: str = task['facilities']['collectionOrigin']['UNLocationCode']
-            last_point_to: str = task['facilities']['deliveryDestination']['UNLocationCode']
+            first_point_from: str = task['facilities']['collectionOrigin'].get('cityUNLocationCode') or task['facilities']['collectionOrigin'].get('siteUNLocationCode')
+            last_point_to: str = task['facilities']['deliveryDestination'].get('cityUNLocationCode') or task['facilities']['deliveryDestination'].get('siteUNLocationCode')
             first_etd:str = task['departureDateTime']
             last_eta:str = task['arrivalDateTime']
             leg_list = process_leg_data(leg_task= task['transportLegs'],first_cut_off=first_cut_off)

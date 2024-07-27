@@ -78,7 +78,7 @@ def log_queue_listener() -> QueueListener:
     logger = logging.getLogger(__name__)
     logger.addHandler(stream_handler)
     logger.addHandler(queue_handler)
-    listener = QueueListener(log_que, *logger.handlers, respect_handler_level=True)
+    listener = QueueListener(log_que, stream_handler, queue_handler, respect_handler_level=True)
     return listener
 
 old_factory = logging.getLogRecordFactory()

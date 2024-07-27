@@ -19,7 +19,7 @@ class PointBase(BaseModel):
 
 
 class Cutoff(BaseModel):
-    model_config = ConfigDict(json_encoders={datetime: convert_datetime_to_iso_8601})
+    model_config = ConfigDict(json_encoders={datetime: convert_datetime_to_iso_8601},cache_strings=False)
     cyCutoffDate: datetime | None = Field(default=None,example='2023-11-11T22:00:00')
     docCutoffDate: datetime | None = Field(default=None,example='2023-11-11T22:00:00')
     vgmCutoffDate: datetime | None = Field(default=None,example='2023-11-11T22:00:00')
@@ -53,6 +53,7 @@ class Transportation(BaseModel):
 
 
 class Voyage(BaseModel):
+    model_config = ConfigDict(cache_strings=False)
     internalVoyage: str | None = Field(default=None,max_length=20, example='126W')
     externalVoyage: str | None = Field(default=None,max_length=20, example='126W')
     @model_validator(mode='after')
@@ -65,8 +66,6 @@ class Service(BaseModel):
     model_config = ConfigDict(cache_strings='all')
     serviceCode: str | None = Field(default=None,max_length=100, example='NVS')
     serviceName: str | None = Field(default=None,max_length=100, example='EAST ASIA TRADE')
-
-
 
 class Leg(BaseModel):
     model_config = ConfigDict(json_encoders={datetime: convert_datetime_to_iso_8601})
@@ -94,7 +93,7 @@ class Leg(BaseModel):
         return self
 
 class Schedule(BaseModel):
-    model_config = ConfigDict(json_encoders={datetime: convert_datetime_to_iso_8601})
+    model_config = ConfigDict(json_encoders={datetime: convert_datetime_to_iso_8601},cache_strings=False)
     scac: CarrierCode = Field(max_length=4, title="Carrier Code", description="This is SCAC.It must be 4 characters",
                               example="MAEU")
     pointFrom: str = Field(max_length=5, title="First Port Of Loading", example='HKHKG', pattern =r"[A-Z]{2}[A-Z0-9]{3}")
@@ -115,6 +114,7 @@ class Schedule(BaseModel):
 
 
 class Product(BaseModel):
+    model_config = ConfigDict(cache_strings=False)
     productid: UUID = Field(description='Generate UUID based on the request params',
                             example='27d23af3-36be-57ce-9dbf-7813e672076c')
     origin: str = Field(max_length=5, title="Origin ",
