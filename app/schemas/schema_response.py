@@ -68,7 +68,7 @@ class Service(BaseModel):
     serviceName: str | None = Field(default=None,max_length=100, example='EAST ASIA TRADE')
 
 class Leg(BaseModel):
-    model_config = ConfigDict(json_encoders={datetime: convert_datetime_to_iso_8601})
+    model_config = ConfigDict(json_encoders={datetime: convert_datetime_to_iso_8601},cache_strings=False)
     pointFrom: PointBase = Field(description="This could be point/port")
     pointTo: PointBase = Field(description="This could be point/port")
     etd: datetime = Field(example='2023-11-13T18:00:00')
