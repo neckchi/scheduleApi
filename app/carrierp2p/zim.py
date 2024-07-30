@@ -6,7 +6,6 @@ from uuid import uuid5,NAMESPACE_DNS,UUID
 from fastapi import BackgroundTasks
 from typing import Generator,Iterator
 from app.schemas.schema_request import TRANSPORT_TYPE
-from functools import cache
 
 
 def map_imo(leg_imo:str|None, vessel_name:str|None,line:str|None, transport:str):

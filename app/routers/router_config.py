@@ -5,7 +5,7 @@ from fastapi import status,HTTPException,BackgroundTasks,Response
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError, ResponseValidationError
-from typing import Literal,Generator,Callable,AsyncGenerator,Dict,Any
+from typing import Generator,Callable,AsyncGenerator,Dict,Any,Optional,Union
 from threading import Lock
 from uuid import UUID
 from datetime import timedelta
@@ -16,7 +16,7 @@ import asyncio
 import time
 
 class HTTPXClientWrapper():
-    def __init__(self):
+    def __init__(self) -> None:
         self.default_limits = load_yaml()['data']['connectionPoolSetting']
         self.limits = self.default_limits.copy()
         self.lock = Lock()
@@ -26,7 +26,7 @@ class HTTPXClientWrapper():
                                         limits=httpx.Limits(max_connections=self.limits['maxClientConnection'],max_keepalive_connections=self.limits['maxKeepAliveConnection'],keepalive_expiry=self.limits['keepAliveExpiry']),
                                         verify=False,proxy = httpx.Proxy("http://proxy.eu-central-1.aws.int.kn:80"))
                                         # verify = False)
-    async def _adjust_pool_limits(self):
+    async def _adjust_pool_limits(self) -> None:
         """designed to dynamically adjust the connection pool limits of the httpx client when a PoolTimeout error occurs"""
         with self.lock:
             self.limits['maxClientConnection'] += 20
@@ -34,12 +34,12 @@ class HTTPXClientWrapper():
             self.client._transport._pool._max_connections = self.limits['maxClientConnection']
             self.client._transport._pool._max_keepalive_connections = self.limits['maxKeepAliveConnection']
 
-    async def close(self):
+    async def close(self)-> None:
         await self.client.aclose()
 
     # Individual Client Session Setup
     @classmethod
-    async def get_individual_httpx_client_wrapper(cls) -> Generator:
+    async def get_individual_httpx_client_wrapper(cls) -> AsyncGenerator["HTTPXClientWrapper", None]:
         async with cls() as standalone_client:
             try:
                 yield standalone_client
@@ -61,8 +61,13 @@ class HTTPXClientWrapper():
                                     detail=f'An error occurred while creating the client - {eg.args}')
             finally:
                 await standalone_client.aclose()
-    async def parse(self, scac:str, url: str, method: Literal['GET', 'POST'] = 'GET', params: dict = None, headers: dict = None,json: dict = None, token_key: str|UUID = None, data: dict = None,
-                    background_tasks: BackgroundTasks = None,expire: timedelta = timedelta(hours=load_yaml()['data']['backgroundTasks']['scheduleExpiry']),stream: bool = False) -> AsyncGenerator[Dict[str, Any], None]:
+    async def parse(self, scac: str, url: str, method: str = 'GET', params: Optional[Dict[str, Any]] = None,
+                    headers: Optional[Dict[str, Any]] = None,
+                    json: Optional[Dict[str, Any]] = None, token_key: Optional[Union[str, UUID]] = None,
+                    data: Optional[Dict[str, Any]] = None,
+                    background_tasks: Optional[BackgroundTasks] = None,
+                    expire: timedelta = timedelta(hours=load_yaml()['data']['backgroundTasks']['scheduleExpiry']),
+                    stream: bool = False) -> AsyncGenerator[Dict[str, Any], None]:
         """Fetch the file from carrier API and deserialize the json file """
         if not stream:
             async for response in self.handle_standard_response(scac,url, method, params, headers, json, data, token_key,background_tasks, expire):
@@ -70,9 +75,11 @@ class HTTPXClientWrapper():
         else:
             async for response in self.handle_streaming_response(scac,url, method, params, headers, data, token_key,background_tasks, expire):
                 yield response
-
-    async def handle_standard_response(self,scac:str, url: str, method: str, params: dict, headers: dict, json: dict, data: dict, token_key: str, background_tasks: BackgroundTasks,
-                                       expire: timedelta) -> AsyncGenerator[Dict[str,Any],None]:
+    async def handle_standard_response(self, scac: str, url: str, method: str, params: Optional[Dict[str, Any]],
+                                       headers: Optional[Dict[str, Any]],
+                                       json: Optional[Dict[str, Any]], data: Optional[Dict[str, Any]],
+                                       token_key: Optional[Union[str, UUID]],
+                                       background_tasks: Optional[BackgroundTasks], expire: timedelta) -> AsyncGenerator[Dict[str, Any], None]:
         try:
             response = await self.client.request(method=method, url=url, params=params, headers=headers, json=json, data=data)
             logging.info(f'{method} {scac} took {response.elapsed.total_seconds()}s to process the request {response.url} {response.http_version} {response.status_code} {response.reason_phrase}')
@@ -92,8 +99,11 @@ class HTTPXClientWrapper():
             logging.info(f'PoolTimeout : Increasing pool size...')
             await self._adjust_pool_limits()
             yield None
-    async def handle_streaming_response(self,scac:str, url: str, method: str, params: dict, headers: dict, data: dict,token_key: str, background_tasks: BackgroundTasks,
-                                        expire: timedelta) -> AsyncGenerator[Dict[str, Any],None]:
+    async def handle_streaming_response(self, scac: str, url: str, method: str, params: Optional[Dict[str, Any]],
+                                        headers: Optional[Dict[str, Any]],
+                                        data: Optional[Dict[str, Any]], token_key: Optional[Union[str, UUID]],
+                                        background_tasks: Optional[BackgroundTasks],
+                                        expire: timedelta) -> AsyncGenerator[Dict[str, Any], None]:
         try:
             async with self.client.stream(method, url, params=params, headers=headers, data=data) as stream_request:
                 if stream_request.status_code == status.HTTP_200_OK:
@@ -109,8 +119,9 @@ class HTTPXClientWrapper():
             logging.info(f'PoolTimeout occurred:Increasing pool size...')
             await self._adjust_pool_limits()
             yield None
-
-    def gen_all_valid_schedules(self,correlation:str|None,response:Response,product_id:UUID,matrix:Generator,point_from:str,point_to:str,background_tasks:BackgroundTasks,task_exception:bool):
+    def gen_all_valid_schedules(self, correlation: Optional[str], response: Response, product_id: UUID,
+                                matrix: Generator, point_from: str, point_to: str,
+                                background_tasks: BackgroundTasks, task_exception: bool) -> Dict[str, Any]:
         """Validate the schedule and serialize hte json file excluding the field without any value """
         mapping_time = time.time()
         flat_list:list = [item for row in matrix if not isinstance(row, Exception) and row is not None for item in row]
@@ -182,14 +193,14 @@ class AsyncTaskManager():
     """Currently there is no built in  python class and method that we can prevent it from cancelling all conroutine tasks if one of the tasks is cancelled
     From BU perspective, all those carrier schedules are independent from one antoher so we shouldnt let a failed task to cancel all other successful tasks"""
     def __init__(self,default_timeout=load_yaml()['data']['connectionPoolSetting']['asyncDefaultTimeOut'],max_retries=load_yaml()['data']['connectionPoolSetting']['retryNumber']):
-        self.__tasks:dict = dict()
+        self.__tasks:Dict[str, asyncio.Task] = dict()
         self.error:bool = False
         self.default_timeout:int = default_timeout
         self.max_retries:int = max_retries
 
     async def __aenter__(self):
         return self
-    async def __aexit__(self, exc_type = None, exc = None, tb= None):
+    async def __aexit__(self, exc_type = None, exc = None, tb= None) -> bool:
         self.results = await asyncio.gather(*self.__tasks.values(), return_exceptions=True)
         if exc_type:
             for task in self.__tasks.values():
@@ -198,7 +209,7 @@ class AsyncTaskManager():
                     task.cancel()
             await asyncio.gather(*self.__tasks.values(), return_exceptions=True)
         return not exc_type
-    async def _timeout_wrapper(self, coro:Callable, task_name:str):
+    async def _timeout_wrapper(self, coro:Callable, task_name:str)  -> Optional[Any]:
         """Wrap a coroutine with a timeout and retry logic."""
         retries:int = 0
         adjusted_timeout = self.default_timeout
@@ -216,7 +227,7 @@ class AsyncTaskManager():
         # return coro()
         return None
 
-    def create_task(self, name:str,coro:Callable):
+    def create_task(self, name:str,coro:Callable) -> None:
         logging.info(f'Forward the request to {name.split("_task")[0]}')
         self.__tasks[name] = asyncio.create_task(self._timeout_wrapper(coro=coro,task_name=name))
 
