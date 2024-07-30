@@ -6,7 +6,7 @@ data:
   backgroundTasks:
     scheduleExpiry: 6
   connectionPoolSetting:
-    connectTimeOut: 10
+    connectTimeOut: 15
     poolTimeOut: 10
     elswhereTimeOut: 11
     maxClientConnection: 8000

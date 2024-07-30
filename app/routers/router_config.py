@@ -14,6 +14,7 @@ import logging
 import orjson
 import asyncio
 import time
+import ssl
 
 class HTTPXClientWrapper():
     def __init__(self) -> None:
@@ -22,10 +23,12 @@ class HTTPXClientWrapper():
         self.lock = Lock()
         self._initialize_client()
     def _initialize_client(self):
+        ctx = ssl.create_default_context()
+        ctx.set_ciphers('DEFAULT')
         self.client = httpx.AsyncClient(timeout=httpx.Timeout(self.limits['elswhereTimeOut'],pool=self.limits['poolTimeOut'],connect=self.limits['connectTimeOut']),
                                         limits=httpx.Limits(max_connections=self.limits['maxClientConnection'],max_keepalive_connections=self.limits['maxKeepAliveConnection'],keepalive_expiry=self.limits['keepAliveExpiry']),
-                                        verify=False,proxy = httpx.Proxy("http://proxy.eu-central-1.aws.int.kn:80"))
-                                        # verify = False)
+                                        verify=ctx,proxy = httpx.Proxy("http://proxy.eu-central-1.aws.int.kn:80"))
+
     async def _adjust_pool_limits(self) -> None:
         """designed to dynamically adjust the connection pool limits of the httpx client when a PoolTimeout error occurs"""
         with self.lock:
