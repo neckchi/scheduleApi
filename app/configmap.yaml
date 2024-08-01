@@ -11,8 +11,8 @@ data:
     maxClientConnection: 8000
     maxKeepAliveConnection: 3000
     keepAliveExpiry: 15
-    retryNumber: 3
-    asyncDefaultTimeOut: 15
+    retryNumber: 2
+    asyncDefaultTimeOut: 10
   activeCarriers:
     cma:  True
     hlag: False
