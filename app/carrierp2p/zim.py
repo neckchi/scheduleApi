@@ -6,10 +6,8 @@ from uuid import uuid5,NAMESPACE_DNS,UUID
 from fastapi import BackgroundTasks
 from typing import Generator,Iterator
 from app.schemas.schema_request import TRANSPORT_TYPE
-from functools import lru_cache
 
 
-@lru_cache(maxsize=None)
 def map_imo(leg_imo:str|None, vessel_name:str|None,line:str|None, transport:str):
     """Map the transportation Details"""
     if leg_imo and vessel_name != 'TO BE NAMED' and transport != 'Truck':

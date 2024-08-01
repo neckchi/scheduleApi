@@ -26,7 +26,7 @@ app.add_event_handler("shutdown", shutdown_event)
 
 @app.get("/health",tags=["healthcheck"],summary="Perform a Health Check",response_description="Return HTTP Status Code 200 (OK)",status_code=status.HTTP_200_OK,response_model=HealthCheck)
 async def get_health() -> HealthCheck:
-    return HealthCheck(status="OK")
+    return HealthCheck(status=f"OK")
 @app.get("/docs", include_in_schema=False)
 def overridden_swagger():
     return get_swagger_ui_html(openapi_url="/openapi.json", title="P2P Schedule API Hub",
@@ -60,6 +60,6 @@ def custom_openapi():
 app.openapi = custom_openapi
 
 if __name__ == "__main__":
-    uvicorn.run("app.main:app",host="0.0.0.0", port=8000,timeout_keep_alive=30)
+    uvicorn.run("app.main:app",host="0.0.0.0", port=8000,timeout_keep_alive=15)
 
     # uvicorn.run("main:app", port=8000, workers=4)

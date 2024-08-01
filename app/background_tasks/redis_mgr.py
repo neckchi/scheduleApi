@@ -7,7 +7,7 @@ from typing import Optional
 import uuid
 import logging
 import orjson
-import time
+import asyncio
 
 class ClientSideCache:
     def __init__(self):
@@ -36,7 +36,7 @@ class ClientSideCache:
                 if retries == 0:
                     raise ConnectionError(f'Unable to connect to RedisDB after retries ')
                 else:
-                    time.sleep(3)
+                    await asyncio.sleep(3)
                     logging.critical(f'Retry - Unable to connect to the RedisDB - {disconnect}',extra={'custom_attribute':None})
     async def set(self,  value: JSONResponse,expire:int = timedelta(hours = load_yaml()['data']['backgroundTasks']['scheduleExpiry']),
                   key: Optional[uuid.UUID]=None,original_response:Optional[bool] = False,scac:Optional[str] = None,params:Optional[str] = None,log_component:Optional[str] = 'data'):
@@ -54,10 +54,8 @@ class ClientSideCache:
                     logging.info(f'Background Task:Cached {log_component} into schedule collection - {generate_key}')
             except WatchError as watch_error:
                 logging.error(watch_error) # FIFO so we wont do anything as we only need the first entry to be taken if any other client is going to change the same key
-                pass
             except Exception as insert_db:
                 logging.error(insert_db)
-                pass
     async def get(self, key: Optional[uuid.UUID]=None,original_response:Optional[bool] = False,scac:Optional[str] = None,params:Optional[str] = None,log_component:Optional[str] = 'data'):
         generate_key = self.generate_cache_key(key=key, scac=scac, params=params, original_response=original_response)
         retries:int = 3
@@ -77,4 +75,5 @@ class ClientSideCache:
                     await self.initialize_database()
 
     async def close(self):
+        await self.__pool.disconnect()
         await self.__pool.aclose()

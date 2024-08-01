@@ -2,14 +2,14 @@ import datetime
 import logging
 import time
 from uuid import uuid5,NAMESPACE_DNS,UUID
+
 from fastapi import APIRouter, Query, Depends,Header, BackgroundTasks,Response
-from app.carrierp2p import cma, one, hmm, zim, maersk, msc, iqax,hlag
-from app.config import log_correlation
-from app.schemas import schema_response
-from app.schemas.schema_request import CarrierCode,StartDateType,SearchRange
 from app.background_tasks import db
-from app.config import Settings,get_settings,load_yaml
-from app.routers.router_config import HTTPXClientWrapper,AsyncTaskManager
+from app.schemas import schema_response
+from app.carrierp2p import cma, one, hmm, zim, maersk, msc, iqax,hlag
+from app.config import log_correlation,Settings,get_settings,load_yaml
+from app.schemas.schema_request import CarrierCode,StartDateType,SearchRange
+from app.routers.router_config import AsyncTaskManager,HTTPXClientWrapper,get_global_httpx_client_wrapper
 from app.routers.security import basic_auth
 
 
@@ -28,15 +28,15 @@ async def get_schedules(background_tasks: BackgroundTasks,
                         search_range: SearchRange = Query(alias='searchRange',description='Search range based on start date and type,max 4 weeks',default=..., example=3),
                         scac: list[CarrierCode | None] = Query(default=[None],description='Prefer to search p2p schedule by scac.Empty means searching for all API schedules'),
                         direct_only: bool | None = Query(alias='directOnly', default=None,description='Direct means only show direct schedule Else show both(direct/transshipment)type of schedule'),
-                        tsp: str | None = Query(default=None, alias='transhipmentPort', max_length=5,regex=r"[A-Z]{2}[A-Z0-9]{3}",description="Filter By Transshipment Port"),
+                        tsp: str | None = Query(default=None, alias='transhipmentPort', max_length=5,pattern=r"[A-Z]{2}[A-Z0-9]{3}",description="Filter By Transshipment Port"),
                         vessel_imo:str|None = Query(alias='vesselIMO', default=None,description='Restricts the search to a particular vessel IMO lloyds code on port of loading', max_length=7),
-                        vessel_flag_code: str | None = Query(alias='vesselFlagCode', default=None, max_length=2,regex=r"[A-Z]{2}"),
+                        vessel_flag_code: str | None = Query(alias='vesselFlagCode', default=None, max_length=2,pattern=r"[A-Z]{2}"),
                         service: str | None = Query(default=None,description='Search by either service code or service name',max_length=30),
                         settings: Settings = Depends(get_settings),
                         carrier_status = Depends(load_yaml),
                         credentials = Depends(basic_auth),
-                        client:HTTPXClientWrapper = Depends(HTTPXClientWrapper.get_individual_httpx_client_wrapper)):
-                        # client:HTTPXClientWrapper = Depends(get_global_httpx_client_wrapper)):
+                        # client:HTTPXClientWrapper = Depends(HTTPXClientWrapper.get_individual_httpx_client_wrapper)):
+                        client:HTTPXClientWrapper = Depends(get_global_httpx_client_wrapper)):
 
     """
     Search P2P Schedules with all the information:
@@ -128,7 +128,6 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                           etd= start_date if start_date_type == StartDateType.departure  else None ,
                                           eta =start_date if start_date_type == StartDateType.arrival else None,tsp=tsp,
                                           direct_only=direct_only))
-
         final_schedules = client.gen_all_valid_schedules(response=response,correlation=X_Correlation_ID,matrix=task_group.results,product_id=product_id,point_from=point_from,point_to=point_to,background_tasks=background_tasks,task_exception=task_group.error)
         process_time = time.time() - start_time
         logging.info(f'total_processing_time={process_time:.2f}s total_results={response.headers.get("KN-Count-Schedules")}')
