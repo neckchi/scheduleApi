@@ -28,6 +28,7 @@ class HTTPXClientWrapper():
         self.client = httpx.AsyncClient(timeout=httpx.Timeout(self.limits['elswhereTimeOut'],pool=self.limits['poolTimeOut'],connect=self.limits['connectTimeOut']),
                                         limits=httpx.Limits(max_connections=self.limits['maxClientConnection'],max_keepalive_connections=self.limits['maxKeepAliveConnection'],keepalive_expiry=self.limits['keepAliveExpiry']),
                                         verify=ctx,proxy = httpx.Proxy("http://proxy.eu-central-1.aws.int.kn:80"))
+                                        # verify=ctx)
 
     async def _adjust_pool_limits(self) -> None:
         """designed to dynamically adjust the connection pool limits of the httpx client when a PoolTimeout error occurs"""
@@ -153,7 +154,7 @@ class HTTPXClientWrapper():
         ACTIVE:The connection is currently being used to handle an HTTP request.It is not available for other requests until the current request completes.
         CLOSED:The connection has been terminated.It is no longer part of the connection pool and cannot be reused.
         ACQUIRED:The connection has been taken from the pool but is not yet actively processing a request.It might be in the process of setting up or awaiting the next action."""
-        background_tasks.add_task(lambda : logging.info(self.client._transport._pool._pool))
+        background_tasks.add_task(lambda : logging.info(self.client._transport._pool))
         return final_result
 
 
