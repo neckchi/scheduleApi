@@ -1,6 +1,6 @@
 import asyncio
 from app.carrierp2p.helpers import deepget
-from app.routers.router_config import HTTPXClientWrapper
+from app.routers.router_config import HTTPClientWrapper
 from app.schemas import schema_response
 from datetime import datetime
 from typing import Generator,Iterator
@@ -59,40 +59,41 @@ def process_schedule_data(task: dict,direct_only:bool |None,) -> Iterator:
         yield schedule_body
 
 
-async def fetch_additional_schedules(client: HTTPXClientWrapper, url: str, headers: dict, params: dict, awaited_response) -> list:
+async def fetch_additional_schedules(client: HTTPClientWrapper, url: str, headers: dict, params: dict, awaited_response) -> list:
     """Fetch additional schedules if the initial response indicates more data is available (HTTP 206)."""
     page:int = 50
     last_page: int = int(awaited_response.headers['content-range'].partition('/')[2])
     cma_code_header:str = awaited_response.headers['X-Shipping-Company-Routings']
     check_header:bool = len(cma_code_header.split(',')) > 1
-    updated_params = lambda cma_internal_code: dict(params, **{'shippingCompany': cma_internal_code, 'specificRoutings': 'Commercial'})
+    updated_params = lambda cma_internal_code: {**params, **{**({'shippingCompany': cma_internal_code} if cma_internal_code is not None else {}), 'specificRoutings': 'Commercial'}}
     extra_tasks:list = [asyncio.create_task(anext(client.parse(scac='cma',method='GET',url=url,params=updated_params(cma_code_header) if not check_header else dict(params, **{'specificRoutings': 'Commercial'}),headers=dict(headers, **{'range': f'{num}-{49 + num}'}))))
                    for num in range(page, last_page, page)]
     additional_schedules:list = []
     for extra_p2p in asyncio.as_completed(extra_tasks):
         result = await extra_p2p
         if result:
-            additional_schedules.extend(result.json())
+            additional_schedules.extend(await result.json())
     return additional_schedules
-async def fetch_initial_schedules(client: HTTPXClientWrapper, cma_list: list, url: str, headers: dict, params: dict, extra_condition: bool) -> list:
+async def fetch_initial_schedules(client: HTTPClientWrapper, cma_list: list, url: str, headers: dict, params: dict, extra_condition: bool) -> list:
     """Fetch the initial set of schedules from CMA."""
-    updated_params = lambda cma_internal_code: dict(params, **{'shippingCompany': cma_internal_code, 'specificRoutings': 'USGovernment' if cma_internal_code == '0015' and extra_condition else 'Commercial'})
+    updated_params = lambda cma_internal_code: {**params,**({'shippingCompany': cma_internal_code} if cma_internal_code is not None else {}),'specificRoutings': 'USGovernment' if cma_internal_code == '0015' and extra_condition else 'Commercial'}
     p2p_resp_tasks:list = [asyncio.create_task(anext(client.parse(scac='cma',method='GET', url=url, params=updated_params(cma_code), headers=headers))) for cma_code in cma_list]
     all_schedule:list = []
     for response in asyncio.as_completed(p2p_resp_tasks):
         awaited_response = await response
-        check_extension = awaited_response is not None and not isinstance(awaited_response, list) and awaited_response.status_code == 206
+        check_extension = awaited_response is not None and not isinstance(awaited_response, list) and awaited_response.status == 206
         if awaited_response:
-            all_schedule.extend(awaited_response.json() if check_extension else awaited_response)
+            all_schedule.extend(await awaited_response.json() if check_extension else awaited_response)
             if check_extension:
                 all_schedule.extend(await fetch_additional_schedules(client, url, headers, params, awaited_response))
     return all_schedule
 
-async def get_cma_p2p(client:HTTPXClientWrapper,url: str, pw: str, pol: str, pod: str, search_range: int, direct_only: bool | None,tsp: str | None = None,vessel_imo:str | None = None,
+async def get_cma_p2p(client:HTTPClientWrapper,url: str, pw: str, pol: str, pod: str, search_range: int, direct_only: bool | None,tsp: str | None = None,vessel_imo:str | None = None,
                           departure_date: datetime.date = None,arrival_date: datetime.date = None, scac: str | None = None, service: str | None = None) -> Generator:
     api_carrier_code: str = next(k for k, v in CMA_GROUP.items() if v == scac.upper()) if scac else None
     headers: dict = {'keyID': pw}
-    params: dict = {'placeOfLoading': pol, 'placeOfDischarge': pod,'departureDate': departure_date,'arrivalDate': arrival_date, 'searchRange': search_range,'polVesselIMO':vessel_imo,'polServiceCode': service, 'tsPortCode': tsp}
+    carrier_params: dict = {'placeOfLoading': pol, 'placeOfDischarge': pod,'departureDate': departure_date,'searchRange': search_range, 'arrivalDate': arrival_date, 'polVesselIMO':vessel_imo,'polServiceCode': service, 'tsPortCode': tsp}
+    params:dict = {k: v for k, v in carrier_params.items() if v is not None} # Remove the key if its value is None
     extra_condition: bool = pol.startswith('US') and pod.startswith('US')
     cma_list:list = [None, '0015'] if api_carrier_code is None else [api_carrier_code]
     response_json = await fetch_initial_schedules(client=client,url=url,headers=headers,params=params,cma_list=cma_list,extra_condition=extra_condition)

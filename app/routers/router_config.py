@@ -9,14 +9,14 @@ from typing import Generator,Callable,AsyncGenerator,Dict,Any,Optional,Union
 from threading import Lock
 from uuid import UUID
 from datetime import timedelta
-import httpx
+import aiohttp
 import logging
 import orjson
 import asyncio
 import time
 import ssl
 
-class HTTPXClientWrapper():
+class HTTPClientWrapper():
     def __init__(self) -> None:
         self.default_limits = load_yaml()['data']['connectionPoolSetting']
         self.limits = self.default_limits.copy()
@@ -25,29 +25,27 @@ class HTTPXClientWrapper():
     def _initialize_client(self):
         ctx = ssl.create_default_context()
         ctx.set_ciphers('DEFAULT')
-        self.client = httpx.AsyncClient(timeout=httpx.Timeout(self.limits['elswhereTimeOut'],pool=self.limits['poolTimeOut'],connect=self.limits['connectTimeOut']),
-                                        limits=httpx.Limits(max_connections=self.limits['maxClientConnection'],max_keepalive_connections=self.limits['maxKeepAliveConnection'],keepalive_expiry=self.limits['keepAliveExpiry']),
-                                        verify=ctx,proxy = httpx.Proxy("http://proxy.eu-central-1.aws.int.kn:80"))
-                                        # verify=ctx)
+        self.conn = aiohttp.TCPConnector(ssl=ctx,ttl_dns_cache=self.limits['dnsCache'],limit_per_host=self.limits['maxConnectionPerHost'], limit=self.limits['maxClientConnection'], keepalive_timeout=self.limits['keepAliveExpiry'])
+        self.client = aiohttp.ClientSession(connector=self.conn, timeout=aiohttp.ClientTimeout(total=self.limits['elswhereTimeOut'],connect=self.limits['poolTimeOut']))
 
     async def _adjust_pool_limits(self) -> None:
-        """designed to dynamically adjust the connection pool limits of the httpx client when a PoolTimeout error occurs"""
+        """designed to dynamically adjust the connection pool limits of the aiohttp client when a PoolTimeout error occurs"""
         with self.lock:
             self.limits['maxClientConnection'] += 20
-            self.limits['maxKeepAliveConnection'] += 10
-            self.client._transport._pool._max_connections = self.limits['maxClientConnection']
-            self.client._transport._pool._max_keepalive_connections = self.limits['maxKeepAliveConnection']
+            self.limits['maxConnectionPerHost'] += 10
+            # Directly access and modify the private attributes
+            self.conn._limit = self.limits['maxClientConnection']
+            self.conn._limit_per_host = self.limits['maxConnectionPerHost']
 
     async def close(self)-> None:
-        await self.client.aclose()
-
+        await self.client.close()
     # Individual Client Session Setup
     @classmethod
-    async def get_individual_httpx_client_wrapper(cls) -> AsyncGenerator["HTTPXClientWrapper", None]:
+    async def get_individual_http_client_wrapper(cls) -> AsyncGenerator["HTTPClientWrapper", None]:
         async with cls() as standalone_client:
             try:
                 yield standalone_client
-            except (ConnectionError, httpx.ConnectTimeout, httpx.ConnectError) as connect_error:
+            except (aiohttp.ClientConnectionError, aiohttp.ConnectionTimeoutError) as connect_error:
                 raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                                     detail=f'{connect_error.__class__.__name__}:{connect_error}')
             except ValueError as value_error:
@@ -64,7 +62,7 @@ class HTTPXClientWrapper():
                 raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                                     detail=f'An error occurred while creating the client - {eg.args}')
             finally:
-                await standalone_client.aclose()
+                await standalone_client.close()
     async def parse(self, scac: str, url: str, method: str = 'GET', params: Optional[Dict[str, Any]] = None,
                     headers: Optional[Dict[str, Any]] = None,
                     json: Optional[Dict[str, Any]] = None, token_key: Optional[Union[str, UUID]] = None,
@@ -74,10 +72,10 @@ class HTTPXClientWrapper():
                     stream: bool = False) -> AsyncGenerator[Dict[str, Any], None]:
         """Fetch the file from carrier API and deserialize the json file """
         if not stream:
-            async for response in self.handle_standard_response(scac,url, method, params, headers, json, data, token_key,background_tasks, expire):
+            async for response in self.handle_standard_response(scac, url, method, params, headers, json, data, token_key, background_tasks, expire):
                 yield response
         else:
-            async for response in self.handle_streaming_response(scac,url, method, params, headers, data, token_key,background_tasks, expire):
+            async for response in self.handle_streaming_response(scac, url, method, params, headers, data, token_key, background_tasks, expire):
                 yield response
     async def handle_standard_response(self, scac: str, url: str, method: str, params: Optional[Dict[str, Any]],
                                        headers: Optional[Dict[str, Any]],
@@ -85,42 +83,53 @@ class HTTPXClientWrapper():
                                        token_key: Optional[Union[str, UUID]],
                                        background_tasks: Optional[BackgroundTasks], expire: timedelta) -> AsyncGenerator[Dict[str, Any], None]:
         try:
-            response = await self.client.request(method=method, url=url, params=params, headers=headers, json=json, data=data)
-            logging.info(f'{method} {scac} took {response.elapsed.total_seconds()}s to process the request {response.url} {response.http_version} {response.status_code} {response.reason_phrase}')
-            if response.status_code == status.HTTP_206_PARTIAL_CONTENT:
-                yield response
-            elif response.status_code == status.HTTP_200_OK:
-                response_json = response.json()
-                if background_tasks:
-                    background_tasks.add_task(db.set, key=token_key, value=response_json, expire=expire,log_component=f'{scac} token')
-                yield response_json
-            elif response.status_code in (status.HTTP_500_INTERNAL_SERVER_ERROR, status.HTTP_502_BAD_GATEWAY):
-                logging.critical(f'Unable to connect to {response.url}')
-                yield None
-            else:
-                yield None
-        except httpx.PoolTimeout as e:
-            logging.info(f'PoolTimeout : Increasing pool size...')
+            start_time = time.time()
+            async with self.client.request(method=method, url=url, params=params, headers=headers, json=json, data=data,proxy='http://proxy.eu-central-1.aws.int.kn:80') as response:
+                response_time = time.time() - start_time
+                logging.info(f'{method} {scac} took {response_time:.2f}s to process the request {response.url} {response.status}')
+                if response.status == status.HTTP_206_PARTIAL_CONTENT:
+                    yield response
+                elif response.status == status.HTTP_200_OK:
+                    response_json = await response.json()
+                    if background_tasks:
+                        background_tasks.add_task(db.set, key=token_key, value=response_json, expire=expire, log_component=f'{scac} token')
+                    yield response_json
+                elif response.status in (status.HTTP_500_INTERNAL_SERVER_ERROR, status.HTTP_502_BAD_GATEWAY):
+                    logging.critical(f'Unable to connect to {response.url}')
+                    yield None
+                elif response.status == status.HTTP_429_TOO_MANY_REQUESTS:
+                    logging.critical(f'Too Many Request Sent To {response.url}')
+                    yield None
+                else:
+                    yield None
+        except aiohttp.ServerTimeoutError as e:
+            logging.info(f'ConnectionError: Increasing pool size...')
             await self._adjust_pool_limits()
             yield None
+
     async def handle_streaming_response(self, scac: str, url: str, method: str, params: Optional[Dict[str, Any]],
                                         headers: Optional[Dict[str, Any]],
                                         data: Optional[Dict[str, Any]], token_key: Optional[Union[str, UUID]],
                                         background_tasks: Optional[BackgroundTasks],
                                         expire: timedelta) -> AsyncGenerator[Dict[str, Any], None]:
         try:
-            async with self.client.stream(method, url, params=params, headers=headers, data=data) as stream_request:
-                if stream_request.status_code == status.HTTP_200_OK:
-                    async for data in stream_request.aiter_lines():
+            start_time = time.time()
+            async with self.client.request(method, url, params=params, headers=headers, data=data,proxy='http://proxy.eu-central-1.aws.int.kn:80') as stream_request:
+                response_time = time.time() - start_time
+                logging.info(f'{method} {scac} took {response_time:.2f}s to process the request {stream_request.url} {stream_request.status}')
+                if stream_request.status == status.HTTP_200_OK:
+                    async for data in stream_request.content.iter_any():
                         response = orjson.loads(data)
-                        logging.info(f'{method} {scac} took {stream_request.elapsed.total_seconds()}s to process the request {stream_request.url} {stream_request.http_version} {stream_request.status_code} {stream_request.reason_phrase}')
                         if background_tasks:
                             background_tasks.add_task(db.set, key=token_key, value=response, expire=expire, log_component=f'{scac} location code')
                         yield response
+                elif stream_request.status == status.HTTP_429_TOO_MANY_REQUESTS:
+                    logging.critical(f'Too Many Request Sent To {stream_request.url}')
+                    yield None
                 else:
                     yield None
-        except httpx.PoolTimeout as e:
-            logging.info(f'PoolTimeout occurred:Increasing pool size...')
+        except aiohttp.ServerTimeoutError as e:
+            logging.info(f'ConnectionError: Increasing pool size...')
             await self._adjust_pool_limits()
             yield None
     def gen_all_valid_schedules(self, correlation: Optional[str], response: Response, product_id: UUID,
@@ -154,30 +163,31 @@ class HTTPXClientWrapper():
         ACTIVE:The connection is currently being used to handle an HTTP request.It is not available for other requests until the current request completes.
         CLOSED:The connection has been terminated.It is no longer part of the connection pool and cannot be reused.
         ACQUIRED:The connection has been taken from the pool but is not yet actively processing a request.It might be in the process of setting up or awaiting the next action."""
-        background_tasks.add_task(lambda : logging.info(self.client._transport._pool))
+
+        # background_tasks.add_task(lambda : logging.info(self.client.connector._conns))
         return final_result
 
 
-logging.getLogger("httpx").setLevel(logging.WARNING)
-httpx_client = HTTPXClientWrapper()
+logging.getLogger("aiohttp").setLevel(logging.WARNING)
+http_client = HTTPClientWrapper()
 queue_listener = log_queue_listener()
 async def startup_event():
     queue_listener.start()
     await db.initialize_database()
-    logging.info("HTTPX Client initialized",extra={'custom_attribute':None})
+    logging.info("Aiohttp Client initialized",extra={'custom_attribute':None})
 
 async def shutdown_event():
     queue_listener.stop()
     await db.close()
-    await httpx_client.close()
-    logging.info("HTTPX Client closed", extra={'custom_attribute': None})
+    await http_client.close()
+    logging.info("Aiohttp Client closed", extra={'custom_attribute': None})
 
 
-async def get_global_httpx_client_wrapper() -> HTTPXClientWrapper:
-    """Global ClientConnection Pool  Setup"""
+async def get_global_http_client_wrapper() -> HTTPClientWrapper:
+    """Global ClientConnection Pool Setup"""
     try:
-        yield httpx_client
-    except (ConnectionError, httpx.ConnectTimeout, httpx.ConnectError) as connect_error:
+        yield http_client
+    except (aiohttp.ClientConnectionError, aiohttp.ConnectionTimeoutError) as connect_error:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                             detail=f'{connect_error.__class__.__name__}:{connect_error}')
     except ValueError as value_error:
@@ -193,6 +203,7 @@ async def get_global_httpx_client_wrapper() -> HTTPXClientWrapper:
         logging.error(f'{eg.__class__.__name__}:{eg.args}')
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail=f'An error occurred while creating the client - {eg.args}')
+
 class AsyncTaskManager():
     """Currently there is no built in  python class and method that we can prevent it from cancelling all conroutine tasks if one of the tasks is cancelled
     From BU perspective, all those carrier schedules are independent from one antoher so we shouldnt let a failed task to cancel all other successful tasks"""
@@ -220,15 +231,14 @@ class AsyncTaskManager():
         while retries < self.max_retries:
             try:
                 return await asyncio.wait_for(coro(), timeout=self.default_timeout)
-            except (asyncio.TimeoutError,asyncio.CancelledError,httpx.ReadTimeout,httpx.ReadError,httpx.ConnectTimeout,):
-                """Due to timeout, the coroutine task is cancelled. Once its cancelled, we retry it 3 times"""
+            except (asyncio.TimeoutError,asyncio.CancelledError,aiohttp.ClientConnectionError,aiohttp.ConnectionTimeoutError):
+                """Due to timeout, the coroutine task is cancelled. Once its cancelled, we retry it"""
                 logging.error(f"{task_name} timed out after {self.default_timeout} seconds. Retrying {retries + 1}/{self.max_retries}...")
                 retries += 1
                 adjusted_timeout += 2
                 await asyncio.sleep(1)  # Wait for 1 sec before the next retry
         logging.error(f"{task_name} reached maximum retries. the schedule  wont be cached anything")
         self.error = True
-        # return coro()
         return None
 
     def create_task(self, name:str,coro:Callable) -> None:

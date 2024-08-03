@@ -1,6 +1,6 @@
 import asyncio
 from app.carrierp2p.helpers import deepget
-from app.routers.router_config import HTTPXClientWrapper
+from app.routers.router_config import HTTPClientWrapper
 from app.background_tasks import db
 from app.schemas import schema_response
 from uuid import uuid5,NAMESPACE_DNS
@@ -56,7 +56,7 @@ def process_schedule_data(resp: dict,first_cut_off:dict, direct_only:bool |None,
                                                                                 'legs':sorted(leg_list, key=lambda d: d['etd']) if check_transshipment else leg_list},warnings=False)
             yield schedule_body
 
-async def get_cutoff_first_leg(client:HTTPXClientWrapper,cut_off_url:str,cut_off_pw:str,response_data:list) -> dict:
+async def get_cutoff_first_leg(client:HTTPClientWrapper,cut_off_url:str,cut_off_pw:str,response_data:list) -> dict:
     """According to the BU requirment, we have to get the first leg from Maersk P2P schedule and map the cutOffDate for the first leg only"""
     get_all_first_leg: list[dict] = [{'country': leg['transportLegs'][0]['facilities']['startLocation']['countryCode'],
                                       'pol': leg['transportLegs'][0]['facilities']['startLocation']['cityName'],'imo': imo, 'voyage': leg['transportLegs'][0]['transport'].get('carrierDepartureVoyageNumber')}
@@ -68,7 +68,7 @@ async def get_cutoff_first_leg(client:HTTPXClientWrapper,cut_off_url:str,cut_off
     first_cut_off: dict = {key: value for cutoff in get_cut_offs if cutoff is not None for key, value in cutoff.items()}
     return first_cut_off
 
-async def get_maersk_cutoff(client:HTTPXClientWrapper, url: str, headers: dict, country: str, pol: str, imo: str, voyage: str)-> dict|None:
+async def get_maersk_cutoff(client:HTTPClientWrapper, url: str, headers: dict, country: str, pol: str, imo: str, voyage: str)-> dict|None:
     """this is the Maersk API to get the cutOffDate """
     params: dict = {'ISOCountryCode': country, 'portOfLoad': pol, 'vesselIMONumber': imo, 'voyage': voyage}
     async for response_json in client.parse(scac='maersk',url=url,method ='GET',stream=True,headers=headers, params=params):
@@ -85,7 +85,7 @@ async def get_maersk_cutoff(client:HTTPXClientWrapper, url: str, headers: dict, 
             return {lookup_key: cut_off_body}
         return None
 
-async def retrieve_geo_locations(client:HTTPXClientWrapper, background_task:BackgroundTasks, pol:str, pod:str, location_url:str, pw:str):
+async def retrieve_geo_locations(client:HTTPClientWrapper, background_task:BackgroundTasks, pol:str, pod:str, location_url:str, pw:str):
     maersk_uuid = lambda port: uuid5(NAMESPACE_DNS, f'maersk-loc-uuid-kuehne-nagel-{port}')
     port_uuid:list = [maersk_uuid(port=port) for port in [pol, pod]]
     [origingeolocation, destinationgeolocation] = await asyncio.gather(*(db.get(key=port_id, log_component='maersk location code') for port_id in port_uuid))
@@ -100,13 +100,13 @@ async def retrieve_geo_locations(client:HTTPXClientWrapper, background_task:Back
             origingeolocation, destinationgeolocation = (location[0] if origingeolocation is None else origingeolocation,location[0] if destinationgeolocation is None else destinationgeolocation)
     return origingeolocation, destinationgeolocation
 
-async def get_maersk_p2p(client:HTTPXClientWrapper,background_task:BackgroundTasks,url: str, location_url: str, cutoff_url: str, pw: str, pw2: str, pol: str, pod: str,
-                         search_range: str, direct_only: bool|None = None, tsp: str | None = None, scac: str | None = None,start_date: datetime.date = None,date_type: str | None = None, service: str | None = None, vessel_imo:str|None = None,vessel_flag: str | None = None) -> Generator:
+async def get_maersk_p2p(client:HTTPClientWrapper,background_task:BackgroundTasks,url: str, location_url: str, cutoff_url: str, pw: str, pw2: str, pol: str, pod: str,start_date: datetime.date,
+                         search_range: str, direct_only: bool|None = None, tsp: str | None = None, scac: str | None = None, date_type: str | None = None, service: str | None = None, vessel_imo:str|None = None,vessel_flag: str | None = None) -> Generator:
     origin_geo_location, des_geo_location = await retrieve_geo_locations(client=client,background_task=background_task,pol=pol,pod=pod,location_url=location_url,pw=pw)
     if origin_geo_location and des_geo_location:
         params:dict= {'collectionOriginCountryCode': origin_geo_location[0]['countryCode'],'collectionOriginCityName': origin_geo_location[0]['cityName'],'collectionOriginUNLocationCode': origin_geo_location[0]['UNLocationCode'],
                         'deliveryDestinationCountryCode': des_geo_location[0]['countryCode'],'deliveryDestinationCityName': des_geo_location[0]['cityName'],'deliveryDestinationUNLocationCode': des_geo_location[0]['UNLocationCode'],
-                        'dateRange': f'P{search_range}W', 'startDateType': date_type, 'startDate': start_date}
+                        'dateRange': f'P{search_range}W', 'startDateType': date_type, 'startDate': start_date.strftime('%Y-%m-%d')}
         params.update({'vesselFlagCode': vessel_flag}) if vessel_flag else ...
         maersk_list: list[str] = ['MAEU', 'MAEI'] if scac is None else [scac]
         response_cache = await asyncio.gather(*(db.get(scac=sub_maersk,params=params,original_response=True, log_component='maersk original response') for sub_maersk in maersk_list))

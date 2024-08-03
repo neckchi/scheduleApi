@@ -9,7 +9,7 @@ from app.schemas import schema_response
 from app.carrierp2p import cma, one, hmm, zim, maersk, msc, iqax,hlag
 from app.config import log_correlation,Settings,get_settings,load_yaml
 from app.schemas.schema_request import CarrierCode,StartDateType,SearchRange
-from app.routers.router_config import AsyncTaskManager,HTTPXClientWrapper,get_global_httpx_client_wrapper
+from app.routers.router_config import AsyncTaskManager,HTTPClientWrapper,get_global_http_client_wrapper
 from app.routers.security import basic_auth
 
 
@@ -35,8 +35,8 @@ async def get_schedules(background_tasks: BackgroundTasks,
                         settings: Settings = Depends(get_settings),
                         carrier_status = Depends(load_yaml),
                         credentials = Depends(basic_auth),
-                        # client:HTTPXClientWrapper = Depends(HTTPXClientWrapper.get_individual_httpx_client_wrapper)):
-                        client:HTTPXClientWrapper = Depends(get_global_httpx_client_wrapper)):
+                        # client:HTTPClientWrapper = Depends(HTTPClientWrapper.get_individual_http_client_wrapper)):
+                        client:HTTPClientWrapper = Depends(get_global_http_client_wrapper)):
 
     """
     Search P2P Schedules with all the information:
@@ -55,8 +55,8 @@ async def get_schedules(background_tasks: BackgroundTasks,
                 if carrier_status['data']['activeCarriers']['cma'] and (carriers in {'CMDU', 'ANNU', 'APLU', 'CHNL'} or carriers is None):
                     task_group.create_task(name=f'CMA_task' if carriers is None else f'{carriers}_task',coro=lambda cma_scac=carriers :cma.get_cma_p2p(client=client, url=settings.cma_url, scac=cma_scac, pol=point_from,
                                         pod=point_to,
-                                        departure_date=start_date if start_date_type == StartDateType.departure else None,
-                                        arrival_date=start_date if start_date_type == StartDateType.arrival else None,
+                                        departure_date=start_date.strftime('%Y-%m-%d') if start_date_type == StartDateType.departure else None,
+                                        arrival_date=start_date.strftime('%Y-%m-%d') if start_date_type == StartDateType.arrival else None,
                                         search_range=search_range.duration, direct_only=direct_only,vessel_imo = vessel_imo,
                                         tsp=tsp,
                                         service=service, pw=settings.cma_token.get_secret_value()))
@@ -113,8 +113,8 @@ async def get_schedules(background_tasks: BackgroundTasks,
                 if carrier_status['data']['activeCarriers']['iqax'] and (carriers in {'OOLU', 'COSU'} or carriers is None):
                     task_group.create_task(name=f'IQAX_task' if carriers is None else f'{carriers}_task',coro=lambda cosco_scac = carriers :iqax.get_iqax_p2p(client=client, background_task = background_tasks,url=settings.iqax_url, pol=point_from,
                                           pod=point_to,
-                                          departure_date=start_date if start_date_type == StartDateType.departure else None,
-                                          arrival_date=start_date if start_date_type == StartDateType.arrival else None,
+                                          departure_date=start_date.strftime('%Y-%m-%d') if start_date_type == StartDateType.departure else None,
+                                          arrival_date=start_date.strftime('%Y-%m-%d') if start_date_type == StartDateType.arrival else None,
                                           search_range=search_range.value, direct_only=direct_only,
                                           tsp=tsp,vessel_imo=vessel_imo,
                                           scac=cosco_scac, service=service,

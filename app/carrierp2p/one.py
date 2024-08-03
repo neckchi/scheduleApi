@@ -1,4 +1,4 @@
-from app.routers.router_config import HTTPXClientWrapper
+from app.routers.router_config import HTTPClientWrapper
 from app.background_tasks import db
 from app.schemas import schema_response
 from uuid import uuid5,NAMESPACE_DNS,UUID
@@ -62,7 +62,7 @@ def process_response_data(task: dict,vessel_imo: str, service: str, tsp: str) ->
                                                                             'legs' : process_leg_data(check_transshipment=check_transshipment,schedule_task=task,first_point_from= first_point_from,last_point_to=last_point_to,
                                                                                                            first_etd=first_etd,last_eta=last_eta,transit_time=transit_time)},warnings=False)
         yield schedule_body
-async def get_one_access_token(client:HTTPXClientWrapper,background_task:BackgroundTasks, url: str, auth: str, api_key: str) -> str:
+async def get_one_access_token(client:HTTPClientWrapper,background_task:BackgroundTasks, url: str, auth: str, api_key: str) -> str:
     one_token_key:UUID = uuid5(NAMESPACE_DNS, 'one-token-uuid-kuehne-nagel')
     response_token:dict = await db.get(key=one_token_key,log_component='one token')
     if response_token is None:
@@ -70,9 +70,9 @@ async def get_one_access_token(client:HTTPXClientWrapper,background_task:Backgro
         response_token:dict = await anext(client.parse(scac='one',method='POST',background_tasks=background_task,url=url, headers=headers,token_key=one_token_key,expire=timedelta(minutes=55)))
     return response_token['access_token']
 
-async def get_one_p2p(client:HTTPXClientWrapper, background_task:BackgroundTasks,url: str, turl: str, pw: str, auth: str, pol: str, pod: str, search_range: int,
+async def get_one_p2p(client:HTTPClientWrapper, background_task:BackgroundTasks,url: str, turl: str, pw: str, auth: str, pol: str, pod: str, search_range: int,
                       direct_only: bool|None,start_date_type: str,start_date: datetime.date, service: str | None = None,vessel_imo: str | None = None, tsp: str | None = None) -> Generator:
-    params: dict = {'originPort': pol, 'destinationPort': pod, 'searchDate': start_date,'searchDateType': start_date_type, 'weeksOut': search_range,'directOnly': 'TRUE' if direct_only is True else 'FALSE'}
+    params: dict = {'originPort': pol, 'destinationPort': pod, 'searchDate': start_date.strftime('%Y-%m-%d'),'searchDateType': start_date_type, 'weeksOut': search_range,'directOnly': 'TRUE' if direct_only is True else 'FALSE'}
     # weekout:1 ≤ value ≤ 14
     response_cache = await db.get(scac='oney',params=params,original_response=True,log_component='one original response file')
     generate_schedule = lambda data:(schedule_result for schedule_type in data for task in data[schedule_type] for schedule_result in process_response_data(task=task, vessel_imo=vessel_imo, service=service,tsp=tsp))

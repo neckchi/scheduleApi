@@ -6,14 +6,16 @@ data:
   backgroundTasks:
     scheduleExpiry: 6
   connectionPoolSetting:
-    connectTimeOut: 15
-    poolTimeOut: 10
-    elswhereTimeOut: 11
+    connectTimeOut: 12
+    poolTimeOut: 12
+    elswhereTimeOut: 25
     maxClientConnection: 8000
-    maxKeepAliveConnection: 4000
-    keepAliveExpiry: 12
+    maxConnectionPerHost: 700
+    maxKeepAliveConnection: 3000
+    dnsCache: 300
+    keepAliveExpiry: 20
     retryNumber: 2
-    asyncDefaultTimeOut: 10
+    asyncDefaultTimeOut: 12
   activeCarriers:
     cma:  True
     hlag: False

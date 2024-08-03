@@ -1,5 +1,5 @@
 from app.carrierp2p.helpers import deepget
-from app.routers.router_config import HTTPXClientWrapper
+from app.routers.router_config import HTTPClientWrapper
 from app.schemas import schema_response
 from app.background_tasks import db
 from fastapi import BackgroundTasks
@@ -70,9 +70,10 @@ def process_schedule_data(task: dict, direct_only:bool |None,vessel_imo: str, se
                                                                              'transshipment': check_transshipment, 'legs': process_leg_data(schedule_task=task,first_etd=first_etd,last_eta=last_eta)},warnings=False)
         yield schedule_body
 
-async def get_iqax_p2p(client:HTTPXClientWrapper,background_task:BackgroundTasks, url: str, pw: str, pol: str, pod: str, search_range: int, direct_only: bool |None ,
+async def get_iqax_p2p(client:HTTPClientWrapper,background_task:BackgroundTasks, url: str, pw: str, pol: str, pod: str, search_range: int, direct_only: bool |None ,
                        tsp: str | None = None, departure_date:datetime.date = None, arrival_date: datetime.date = None,vessel_imo:str|None = None,scac: str | None = None, service: str | None = None) -> Generator:
-    params: dict = {'appKey': pw, 'porID': pol, 'fndID': pod, 'departureFrom': departure_date,'arrivalFrom': arrival_date, 'searchDuration': search_range}
+    carrier_params: dict = {'appKey': pw, 'porID': pol, 'fndID': pod, 'departureFrom': departure_date,'arrivalFrom': arrival_date, 'searchDuration': search_range}
+    params: dict = {k: v for k, v in carrier_params.items() if v is not None}
     iqax_list: list[str] = ['OOLU', 'COSU'] if scac is None else [scac]
     response_cache:list = await asyncio.gather(*(db.get(scac=sub_iqax,params=params,original_response=True,log_component='iqax original response file') for sub_iqax in iqax_list))
     check_cache: bool = any(item is None for item in response_cache)

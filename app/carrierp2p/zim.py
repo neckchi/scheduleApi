@@ -1,5 +1,5 @@
 import datetime
-from app.routers.router_config import HTTPXClientWrapper
+from app.routers.router_config import HTTPClientWrapper
 from app.background_tasks import db
 from app.schemas import schema_response
 from uuid import uuid5,NAMESPACE_DNS,UUID
@@ -52,7 +52,7 @@ def process_schedule_data(task: dict, direct_only:bool |None,vessel_imo: str, se
         yield schedule_body
 
 
-async def get_zim_access_token(client:HTTPXClientWrapper,background_task:BackgroundTasks, url: str, api_key: str, client_id: str, secret: str) -> str:
+async def get_zim_access_token(client:HTTPClientWrapper,background_task:BackgroundTasks, url: str, api_key: str, client_id: str, secret: str) -> str:
     zim_token_key:UUID = uuid5(NAMESPACE_DNS, 'zim-token-uuid-kuehne-nagel2')
     response_token:dict = await db.get(key=zim_token_key,log_component='zim token')
     if response_token is None:
@@ -62,9 +62,9 @@ async def get_zim_access_token(client:HTTPXClientWrapper,background_task:Backgro
     return response_token['access_token']
 
 
-async def get_zim_p2p(client:HTTPXClientWrapper, background_task:BackgroundTasks,url: str, turl: str, pw: str, zim_client: str, zim_secret: str, pol: str, pod: str,
+async def get_zim_p2p(client:HTTPClientWrapper, background_task:BackgroundTasks,url: str, turl: str, pw: str, zim_client: str, zim_secret: str, pol: str, pod: str,
                       search_range: int,start_date_type: str,start_date: datetime.datetime.date, direct_only: bool |None,vessel_imo:str|None = None, service: str | None = None, tsp: str | None = None):
-    params: dict = {'originCode': pol, 'destCode': pod, 'fromDate': start_date,'toDate': (start_date + datetime.timedelta(days=search_range)).strftime("%Y-%m-%d"), 'sortByDepartureOrArrival': start_date_type}
+    params: dict = {'originCode': pol, 'destCode': pod, 'fromDate': start_date.strftime('%Y-%m-%d'),'toDate': (start_date + datetime.timedelta(days=search_range)).strftime("%Y-%m-%d"), 'sortByDepartureOrArrival': start_date_type}
     response_cache = await db.get(scac='zimu',params=params,original_response=True,log_component='zim original response file')
     generate_schedule = lambda data: (result for task in data['response']['routes'] for result in process_schedule_data(task=task, direct_only=direct_only, vessel_imo=vessel_imo, service=service, tsp=tsp))
     if response_cache:

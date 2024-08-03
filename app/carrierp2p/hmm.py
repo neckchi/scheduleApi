@@ -1,5 +1,5 @@
 import datetime
-from app.routers.router_config import HTTPXClientWrapper
+from app.routers.router_config import HTTPClientWrapper
 from app.schemas import schema_response
 from app.background_tasks import db
 from typing import Generator,Iterator
@@ -89,7 +89,7 @@ def process_schedule_data(task: dict, vessel_imo: str, service: str, tsp: str) -
         yield schedule_body
 
 
-async def get_hmm_p2p(client:HTTPXClientWrapper, background_task:BackgroundTasks, url: str, pw: str, pol: str, pod: str, search_range: str, direct_only: bool|None,
+async def get_hmm_p2p(client:HTTPClientWrapper, background_task:BackgroundTasks, url: str, pw: str, pol: str, pod: str, search_range: str, direct_only: bool|None,
                       start_date: datetime,tsp: str | None = None,vessel_imo:str | None = None, service: str | None = None) -> Generator:
     params: dict = {'fromLocationCode': pol, 'receiveTermCode': 'CY', 'toLocationCode': pod, 'deliveryTermCode': 'CY',
                     'periodDate': start_date.strftime("%Y%m%d"),'weekTerm': search_range, 'webSort': 'D','webPriority':'D' if direct_only is True else 'T' if direct_only is False else 'A'}

@@ -3,7 +3,7 @@ import base64
 from datetime import datetime, timedelta, timezone
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
-from app.routers.router_config import HTTPXClientWrapper
+from app.routers.router_config import HTTPClientWrapper
 from app.background_tasks import db
 from app.schemas import schema_response
 from uuid import uuid5,NAMESPACE_DNS,UUID
@@ -53,7 +53,7 @@ def process_schedule_data(task: dict, direct_only:bool |None,vessel_imo: str, se
         yield schedule_body
 
 
-async def get_msc_token(client:HTTPXClientWrapper,background_task:BackgroundTasks, oauth: str, aud: str, rsa:str, msc_client: str, msc_scope: str, msc_thumbprint: str) ->AsyncIterator:
+async def get_msc_token(client:HTTPClientWrapper,background_task:BackgroundTasks, oauth: str, aud: str, rsa:str, msc_client: str, msc_scope: str, msc_thumbprint: str) ->AsyncIterator:
     msc_token_key:UUID = uuid5(NAMESPACE_DNS, 'msc-token-uuid-kuehne-nagel')
     response_token:dict = await db.get(key=msc_token_key,log_component='msc token')
     if response_token is None:
@@ -67,9 +67,9 @@ async def get_msc_token(client:HTTPXClientWrapper,background_task:BackgroundTask
         response_token:dict = await anext(client.parse(scac='msc',background_tasks =background_task,method='POST',url=oauth, headers=headers, data=params,token_key=msc_token_key,expire = timedelta(minutes=40)))
     return response_token['access_token']
 
-async def get_msc_p2p(client:HTTPXClientWrapper, background_task:BackgroundTasks,url: str, oauth: str, aud: str, pw: str, msc_client: str, msc_scope: str,msc_thumbprint: str, pol: str, pod: str,
+async def get_msc_p2p(client:HTTPClientWrapper, background_task:BackgroundTasks,url: str, oauth: str, aud: str, pw: str, msc_client: str, msc_scope: str,msc_thumbprint: str, pol: str, pod: str,
                       search_range: int, start_date_type: str,start_date: datetime.date, direct_only: bool |None, vessel_imo: str | None = None, service: str | None = None, tsp: str | None = None) -> Generator:
-    params: dict = {'fromPortUNCode': pol, 'toPortUNCode': pod, 'fromDate': start_date,'toDate': (start_date + timedelta(days=search_range)).strftime("%Y-%m-%d"), 'datesRelated': start_date_type}
+    params: dict = {'fromPortUNCode': pol, 'toPortUNCode': pod, 'fromDate': start_date.strftime('%Y-%m-%d'),'toDate': (start_date + timedelta(days=search_range)).strftime("%Y-%m-%d"), 'datesRelated': start_date_type}
     generate_schedule = lambda data:(schedule_result for task in data['MSCSchedule']['Transactions'] for schedule_result in process_schedule_data(task=task,direct_only=direct_only, vessel_imo=vessel_imo, service=service,tsp=tsp))
     response_cache = await db.get(original_response=True, scac='mscu', params=str(params),log_component='msc original response')
     if response_cache:
