@@ -6,7 +6,6 @@ from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError, ResponseValidationError
 from typing import Generator,Callable,AsyncGenerator,Dict,Any,Optional,Union
-from threading import Lock
 from uuid import UUID
 from datetime import timedelta
 import aiohttp
@@ -20,20 +19,20 @@ class HTTPClientWrapper():
     def __init__(self) -> None:
         self.default_limits = load_yaml()['data']['connectionPoolSetting']
         self.limits = self.default_limits.copy()
-        self.lock = Lock()
+        self.lock = asyncio.Lock()
         self._initialize_client()
+
     def _initialize_client(self):
-        ctx = ssl.create_default_context()
-        ctx.set_ciphers('DEFAULT')
-        self.conn = aiohttp.TCPConnector(ssl=ctx,ttl_dns_cache=self.limits['dnsCache'],limit_per_host=self.limits['maxConnectionPerHost'], limit=self.limits['maxClientConnection'], keepalive_timeout=self.limits['keepAliveExpiry'])
+        # ctx = ssl.create_default_context()
+        # ctx.set_ciphers('DEFAULT')
+        self.conn = aiohttp.TCPConnector(ssl=False,ttl_dns_cache=self.limits['dnsCache'],limit_per_host=self.limits['maxConnectionPerHost'], limit=self.limits['maxClientConnection'], keepalive_timeout=self.limits['keepAliveExpiry'])
         self.client = aiohttp.ClientSession(connector=self.conn, timeout=aiohttp.ClientTimeout(total=self.limits['elswhereTimeOut'],connect=self.limits['poolTimeOut']))
 
     async def _adjust_pool_limits(self) -> None:
         """designed to dynamically adjust the connection pool limits of the aiohttp client when a PoolTimeout error occurs"""
-        with self.lock:
+        async with self.lock:
             self.limits['maxClientConnection'] += 20
             self.limits['maxConnectionPerHost'] += 10
-            # Directly access and modify the private attributes
             self.conn._limit = self.limits['maxClientConnection']
             self.conn._limit_per_host = self.limits['maxConnectionPerHost']
 
@@ -45,7 +44,7 @@ class HTTPClientWrapper():
         async with cls() as standalone_client:
             try:
                 yield standalone_client
-            except (aiohttp.ClientConnectionError, aiohttp.ConnectionTimeoutError) as connect_error:
+            except (aiohttp.ClientConnectionError) as connect_error:
                 raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                                     detail=f'{connect_error.__class__.__name__}:{connect_error}')
             except ValueError as value_error:
@@ -84,7 +83,7 @@ class HTTPClientWrapper():
                                        background_tasks: Optional[BackgroundTasks], expire: timedelta) -> AsyncGenerator[Dict[str, Any], None]:
         try:
             start_time = time.time()
-            async with self.client.request(method=method, url=url, params=params, headers=headers, json=json, data=data, proxy="http://proxy.eu-central-1.aws.int.kn:80") as response:
+            async with self.client.request(method=method, url=url, params=params, headers=headers, json=json, data=data,proxy="http://proxy.eu-central-1.aws.int.kn:80") as response:
                 response_time = time.time() - start_time
                 logging.info(f'{method} {scac} took {response_time:.2f}s to process the request {response.url} {response.status}')
                 if response.status == status.HTTP_206_PARTIAL_CONTENT:
@@ -118,7 +117,7 @@ class HTTPClientWrapper():
                 response_time = time.time() - start_time
                 logging.info(f'{method} {scac} took {response_time:.2f}s to process the request {stream_request.url} {stream_request.status}')
                 if stream_request.status == status.HTTP_200_OK:
-                    async for data in stream_request.content.iter_any():
+                    async for data in stream_request.content:
                         response = orjson.loads(data)
                         if background_tasks:
                             background_tasks.add_task(db.set, key=token_key, value=response, expire=expire, log_component=f'{scac} location code')
@@ -128,6 +127,9 @@ class HTTPClientWrapper():
                     yield None
                 else:
                     yield None
+        except orjson.JSONDecodeError  as e:
+            logging.error(f'Error parsing JSON:{e}')
+            raise
         except aiohttp.ServerTimeoutError as e:
             logging.info(f'ConnectionError: Increasing pool size...')
             await self._adjust_pool_limits()
@@ -182,12 +184,11 @@ async def shutdown_event():
     await http_client.close()
     logging.info("Aiohttp Client closed", extra={'custom_attribute': None})
 
-
 async def get_global_http_client_wrapper() -> HTTPClientWrapper:
     """Global ClientConnection Pool Setup"""
     try:
         yield http_client
-    except (aiohttp.ClientConnectionError, aiohttp.ConnectionTimeoutError) as connect_error:
+    except (aiohttp.ClientConnectionError) as connect_error:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                             detail=f'{connect_error.__class__.__name__}:{connect_error}')
     except ValueError as value_error:
@@ -203,7 +204,6 @@ async def get_global_http_client_wrapper() -> HTTPClientWrapper:
         logging.error(f'{eg.__class__.__name__}:{eg.args}')
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail=f'An error occurred while creating the client - {eg.args}')
-
 class AsyncTaskManager():
     """Currently there is no built in  python class and method that we can prevent it from cancelling all conroutine tasks if one of the tasks is cancelled
     From BU perspective, all those carrier schedules are independent from one antoher so we shouldnt let a failed task to cancel all other successful tasks"""
@@ -231,7 +231,7 @@ class AsyncTaskManager():
         while retries < self.max_retries:
             try:
                 return await asyncio.wait_for(coro(), timeout=self.default_timeout)
-            except (asyncio.TimeoutError,asyncio.CancelledError,aiohttp.ClientConnectionError,aiohttp.ConnectionTimeoutError):
+            except (asyncio.TimeoutError,asyncio.CancelledError,aiohttp.ClientConnectionError,aiohttp.ConnectionTimeoutError,aiohttp.ServerTimeoutError ):
                 """Due to timeout, the coroutine task is cancelled. Once its cancelled, we retry it"""
                 logging.error(f"{task_name} timed out after {self.default_timeout} seconds. Retrying {retries + 1}/{self.max_retries}...")
                 retries += 1
