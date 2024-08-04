@@ -8,6 +8,7 @@ from fastapi.exceptions import RequestValidationError, ResponseValidationError
 from typing import Generator,Callable,AsyncGenerator,Dict,Any,Optional,Union
 from uuid import UUID
 from datetime import timedelta
+from yarl import URL
 import aiohttp
 import logging
 import orjson
@@ -81,7 +82,7 @@ class HTTPClientWrapper():
                                        background_tasks: Optional[BackgroundTasks], expire: timedelta) -> AsyncGenerator[Dict[str, Any], None]:
         try:
             start_time = time.time()
-            async with self.client.request(method=method, url=url, params=params, headers=headers, json=json, data=data,proxy='http://proxy.eu-central-1.aws.int.kn:80',ssl=False) as response:
+            async with self.client.request(method=method, url=url, params=params, headers=headers, json=json, data=data,proxy=URL('http://proxy.eu-central-1.aws.int.kn:80'),ssl=False) as response:
                 response_time = time.time() - start_time
                 logging.info(f'{method} {scac} took {response_time:.2f}s to process the request {response.url} {response.status}')
                 if response.status == status.HTTP_206_PARTIAL_CONTENT:
@@ -103,7 +104,6 @@ class HTTPClientWrapper():
             logging.info(f'ConnectionError: Increasing pool size...')
             await self._adjust_pool_limits()
             yield None
-
     async def handle_streaming_response(self, scac: str, url: str, method: str, params: Optional[Dict[str, Any]],
                                         headers: Optional[Dict[str, Any]],
                                         data: Optional[Dict[str, Any]], token_key: Optional[Union[str, UUID]],
@@ -111,7 +111,7 @@ class HTTPClientWrapper():
                                         expire: timedelta) -> AsyncGenerator[Dict[str, Any], None]:
         try:
             start_time = time.time()
-            async with self.client.request(method, url=url, params=params, headers=headers, data=data,proxy='http://proxy.eu-central-1.aws.int.kn:80',ssl=False) as stream_request:
+            async with self.client.request(method, url=url, params=params, headers=headers, data=data,proxy=URL('http://proxy.eu-central-1.aws.int.kn:80'),ssl=False) as stream_request:
                 response_time = time.time() - start_time
                 logging.info(f'{method} {scac} took {response_time:.2f}s to process the request {stream_request.url} {stream_request.status}')
                 if stream_request.status == status.HTTP_200_OK:
