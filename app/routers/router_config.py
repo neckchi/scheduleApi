@@ -164,8 +164,6 @@ class HTTPClientWrapper():
         ACTIVE:The connection is currently being used to handle an HTTP request.It is not available for other requests until the current request completes.
         CLOSED:The connection has been terminated.It is no longer part of the connection pool and cannot be reused.
         ACQUIRED:The connection has been taken from the pool but is not yet actively processing a request.It might be in the process of setting up or awaiting the next action."""
-
-        # background_tasks.add_task(lambda : logging.info(self.client.connector._conns))
         return final_result
 
 logging.getLogger("aiohttp").setLevel(logging.WARNING)
