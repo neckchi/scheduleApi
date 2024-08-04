@@ -16,7 +16,6 @@ import time
 import ssl
 import os
 
-os.environ["HTTP_PROXY"] = "http://proxy.eu-central-1.aws.int.kn:80"
 class HTTPClientWrapper():
     def __init__(self) -> None:
         self.default_limits = load_yaml()['data']['connectionPoolSetting']
@@ -24,9 +23,9 @@ class HTTPClientWrapper():
         self.lock = asyncio.Lock()
         self._initialize_client()
     def _initialize_client(self):
-        # ctx = ssl.create_default_context()
-        # ctx.set_ciphers('DEFAULT')
-        self.conn = aiohttp.TCPConnector(ssl=False,ttl_dns_cache=self.limits['dnsCache'],limit_per_host=self.limits['maxConnectionPerHost'], limit=self.limits['maxClientConnection'], keepalive_timeout=self.limits['keepAliveExpiry'])
+        ctx = ssl.create_default_context()
+        ctx.set_ciphers('DEFAULT')
+        self.conn = aiohttp.TCPConnector(ssl=ctx,ttl_dns_cache=self.limits['dnsCache'],limit_per_host=self.limits['maxConnectionPerHost'], limit=self.limits['maxClientConnection'], keepalive_timeout=self.limits['keepAliveExpiry'])
         self.client = aiohttp.ClientSession(trust_env=True,connector=self.conn, timeout=aiohttp.ClientTimeout(total=self.limits['elswhereTimeOut'],connect=self.limits['poolTimeOut']))
         print(os.environ)
         print(self.client.connector.__dict__)
