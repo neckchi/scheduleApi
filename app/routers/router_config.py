@@ -14,19 +14,21 @@ import orjson
 import asyncio
 import time
 import ssl
+import os
 
+os.environ["HTTP_PROXY"] = "http://proxy.eu-central-1.aws.int.kn:80"
 class HTTPClientWrapper():
     def __init__(self) -> None:
         self.default_limits = load_yaml()['data']['connectionPoolSetting']
         self.limits = self.default_limits.copy()
         self.lock = asyncio.Lock()
         self._initialize_client()
-
     def _initialize_client(self):
-        # ctx = ssl.create_default_context()
-        # ctx.set_ciphers('DEFAULT')
-        self.conn = aiohttp.TCPConnector(ssl=False,ttl_dns_cache=self.limits['dnsCache'],limit_per_host=self.limits['maxConnectionPerHost'], limit=self.limits['maxClientConnection'], keepalive_timeout=self.limits['keepAliveExpiry'])
-        self.client = aiohttp.ClientSession(connector=self.conn, timeout=aiohttp.ClientTimeout(total=self.limits['elswhereTimeOut'],connect=self.limits['poolTimeOut']))
+        ctx = ssl.create_default_context()
+        ctx.set_ciphers('DEFAULT')
+        print(os.environ.get('HTTP_PROXY'))
+        self.conn = aiohttp.TCPConnector(ssl=ctx,ttl_dns_cache=self.limits['dnsCache'],limit_per_host=self.limits['maxConnectionPerHost'], limit=self.limits['maxClientConnection'], keepalive_timeout=self.limits['keepAliveExpiry'])
+        self.client = aiohttp.ClientSession(trust_env=True,connector=self.conn, timeout=aiohttp.ClientTimeout(total=self.limits['elswhereTimeOut'],connect=self.limits['poolTimeOut']))
 
     async def _adjust_pool_limits(self) -> None:
         """designed to dynamically adjust the connection pool limits of the aiohttp client when a PoolTimeout error occurs"""
@@ -35,9 +37,9 @@ class HTTPClientWrapper():
             self.limits['maxConnectionPerHost'] += 10
             self.conn._limit = self.limits['maxClientConnection']
             self.conn._limit_per_host = self.limits['maxConnectionPerHost']
-
     async def close(self)-> None:
         await self.client.close()
+
     # Individual Client Session Setup
     @classmethod
     async def get_individual_http_client_wrapper(cls) -> AsyncGenerator["HTTPClientWrapper", None]:
@@ -83,7 +85,7 @@ class HTTPClientWrapper():
                                        background_tasks: Optional[BackgroundTasks], expire: timedelta) -> AsyncGenerator[Dict[str, Any], None]:
         try:
             start_time = time.time()
-            async with self.client.request(method=method, url=url, params=params, headers=headers, json=json, data=data,proxy="http://proxy.eu-central-1.aws.int.kn:80") as response:
+            async with self.client.request(method=method, url=url, params=params, headers=headers, json=json, data=data) as response:
                 response_time = time.time() - start_time
                 logging.info(f'{method} {scac} took {response_time:.2f}s to process the request {response.url} {response.status}')
                 if response.status == status.HTTP_206_PARTIAL_CONTENT:
@@ -113,7 +115,7 @@ class HTTPClientWrapper():
                                         expire: timedelta) -> AsyncGenerator[Dict[str, Any], None]:
         try:
             start_time = time.time()
-            async with self.client.request(method, url, params=params, headers=headers, data=data,proxy="http://proxy.eu-central-1.aws.int.kn:80") as stream_request:
+            async with self.client.request(method, url=url, params=params, headers=headers, data=data) as stream_request:
                 response_time = time.time() - start_time
                 logging.info(f'{method} {scac} took {response_time:.2f}s to process the request {stream_request.url} {stream_request.status}')
                 if stream_request.status == status.HTTP_200_OK:
@@ -169,10 +171,10 @@ class HTTPClientWrapper():
         # background_tasks.add_task(lambda : logging.info(self.client.connector._conns))
         return final_result
 
-
 logging.getLogger("aiohttp").setLevel(logging.WARNING)
 http_client = HTTPClientWrapper()
 queue_listener = log_queue_listener()
+
 async def startup_event():
     queue_listener.start()
     await db.initialize_database()
@@ -212,18 +214,17 @@ class AsyncTaskManager():
         self.error:bool = False
         self.default_timeout:int = default_timeout
         self.max_retries:int = max_retries
-
     async def __aenter__(self):
         return self
-    async def __aexit__(self, exc_type = None, exc = None, tb= None) -> bool:
+    async def __aexit__(self, exc_type = None, exc = None, tb= None):
         self.results = await asyncio.gather(*self.__tasks.values(), return_exceptions=True)
-        if exc_type:
-            for task in self.__tasks.values():
-                if not task.done():
-                    logging.info('Cancel remaining tasks if an exception occurred')
-                    task.cancel()
-            await asyncio.gather(*self.__tasks.values(), return_exceptions=True)
-        return not exc_type
+        # if exc_type:
+        #     for task in self.__tasks.values():
+        #         if not task.done():
+        #             logging.info('Cancel remaining tasks if an exception occurred')
+        #             task.cancel()
+        #     await asyncio.gather(*self.__tasks.values(), return_exceptions=True)
+        # return not exc_type
     async def _timeout_wrapper(self, coro:Callable, task_name:str)  -> Optional[Any]:
         """Wrap a coroutine with a timeout and retry logic."""
         retries:int = 0
