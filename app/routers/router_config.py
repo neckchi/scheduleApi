@@ -169,7 +169,7 @@ class HTTPClientWrapper():
         return final_result
 
 logging.getLogger("aiohttp").setLevel(logging.WARNING)
-http_client = HTTPClientWrapper(proxy="http://proxy.eu-central-1.aws.int.kn:80")
+http_client = HTTPClientWrapper(proxy="http://zscaler.proxy.int.kn:80")
 queue_listener = log_queue_listener()
 
 async def startup_event():

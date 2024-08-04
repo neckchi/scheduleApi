@@ -81,8 +81,9 @@ def log_queue_listener() -> QueueListener:
     listener = QueueListener(log_que, stream_handler, queue_handler, respect_handler_level=True)
     return listener
 
-old_factory = logging.getLogRecordFactory()
+
 def log_correlation(correlation:str |None = None):
+    old_factory = logging.getLogRecordFactory()
     def record_factory(*args, **kwargs):
         record = old_factory(*args, **kwargs)
         record.custom_attribute = correlation
