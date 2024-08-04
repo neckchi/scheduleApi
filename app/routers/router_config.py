@@ -8,23 +8,24 @@ from fastapi.exceptions import RequestValidationError, ResponseValidationError
 from typing import Generator,Callable,AsyncGenerator,Dict,Any,Optional,Union
 from uuid import UUID
 from datetime import timedelta
-from yarl import URL
 import aiohttp
 import logging
 import orjson
 import asyncio
 import time
+import ssl
 
 class HTTPClientWrapper():
-    def __init__(self) -> None:
+    def __init__(self, proxy: Optional[str] = None) -> None:
         self.default_limits = load_yaml()['data']['connectionPoolSetting']
         self.limits = self.default_limits.copy()
+        self.proxy = proxy
         self.lock = asyncio.Lock()
         self._initialize_client()
     def _initialize_client(self):
-        # ctx = ssl.create_default_context()
-        # ctx.set_ciphers('DEFAULT')
-        self.conn = aiohttp.TCPConnector(ssl=False,ttl_dns_cache=self.limits['dnsCache'],limit_per_host=self.limits['maxConnectionPerHost'], limit=self.limits['maxClientConnection'], keepalive_timeout=self.limits['keepAliveExpiry'])
+        ctx = ssl.create_default_context()
+        ctx.set_ciphers('DEFAULT')
+        self.conn = aiohttp.TCPConnector(ssl=ctx,ttl_dns_cache=self.limits['dnsCache'],limit_per_host=self.limits['maxConnectionPerHost'], limit=self.limits['maxClientConnection'], keepalive_timeout=self.limits['keepAliveExpiry'])
         self.client = aiohttp.ClientSession(connector=self.conn, timeout=aiohttp.ClientTimeout(total=self.limits['elswhereTimeOut'],connect=self.limits['poolTimeOut']))
 
 
@@ -82,7 +83,7 @@ class HTTPClientWrapper():
                                        background_tasks: Optional[BackgroundTasks], expire: timedelta) -> AsyncGenerator[Dict[str, Any], None]:
         try:
             start_time = time.time()
-            async with self.client.request(method=method, url=url, params=params, headers=headers, json=json, data=data,proxy=URL('http://proxy.eu-central-1.aws.int.kn:80'),ssl=False) as response:
+            async with self.client.request(method=method, url=url, params=params, headers=headers, json=json, data=data, proxy=self.proxy) as response:
                 response_time = time.time() - start_time
                 logging.info(f'{method} {scac} took {response_time:.2f}s to process the request {response.url} {response.status}')
                 if response.status == status.HTTP_206_PARTIAL_CONTENT:
@@ -111,7 +112,7 @@ class HTTPClientWrapper():
                                         expire: timedelta) -> AsyncGenerator[Dict[str, Any], None]:
         try:
             start_time = time.time()
-            async with self.client.request(method, url=url, params=params, headers=headers, data=data,proxy=URL('http://proxy.eu-central-1.aws.int.kn:80'),ssl=False) as stream_request:
+            async with self.client.request(method, url=url, params=params, headers=headers, data=data, proxy=self.proxy) as stream_request:
                 response_time = time.time() - start_time
                 logging.info(f'{method} {scac} took {response_time:.2f}s to process the request {stream_request.url} {stream_request.status}')
                 if stream_request.status == status.HTTP_200_OK:
@@ -168,7 +169,7 @@ class HTTPClientWrapper():
         return final_result
 
 logging.getLogger("aiohttp").setLevel(logging.WARNING)
-http_client = HTTPClientWrapper()
+http_client = HTTPClientWrapper(proxy="http://proxy.eu-central-1.aws.int.kn:80")
 queue_listener = log_queue_listener()
 
 async def startup_event():
