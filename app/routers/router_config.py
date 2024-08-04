@@ -26,9 +26,10 @@ class HTTPClientWrapper():
     def _initialize_client(self):
         ctx = ssl.create_default_context()
         ctx.set_ciphers('DEFAULT')
-        print(os.environ.get('HTTP_PROXY'))
         self.conn = aiohttp.TCPConnector(ssl=ctx,ttl_dns_cache=self.limits['dnsCache'],limit_per_host=self.limits['maxConnectionPerHost'], limit=self.limits['maxClientConnection'], keepalive_timeout=self.limits['keepAliveExpiry'])
-        self.client = aiohttp.ClientSession(trust_env=True,connector=self.conn, timeout=aiohttp.ClientTimeout(total=self.limits['elswhereTimeOut'],connect=self.limits['poolTimeOut']))
+        self.client = aiohttp.ClientSession(connector=self.conn, timeout=aiohttp.ClientTimeout(total=self.limits['elswhereTimeOut'],connect=self.limits['poolTimeOut']))
+        print(os.environ['HTTP_PROXY'])
+        print(aiohttp.helpers.proxies_from_env())
 
     async def _adjust_pool_limits(self) -> None:
         """designed to dynamically adjust the connection pool limits of the aiohttp client when a PoolTimeout error occurs"""
