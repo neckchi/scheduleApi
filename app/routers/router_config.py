@@ -25,7 +25,7 @@ class HTTPClientWrapper():
     def _initialize_client(self):
         ctx = ssl.create_default_context()
         ctx.set_ciphers('DEFAULT')
-        self.conn = aiohttp.TCPConnector(ssl=ctx,ttl_dns_cache=self.limits['dnsCache'],limit_per_host=self.limits['maxConnectionPerHost'], limit=self.limits['maxClientConnection'], keepalive_timeout=self.limits['keepAliveExpiry'])
+        self.conn = aiohttp.TCPConnector(ssl=False,ttl_dns_cache=self.limits['dnsCache'],limit_per_host=self.limits['maxConnectionPerHost'], limit=self.limits['maxClientConnection'], keepalive_timeout=self.limits['keepAliveExpiry'])
         self.client = aiohttp.ClientSession(connector=self.conn, timeout=aiohttp.ClientTimeout(total=self.limits['elswhereTimeOut'],connect=self.limits['poolTimeOut']))
 
 
@@ -83,7 +83,8 @@ class HTTPClientWrapper():
                                        background_tasks: Optional[BackgroundTasks], expire: timedelta) -> AsyncGenerator[Dict[str, Any], None]:
         try:
             start_time = time.time()
-            async with self.client.request(method=method, url=url, params=params, headers=headers, json=json, data=data, proxy=self.proxy) as response:
+            async with self.client.request(method=method, url=url, params=params, headers=headers, json=json, data=data, proxy=self.proxy,ssl=False) as response:
+                logging.info(self.client._connector._conns)
                 response_time = time.time() - start_time
                 logging.info(f'{method} {scac} took {response_time:.2f}s to process the request {response.url} {response.status}')
                 if response.status == status.HTTP_206_PARTIAL_CONTENT:
@@ -101,6 +102,8 @@ class HTTPClientWrapper():
                     yield None
                 else:
                     yield None
+        except aiohttp.ClientProxyConnectionError as proxy_issue:
+            logging.error(f'Proxy Issue:{proxy_issue}')
         except aiohttp.ServerTimeoutError as e:
             logging.info(f'ConnectionError: Increasing pool size...')
             await self._adjust_pool_limits()
@@ -113,6 +116,7 @@ class HTTPClientWrapper():
         try:
             start_time = time.time()
             async with self.client.request(method, url=url, params=params, headers=headers, data=data, proxy=self.proxy) as stream_request:
+                logging.info(self.client._connector._conns)
                 response_time = time.time() - start_time
                 logging.info(f'{method} {scac} took {response_time:.2f}s to process the request {stream_request.url} {stream_request.status}')
                 if stream_request.status == status.HTTP_200_OK:
@@ -143,7 +147,6 @@ class HTTPClientWrapper():
         count_schedules:int = len(flat_list)
         response.headers.update({"X-Correlation-ID": str(correlation), "Cache-Control": "public, max-age=7200" if count_schedules >0 else "no-cache, no-store, max-age=0, must-revalidate",
                                  "KN-Count-Schedules": str(count_schedules)})
-
         if count_schedules == 0:
             final_result = JSONResponse(status_code=status.HTTP_200_OK,content=jsonable_encoder(schema_response.Error(productid=product_id,details=f"{point_from}-{point_to} schedule not found")))
         else:
