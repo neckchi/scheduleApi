@@ -14,7 +14,6 @@ import orjson
 import asyncio
 import time
 import ssl
-
 class HTTPClientWrapper():
     def __init__(self, proxy: Optional[str] = None) -> None:
         self.default_limits = load_yaml()['data']['connectionPoolSetting']
@@ -25,7 +24,7 @@ class HTTPClientWrapper():
     def _initialize_client(self):
         ctx = ssl.create_default_context()
         ctx.set_ciphers('DEFAULT')
-        self.conn = aiohttp.TCPConnector(ssl=False,ttl_dns_cache=self.limits['dnsCache'],limit_per_host=self.limits['maxConnectionPerHost'], limit=self.limits['maxClientConnection'], keepalive_timeout=self.limits['keepAliveExpiry'])
+        self.conn = aiohttp.TCPConnector(ssl=ctx,ttl_dns_cache=self.limits['dnsCache'],limit_per_host=self.limits['maxConnectionPerHost'], limit=self.limits['maxClientConnection'], keepalive_timeout=self.limits['keepAliveExpiry'])
         self.client = aiohttp.ClientSession(connector=self.conn, timeout=aiohttp.ClientTimeout(total=self.limits['elswhereTimeOut'],connect=self.limits['poolTimeOut']))
 
 
@@ -83,10 +82,13 @@ class HTTPClientWrapper():
                                        background_tasks: Optional[BackgroundTasks], expire: timedelta) -> AsyncGenerator[Dict[str, Any], None]:
         try:
             start_time = time.time()
-            async with self.client.request(method=method, url=url, params=params, headers=headers, json=json, data=data, proxy=self.proxy,ssl=False) as response:
-                logging.info(self.client._connector._conns)
+            async with self.client.request(method=method, url=url, params=params, headers=headers, json=json, data=data, proxy=self.proxy) as response:
+                # logging.info(self.client._connector)
+                # response.raise_for_status()
                 response_time = time.time() - start_time
                 logging.info(f'{method} {scac} took {response_time:.2f}s to process the request {response.url} {response.status}')
+                # self.carrier_response_time = time.time() - start_time
+                # logging.info(f'{method} {scac} took {self.carrier_response_time:.2f}s to process the request {response.url} {response.status}')
                 if response.status == status.HTTP_206_PARTIAL_CONTENT:
                     yield response
                 elif response.status == status.HTTP_200_OK:
@@ -104,10 +106,10 @@ class HTTPClientWrapper():
                     yield None
         except aiohttp.ClientProxyConnectionError as proxy_issue:
             logging.error(f'Proxy Issue:{proxy_issue}')
-        except aiohttp.ServerTimeoutError as e:
-            logging.info(f'ConnectionError: Increasing pool size...')
-            await self._adjust_pool_limits()
-            yield None
+        # except aiohttp.ConnectionTimeoutError as e:
+        #     logging.info(f'ConnectionError:{e}.Increasing pool size.')
+        #     await self._adjust_pool_limits()
+        #     yield None
     async def handle_streaming_response(self, scac: str, url: str, method: str, params: Optional[Dict[str, Any]],
                                         headers: Optional[Dict[str, Any]],
                                         data: Optional[Dict[str, Any]], token_key: Optional[Union[str, UUID]],
@@ -116,7 +118,7 @@ class HTTPClientWrapper():
         try:
             start_time = time.time()
             async with self.client.request(method, url=url, params=params, headers=headers, data=data, proxy=self.proxy) as stream_request:
-                logging.info(self.client._connector._conns)
+                # logging.info(self.client._connector._conns)
                 response_time = time.time() - start_time
                 logging.info(f'{method} {scac} took {response_time:.2f}s to process the request {stream_request.url} {stream_request.status}')
                 if stream_request.status == status.HTTP_200_OK:
@@ -133,10 +135,10 @@ class HTTPClientWrapper():
         except orjson.JSONDecodeError  as e:
             logging.error(f'Error parsing JSON:{e}')
             raise
-        except aiohttp.ServerTimeoutError as e:
-            logging.info(f'ConnectionError: Increasing pool size...')
-            await self._adjust_pool_limits()
-            yield None
+        # except aiohttp.ClientProxyConnectionErr as e:
+        #     logging.info(f'ConnectionError:{e}. Increasing pool size...')
+        #     await self._adjust_pool_limits()
+        #     yield None
     def gen_all_valid_schedules(self, correlation: Optional[str], response: Response, product_id: UUID,
                                 matrix: Generator, point_from: str, point_to: str,
                                 background_tasks: BackgroundTasks, task_exception: bool) -> Dict[str, Any]:
@@ -147,6 +149,8 @@ class HTTPClientWrapper():
         count_schedules:int = len(flat_list)
         response.headers.update({"X-Correlation-ID": str(correlation), "Cache-Control": "public, max-age=7200" if count_schedules >0 else "no-cache, no-store, max-age=0, must-revalidate",
                                  "KN-Count-Schedules": str(count_schedules)})
+        # response.headers.update({"X-Correlation-ID": str(correlation), "Cache-Control": "public, max-age=7200" if count_schedules >0 else "no-cache, no-store, max-age=0, must-revalidate",
+        #                          "KN-Count-Schedules": str(count_schedules),"Carrier-Response-Time":str(self.carrier_response_time)})
         if count_schedules == 0:
             final_result = JSONResponse(status_code=status.HTTP_200_OK,content=jsonable_encoder(schema_response.Error(productid=product_id,details=f"{point_from}-{point_to} schedule not found")))
         else:
@@ -170,7 +174,7 @@ class HTTPClientWrapper():
         return final_result
 
 logging.getLogger("aiohttp").setLevel(logging.WARNING)
-http_client = HTTPClientWrapper(proxy="http://proxy.eu-central-1.aws.int.kn:80")
+http_client = HTTPClientWrapper('http://proxy.eu-central-1.aws.int.kn:80')
 queue_listener = log_queue_listener()
 
 async def startup_event():
@@ -205,7 +209,7 @@ async def get_global_http_client_wrapper() -> HTTPClientWrapper:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail=f'An error occurred while creating the client - {eg.args}')
 class AsyncTaskManager():
-    """Currently there is no built in  python class and method that we can prevent it from cancelling all conroutine tasks if one of the tasks is cancelled
+    """Currently there is no built-in  python class and method that we can prevent it from cancelling all conroutine tasks if one of the tasks is cancelled
     From BU perspective, all those carrier schedules are independent from one antoher so we shouldnt let a failed task to cancel all other successful tasks"""
     def __init__(self,default_timeout=load_yaml()['data']['connectionPoolSetting']['asyncDefaultTimeOut'],max_retries=load_yaml()['data']['connectionPoolSetting']['retryNumber']):
         self.__tasks:Dict[str, asyncio.Task] = dict()
@@ -230,7 +234,7 @@ class AsyncTaskManager():
         while retries < self.max_retries:
             try:
                 return await asyncio.wait_for(coro(), timeout=self.default_timeout)
-            except (asyncio.TimeoutError,asyncio.CancelledError,aiohttp.ClientConnectionError,aiohttp.ConnectionTimeoutError,aiohttp.ServerTimeoutError ):
+            except (asyncio.TimeoutError,asyncio.CancelledError,aiohttp.ClientConnectionError,aiohttp.ServerConnectionError):
                 """Due to timeout, the coroutine task is cancelled. Once its cancelled, we retry it"""
                 logging.error(f"{task_name} timed out after {self.default_timeout} seconds. Retrying {retries + 1}/{self.max_retries}...")
                 retries += 1

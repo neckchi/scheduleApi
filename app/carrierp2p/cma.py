@@ -2,9 +2,9 @@ import asyncio
 from app.carrierp2p.helpers import deepget
 from app.routers.router_config import HTTPClientWrapper
 from app.schemas import schema_response
+from app.schemas.schema_request import CMA_GROUP
 from datetime import datetime
 from typing import Generator,Iterator
-from app.schemas.schema_request import CMA_GROUP
 
 
 

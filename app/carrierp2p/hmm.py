@@ -5,7 +5,7 @@ from app.background_tasks import db
 from typing import Generator,Iterator
 from fastapi import BackgroundTasks
 
-def process_leg_data(schedule_task:dict,first_pol:str,first_point_from:str,last_point_to:str,check_transshipment:str|None)->list:
+def process_leg_data(schedule_task:dict,last_point_to:str,check_transshipment:str|None)->list:
     first_pol_terminal_name: str = schedule_task.get('loadingTerminalName')
     first_pol_terminal_code: str = schedule_task.get('loadingTerminalCode')
     first_pot_terminal_name: str = schedule_task.get('transshipTerminalName')
@@ -17,11 +17,11 @@ def process_leg_data(schedule_task:dict,first_pol:str,first_point_from:str,last_
     # outbound
     leg_list: list = [schema_response.LEG_ADAPTER.dump_python({
         'pointFrom': {'locationName': schedule_task['outboundInland']['fromLocationName'],
-                      'locationCode': first_point_from,
+                      'locationCode': schedule_task['outboundInland']['fromUnLocationCode'],
                       'terminalName': schedule_task['porFacilityName'],
                       'terminalCode': schedule_task['porFacilityCode']},
         'pointTo': {'locationName': schedule_task['outboundInland']['toLocationName'],
-                    'locationCode': first_pol,
+                    'locationCode': schedule_task['outboundInland']['toUnLocationCode'],
                     'terminalName': first_pol_terminal_name,
                     'terminalCode': first_pol_terminal_code},
         'etd': (outbound_etd := schedule_task['outboundInland']['fromLocationDepatureDate']),
@@ -51,7 +51,7 @@ def process_leg_data(schedule_task:dict,first_pol:str,first_point_from:str,last_
     # inbound
     leg_list += [schema_response.LEG_ADAPTER.dump_python({
         'pointFrom': {'locationName': schedule_task['inboundInland']['fromLocationName'],
-                      'locationCode': last_point_to,
+                      'locationCode': schedule_task['inboundInland']['fromUnLocationCode'],
                       'terminalName': last_pod_terminal_name,
                       'terminalCode': last_pod_terminal_code},
         'pointTo': {'locationName': schedule_task['inboundInland']['toLocationName'],
@@ -78,7 +78,7 @@ def process_schedule_data(task: dict, vessel_imo: str, service: str, tsp: str) -
         last_point_to: str = task['inboundInland']['fromUnLocationCode'] if task.get('inboundInland') else task.get('dischargePortCode')
         first_etd: str = task.get('departureDate')
         last_eta: str = task.get('arrivalDate')
-        leg_list = process_leg_data(schedule_task=task,first_pol=first_pol,first_point_from=first_point_from,last_point_to=last_point_to,check_transshipment=check_transshipment)
+        leg_list = process_leg_data(schedule_task=task,last_point_to=last_point_to,check_transshipment=check_transshipment)
         schedule_body: dict = schema_response.SCHEDULE_ADAPTER.dump_python({'scac':'HDMU',
                                                                        'pointFrom':first_point_from,
                                                                        'pointTo':last_point_to, 'etd':first_etd,

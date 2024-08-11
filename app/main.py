@@ -6,6 +6,7 @@ from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from app.routers import schedules
 from app.schemas.schema_response import HealthCheck
 from app.routers.router_config import startup_event,shutdown_event
+from urllib import request
 import uvicorn
 
 
@@ -26,7 +27,16 @@ app.add_event_handler("shutdown", shutdown_event)
 
 @app.get("/health",tags=["healthcheck"],summary="Perform a Health Check",response_description="Return HTTP Status Code 200 (OK)",status_code=status.HTTP_200_OK,response_model=HealthCheck)
 async def get_health() -> HealthCheck:
-    return HealthCheck(status=f"OK")
+    try:
+        proxy_host = 'proxy.eu-central-1.aws.int.kn:80'  # host and port of your proxy
+        url = 'http://www.httpbin.org/ip'
+        req = request.Request(url)
+        req.set_proxy(proxy_host, 'http')
+        response = request.urlopen(req)
+    except IOError as e:
+        return HealthCheck(status = f"{e}.Connection error! (Check proxy)")
+    else:
+        return HealthCheck(status=f"OK.{response.read()}")
 @app.get("/docs", include_in_schema=False)
 def overridden_swagger():
     return get_swagger_ui_html(openapi_url="/openapi.json", title="P2P Schedule API Hub",
@@ -60,6 +70,6 @@ def custom_openapi():
 app.openapi = custom_openapi
 
 if __name__ == "__main__":
-    uvicorn.run("app.main:app",host="0.0.0.0", port=8000,timeout_keep_alive=25)
+    uvicorn.run("app.main:app",host="0.0.0.0", port=8000,timeout_keep_alive=35)
 
     # uvicorn.run("main:app", port=8000, workers=4)

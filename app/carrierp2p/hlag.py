@@ -21,7 +21,7 @@ def process_leg_data(leg_task:list)->list:
         'transportations': {'transportType': str(leg.get('modeOfTransport')).title(),
                             'transportName': leg['vesselName'] if (vessel_imo := leg.get('vesselIMONumber')) else None,
                             'referenceType': 'IMO' if vessel_imo and vessel_imo != '0000000' else None,
-                            'reference': vessel_imo if vessel_imo != '0000000' else None},
+                            'reference': vessel_imo if vessel_imo and vessel_imo != '0000000' else None},
         'services': {'serviceCode': check_service_code, 'serviceName': leg.get('carrierServiceName')} if (check_service_code := leg.get('carrierServiceCode')) else None,
         'voyages': {'internalVoyage': internal_voy if (internal_voy := leg.get('universalExportVoyageReference')) else None}},warnings=False) for leg in leg_task]
     return leg_list
