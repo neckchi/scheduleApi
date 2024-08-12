@@ -186,3 +186,8 @@ module "ecs_service_task" {
     aws_secretsmanager_secret.this
   ]
 }
+
+
+output "alb_arn_suffix" {
+  value = data.aws_lb.lb.arn_suffix
+}

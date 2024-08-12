@@ -108,3 +108,9 @@ variable "static_variables" {
   description = "Map of variables and static values to add to the task definition"
   default     = {}
 }
+
+
+variable "alerting_subscriptions" {
+  type = list(string)
+  description = "email subscriptions for alerting"
+}
