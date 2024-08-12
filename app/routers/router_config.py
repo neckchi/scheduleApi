@@ -25,7 +25,7 @@ class HTTPClientWrapper():
         ctx = ssl.create_default_context()
         ctx.set_ciphers('DEFAULT')
         self.conn = aiohttp.TCPConnector(ssl=ctx,ttl_dns_cache=self.limits['dnsCache'],limit_per_host=self.limits['maxConnectionPerHost'], limit=self.limits['maxClientConnection'], keepalive_timeout=self.limits['keepAliveExpiry'])
-        self.client = aiohttp.ClientSession(connector=self.conn, timeout=aiohttp.ClientTimeout(total=self.limits['elswhereTimeOut'],connect=self.limits['poolTimeOut']))
+        self.client = aiohttp.ClientSession(connector=self.conn, timeout=aiohttp.ClientTimeout(total=self.limits['elswhereTimeOut'],connect=self.limits['poolTimeOut']),trust_env=False,headers={"Connection":"Keep-Alive"},skip_auto_headers=['User-Agent'])
 
 
     async def _adjust_pool_limits(self) -> None:
@@ -147,7 +147,7 @@ class HTTPClientWrapper():
         flat_list:list = [item for row in matrix if not isinstance(row, Exception) and row is not None for item in row]
         logging.info(f'mapping_time = {time.time() - mapping_time:.2f}s Gathering all the schedule files obtained from carriers and mapping to our data format')
         count_schedules:int = len(flat_list)
-        response.headers.update({"X-Correlation-ID": str(correlation), "Cache-Control": "public, max-age=7200" if count_schedules >0 else "no-cache, no-store, max-age=0, must-revalidate",
+        response.headers.update({"X-Correlation-ID": str(correlation),"Connection":"Keep-Alive", "Cache-Control": "public, max-age=7200" if count_schedules >0 else "no-cache, no-store, max-age=0, must-revalidate",
                                  "KN-Count-Schedules": str(count_schedules)})
         # response.headers.update({"X-Correlation-ID": str(correlation), "Cache-Control": "public, max-age=7200" if count_schedules >0 else "no-cache, no-store, max-age=0, must-revalidate",
         #                          "KN-Count-Schedules": str(count_schedules),"Carrier-Response-Time":str(self.carrier_response_time)})
