@@ -14,30 +14,64 @@ import orjson
 import asyncio
 import time
 import ssl
-class HTTPClientWrapper():
+
+
+class HTTPClientWrapper:
     def __init__(self, proxy: Optional[str] = None) -> None:
         self.default_limits = load_yaml()['data']['connectionPoolSetting']
         self.limits = self.default_limits.copy()
         self.proxy = proxy
         self.lock = asyncio.Lock()
-        self._initialize_client()
-    def _initialize_client(self):
-        ctx = ssl.create_default_context()
-        ctx.set_ciphers('DEFAULT')
-        self.conn = aiohttp.TCPConnector(ssl=ctx,ttl_dns_cache=self.limits['dnsCache'],limit_per_host=self.limits['maxConnectionPerHost'], limit=self.limits['maxClientConnection'], keepalive_timeout=self.limits['keepAliveExpiry'])
-        self.client = aiohttp.ClientSession(connector=self.conn, timeout=aiohttp.ClientTimeout(total=self.limits['elswhereTimeOut'],connect=self.limits['poolTimeOut']),trust_env=False,headers={"Connection":"Keep-Alive"},skip_auto_headers=['User-Agent'])
+        self._client: Optional[aiohttp.ClientSession] = None
+        self._queue_listener = log_queue_listener()
 
+    async def startup(self) -> None:
+        """Initialize the HTTP client and start necessary services."""
+        self._queue_listener.start()
+        await db.initialize_database()
+
+        if self._client is None:
+            ctx = ssl.create_default_context()
+            ctx.set_ciphers('DEFAULT')
+            self.conn = aiohttp.TCPConnector(
+                ssl=ctx,
+                ttl_dns_cache=self.limits['dnsCache'],
+                limit_per_host=self.limits['maxConnectionPerHost'],
+                limit=self.limits['maxClientConnection'],
+                keepalive_timeout=self.limits['keepAliveExpiry']
+            )
+            self._client = aiohttp.ClientSession(
+                connector=self.conn,
+                timeout=aiohttp.ClientTimeout(
+                    total=self.limits['elswhereTimeOut'],
+                    connect=self.limits['poolTimeOut']
+                ),
+                trust_env=False,
+                headers={"Connection": "Keep-Alive"},
+                skip_auto_headers=['User-Agent']
+            )
+            logging.info("Aiohttp Client initialized", extra={'custom_attribute': None})
+
+    async def shutdown(self) -> None:
+        """Shut down the HTTP client and stop necessary services."""
+        self._queue_listener.stop()
+        await db.close()
+
+        if self._client:
+            await self._client.close()
+            logging.info("Aiohttp Client closed", extra={'custom_attribute': None})
 
     async def _adjust_pool_limits(self) -> None:
-        """designed to dynamically adjust the connection pool limits of the aiohttp client when a PoolTimeout error occurs"""
+        """Dynamically adjust the connection pool limits of the aiohttp client when a PoolTimeout error occurs"""
         async with self.lock:
             self.limits['maxClientConnection'] += 20
             self.limits['maxConnectionPerHost'] += 10
             self.conn._limit = self.limits['maxClientConnection']
             self.conn._limit_per_host = self.limits['maxConnectionPerHost']
-    async def close(self)-> None:
-        await self.client.close()
-    # Individual Client Session Setup
+
+    async def close(self) -> None:
+        await self.shutdown()
+
     @classmethod
     async def get_individual_http_client_wrapper(cls) -> AsyncGenerator["HTTPClientWrapper", None]:
         async with cls() as standalone_client:
@@ -82,9 +116,7 @@ class HTTPClientWrapper():
                                        background_tasks: Optional[BackgroundTasks], expire: timedelta) -> AsyncGenerator[Dict[str, Any], None]:
         try:
             start_time = time.time()
-            async with self.client.request(method=method, url=url, params=params, headers=headers, json=json, data=data, proxy=self.proxy) as response:
-                # logging.info(self.client._connector)
-                # response.raise_for_status()
+            async with self._client.request(method=method, url=url, params=params, headers=headers, json=json, data=data, proxy=self.proxy) as response:
                 response_time = time.time() - start_time
                 logging.info(f'{method} {scac} took {response_time:.2f}s to process the request {response.url} {response.status}')
                 # self.carrier_response_time = time.time() - start_time
@@ -117,8 +149,7 @@ class HTTPClientWrapper():
                                         expire: timedelta) -> AsyncGenerator[Dict[str, Any], None]:
         try:
             start_time = time.time()
-            async with self.client.request(method, url=url, params=params, headers=headers, data=data, proxy=self.proxy) as stream_request:
-                # logging.info(self.client._connector._conns)
+            async with self._client.request(method, url=url, params=params, headers=headers, data=data, proxy=self.proxy) as stream_request:
                 response_time = time.time() - start_time
                 logging.info(f'{method} {scac} took {response_time:.2f}s to process the request {stream_request.url} {stream_request.status}')
                 if stream_request.status == status.HTTP_200_OK:
@@ -135,10 +166,10 @@ class HTTPClientWrapper():
         except orjson.JSONDecodeError  as e:
             logging.error(f'Error parsing JSON:{e}')
             raise
-        # except aiohttp.ClientProxyConnectionErr as e:
-        #     logging.info(f'ConnectionError:{e}. Increasing pool size...')
-        #     await self._adjust_pool_limits()
-        #     yield None
+        except aiohttp.ClientProxyConnectionErr as e:
+            logging.info(f'ConnectionError:{e}. Increasing pool size...')
+            await self._adjust_pool_limits()
+            yield None
     def gen_all_valid_schedules(self, correlation: Optional[str], response: Response, product_id: UUID,
                                 matrix: Generator, point_from: str, point_to: str,
                                 background_tasks: BackgroundTasks, task_exception: bool) -> Dict[str, Any]:
@@ -173,20 +204,12 @@ class HTTPClientWrapper():
         ACQUIRED:The connection has been taken from the pool but is not yet actively processing a request.It might be in the process of setting up or awaiting the next action."""
         return final_result
 
-logging.getLogger("aiohttp").setLevel(logging.WARNING)
 http_client = HTTPClientWrapper('http://proxy.eu-central-1.aws.int.kn:80')
-queue_listener = log_queue_listener()
-
 async def startup_event():
-    queue_listener.start()
-    await db.initialize_database()
-    logging.info("Aiohttp Client initialized",extra={'custom_attribute':None})
+    await http_client.startup()
 
 async def shutdown_event():
-    queue_listener.stop()
-    await db.close()
-    await http_client.close()
-    logging.info("Aiohttp Client closed", extra={'custom_attribute': None})
+    await http_client.shutdown()
 
 async def get_global_http_client_wrapper() -> HTTPClientWrapper:
     """Global ClientConnection Pool Setup"""
@@ -210,7 +233,7 @@ async def get_global_http_client_wrapper() -> HTTPClientWrapper:
                             detail=f'An error occurred while creating the client - {eg.args}')
 class AsyncTaskManager():
     """Currently there is no built-in  python class and method that we can prevent it from cancelling all conroutine tasks if one of the tasks is cancelled
-    From BU perspective, all those carrier schedules are independent from one antoher so we shouldnt let a failed task to cancel all other successful tasks"""
+    From BU perspective,all those carrier schedules are independent from one antoher so we shouldnt let a failed task to cancel all other successful tasks"""
     def __init__(self,default_timeout=load_yaml()['data']['connectionPoolSetting']['asyncDefaultTimeOut'],max_retries=load_yaml()['data']['connectionPoolSetting']['retryNumber']):
         self.__tasks:Dict[str, asyncio.Task] = dict()
         self.error:bool = False
