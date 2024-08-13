@@ -15,7 +15,6 @@ import asyncio
 import time
 import ssl
 
-
 class HTTPClientWrapper:
     def __init__(self, proxy: Optional[str] = None) -> None:
         self.default_limits = load_yaml()['data']['connectionPoolSetting']
@@ -150,6 +149,7 @@ class HTTPClientWrapper:
         try:
             start_time = time.time()
             async with self._client.request(method, url=url, params=params, headers=headers, data=data, proxy=self.proxy) as stream_request:
+                # logging.info(self.client._connector._conns)
                 response_time = time.time() - start_time
                 logging.info(f'{method} {scac} took {response_time:.2f}s to process the request {stream_request.url} {stream_request.status}')
                 if stream_request.status == status.HTTP_200_OK:
@@ -166,10 +166,9 @@ class HTTPClientWrapper:
         except orjson.JSONDecodeError  as e:
             logging.error(f'Error parsing JSON:{e}')
             raise
-        except aiohttp.ClientProxyConnectionErr as e:
-            logging.info(f'ConnectionError:{e}. Increasing pool size...')
-            await self._adjust_pool_limits()
-            yield None
+        except aiohttp.ClientProxyConnectionError as proxy_issue:
+            logging.error(f'Proxy Issue:{proxy_issue}')
+
     def gen_all_valid_schedules(self, correlation: Optional[str], response: Response, product_id: UUID,
                                 matrix: Generator, point_from: str, point_to: str,
                                 background_tasks: BackgroundTasks, task_exception: bool) -> Dict[str, Any]:
@@ -205,6 +204,7 @@ class HTTPClientWrapper:
         return final_result
 
 http_client = HTTPClientWrapper('http://proxy.eu-central-1.aws.int.kn:80')
+
 async def startup_event():
     await http_client.startup()
 
