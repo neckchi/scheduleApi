@@ -12,7 +12,7 @@ data:
     maxClientConnection: 8000
     maxConnectionPerHost: 700
     maxKeepAliveConnection: 3000
-    dnsCache: 500
+    dnsCache: 5000
     keepAliveExpiry: 35
     retryNumber: 2
     asyncDefaultTimeOut: 12
