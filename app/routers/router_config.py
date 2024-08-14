@@ -203,7 +203,7 @@ class HTTPClientWrapper:
         ACQUIRED:The connection has been taken from the pool but is not yet actively processing a request.It might be in the process of setting up or awaiting the next action."""
         return final_result
 
-http_client = HTTPClientWrapper('http://proxy.eu-central-1.aws.int.kn:80')
+http_client = HTTPClientWrapper(proxy='http://proxy.eu-central-1.aws.int.kn:80')
 
 async def startup_event():
     await http_client.startup()
