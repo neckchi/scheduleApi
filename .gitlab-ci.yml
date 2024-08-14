@@ -16,7 +16,7 @@
   - git checkout $CI_COMMIT_BRANCH
 
 .terraform_image: &terraform_image
-  name: hashicorp/terraform:light
+  name: hashicorp/terraform:1.9.3
   entrypoint:
     - '/usr/bin/env'
     - 'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
