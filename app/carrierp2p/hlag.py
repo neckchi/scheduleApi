@@ -48,7 +48,7 @@ async def get_hlag_access_token(client:HTTPClientWrapper,background_task, url: s
                          'X-IBM-Client-Secret': client_secret,
                          'Accept': 'application/json'}
         body:dict = {'mode': "raw",'userId': user,'password': pw,'orgUnit': "HLAG"}
-        response_token:dict  = await anext(client.parse(scac='hlag',method='POST',background_tasks =background_task,url=url, headers=headers,json=body,token_key=hlcu_token_key,expire=timedelta(minutes=55)))
+        response_token:dict  = await anext(client.parse(scac='hlag',method='POST',background_tasks =background_task,url=url, headers=headers,json=body,token_key=hlcu_token_key,expire=timedelta(minutes=14)))
     return response_token['token']
 async def get_hlag_p2p(client:HTTPClientWrapper,background_task:BackgroundTasks,url: str, turl: str,user:str, pw: str, client_id: str,client_secret:str,pol: str, pod: str,search_range: int,
                        etd: datetime.date = None, eta: datetime.date = None, direct_only: bool|None = None,service: str | None = None, tsp: str | None = None):
