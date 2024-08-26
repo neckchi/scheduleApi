@@ -2,9 +2,8 @@ from app.routers.router_config import HTTPClientWrapper
 from app.schemas import schema_response
 from app.background_tasks import db
 from datetime import datetime,timedelta
-from uuid import uuid5,NAMESPACE_DNS,UUID
 from fastapi import BackgroundTasks
-from typing import Generator,Iterator,AsyncIterator
+from typing import Generator,Iterator
 
 
 def process_leg_data(leg_task:list)->list:
@@ -40,31 +39,23 @@ def process_schedule_data(task: dict, service: str, tsp: str) -> Iterator:
                                                                         'eta': last_eta,'transitTime': transit_time,
                                                                         'transshipment': check_transshipment,'legs': process_leg_data(leg_task=task['legs'])},warnings=False)
         yield schedule_body
-async def get_hlag_access_token(client:HTTPClientWrapper,background_task, url: str,pw:str,user:str, client_id: str,client_secret:str) -> AsyncIterator[str]:
-    hlcu_token_key:UUID = uuid5(NAMESPACE_DNS, 'hlcu-token-uuid-kuehne-nagel')
-    response_token:dict = await db.get(key=hlcu_token_key,log_component='hlag token')
-    if response_token is None:
-        headers: dict = {'X-IBM-Client-Id': client_id,
-                         'X-IBM-Client-Secret': client_secret,
-                         'Accept': 'application/json'}
-        body:dict = {'mode': "raw",'userId': user,'password': pw,'orgUnit': "HLAG"}
-        response_token:dict  = await anext(client.parse(scac='hlag',method='POST',background_tasks =background_task,url=url, headers=headers,json=body,token_key=hlcu_token_key,expire=timedelta(minutes=14)))
-    return response_token['token']
-async def get_hlag_p2p(client:HTTPClientWrapper,background_task:BackgroundTasks,url: str, turl: str,user:str, pw: str, client_id: str,client_secret:str,pol: str, pod: str,search_range: int,
+async def get_hlag_p2p(client:HTTPClientWrapper,background_task:BackgroundTasks,url: str, client_id: str,client_secret:str,pol: str, pod: str,search_range: int,
                        etd: datetime.date = None, eta: datetime.date = None, direct_only: bool|None = None,service: str | None = None, tsp: str | None = None):
     start_day:str = etd.strftime("%Y-%m-%dT%H:%M:%S.%SZ") if etd else eta.strftime("%Y-%m-%dT%H:%M:%S.%SZ")
     end_day:str = (etd+ timedelta(days=search_range)).strftime("%Y-%m-%dT%H:%M:%S.%SZ") if etd else (eta + timedelta(days=search_range)).strftime("%Y-%m-%dT%H:%M:%S.%SZ")
     params: dict = {'placeOfReceipt': pol, 'placeOfDelivery': pod}
     params.update({'departureDateTime:gte': start_day,'departureDateTime:lte':end_day}) if etd else params.update({'arrivalDateTime:gte': start_day,'arrivalDateTime:lte':end_day})
     params.update({'isTranshipment': not(direct_only)}) if direct_only is not None else...
-    hlcu_response_uuid: UUID = uuid5(NAMESPACE_DNS, 'hlcu-response-kuehne-nagel' + str(params) + str(service) + str(tsp))
     generate_schedule = lambda data: (result for task in data for result in process_schedule_data(task=task, service=service, tsp=tsp))
-    token = await get_hlag_access_token(client=client,background_task=background_task, url=turl,user=user, pw=pw, client_id= client_id,client_secret = client_secret)
-    headers: dict = {'X-IBM-Client-Id': client_id,'X-IBM-Client-Secret': client_secret, 'Authorization': f'Bearer {token}', 'Accept': 'application/json'}
+    response_cache = await db.get(scac='hlcu', params=params, original_response=True,log_component='hlcu original response file')
+    if response_cache:
+        p2p_schedule: Generator = generate_schedule(data=response_cache)
+        return p2p_schedule
+    headers: dict = {'X-IBM-Client-Id': client_id, 'X-IBM-Client-Secret': client_secret, 'Accept': 'application/json'}
     response_json = await anext(client.parse(scac='hlag',method='GET', url=url, params=params,headers=headers))
     if response_json:
         p2p_schedule: Generator = generate_schedule(data=response_json)
-        background_task.add_task(db.set, key=hlcu_response_uuid, value=response_json,log_component='hlag original response file')
+        background_task.add_task(db.set,original_response=True,scac='hlcu', params=params, value=response_json,log_component='hlag original response file')
         return p2p_schedule
 
 
