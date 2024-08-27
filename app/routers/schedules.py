@@ -120,9 +120,8 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                           pw=settings.iqax_token.get_secret_value()))
 
                 if carrier_status['data']['activeCarriers']['hlag'] and (carriers == 'HLCU' or carriers is None):
-                    task_group.create_task(name='HLAG_task',coro=lambda:hlag.get_hlag_p2p(client= client,background_task = background_tasks, url = settings.hlcu_url,turl=settings.hlcu_token_url,
+                    task_group.create_task(name='HLAG_task',coro=lambda:hlag.get_hlag_p2p(client= client,background_task = background_tasks, url = settings.hlcu_url,
                                           client_id= settings.hlcu_client_id.get_secret_value(),client_secret=settings.hlcu_client_secret.get_secret_value(),
-                                          user= settings.hlcu_user_id.get_secret_value(),pw= settings.hlcu_password.get_secret_value(),
                                           pol=point_from,pod=point_to,search_range= search_range.duration,
                                           etd= start_date if start_date_type == StartDateType.departure  else None ,
                                           eta =start_date if start_date_type == StartDateType.arrival else None,tsp=tsp,
