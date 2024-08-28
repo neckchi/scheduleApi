@@ -38,7 +38,6 @@ resource "aws_secretsmanager_secret_version" "this" {
     HLCU_URL           = data.sops_file.sops-secret.data["HLCU_URL"]
     HLCU_CLIENT_ID     = data.sops_file.sops-secret.data["HLCU_CLIENT_ID"]
     HLCU_CLIENT_SECRET = data.sops_file.sops-secret.data["HLCU_CLIENT_SECRET"]
-    HLCU_URL           = data.sops_file.sops-secret.data["HLCU_URL"]
     BASIC_USER         = data.sops_file.sops-secret.data["BASIC_USER"]
     BASIC_PW           = data.sops_file.sops-secret.data["BASIC_PW"]
     REDIS_HOST         = data.sops_file.sops-secret.data["REDIS_HOST"]
