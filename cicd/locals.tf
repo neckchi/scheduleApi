@@ -333,10 +333,6 @@ locals {
           "valueFrom" : "${aws_secretsmanager_secret.this.arn}:MSCU_RSA_KEY::"
         },
         {
-          "name" : "HLCU_TOKEN_URL",
-          "valueFrom" : "${aws_secretsmanager_secret.this.arn}:HLCU_TOKEN_URL::"
-        },
-        {
           "name" : "HLCU_URL",
           "valueFrom" : "${aws_secretsmanager_secret.this.arn}:HLCU_URL::"
         },
@@ -347,14 +343,6 @@ locals {
         {
           "name" : "HLCU_CLIENT_SECRET",
           "valueFrom" : "${aws_secretsmanager_secret.this.arn}:HLCU_CLIENT_SECRET::"
-        },
-        {
-          "name" : "HLCU_USER_ID",
-          "valueFrom" : "${aws_secretsmanager_secret.this.arn}:HLCU_USER_ID::"
-        },
-        {
-          "name" : "HLCU_PASSWORD",
-          "valueFrom" : "${aws_secretsmanager_secret.this.arn}:HLCU_PASSWORD::"
         },
         {
           "name" : "BASIC_USER",
