@@ -25,8 +25,8 @@ class Cutoff(BaseModel):
     vgmCutoffDate: datetime | None = Field(default=None,example='2023-11-11T22:00:00')
 
 
-TRANSPORT_TYPE = Literal['Vessel', 'Barge', 'Feeder', 'Truck', 'Rail', 'Truck / Rail','Intermodal']
-REFERENCE_MAPPING: dict = {'Vessel': '1', 'Barge': '9', 'Feeder': '9', 'Truck': '3', 'Rail': '11', 'Truck / Rail': '11','Intermodal': '5'}
+TRANSPORT_TYPE = Literal['Vessel', 'Barge', 'Feeder', 'Truck', 'Rail', 'Truck / Rail','Road','Intermodal']
+REFERENCE_MAPPING: dict = {'Vessel': '1', 'Barge': '9', 'Feeder': '9', 'Truck': '3','Road': '3', 'Rail': '11', 'Truck / Rail': '11','Intermodal': '5'}
 class Transportation(BaseModel):
     model_config = ConfigDict(cache_strings='all')
     transportType: TRANSPORT_TYPE = Field(description='e.g:Vessel,Barge,Feeder,Truck,Rail,Truck / Rail,Intermodal', example='Vessel')
