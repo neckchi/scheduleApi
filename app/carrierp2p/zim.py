@@ -1,7 +1,7 @@
 import datetime
 from app.routers.router_config import HTTPClientWrapper
 from app.background_tasks import db
-from app.schemas import schema_response
+from app.schemas.schema_response import Schedule,Leg,PointBase,Cutoff,Voyage,Service,Transportation
 from uuid import uuid5,NAMESPACE_DNS,UUID
 from fastapi import BackgroundTasks
 from typing import Generator,Iterator
@@ -20,18 +20,17 @@ def map_imo(leg_imo:str|None, vessel_name:str|None,line:str|None, transport:str)
         return '1'
 
 def process_leg_data(leg_task:list,check_nearest_pol_etd:tuple)->list:
-    leg_list:list  = [schema_response.LEG_ADAPTER.dump_python({
-        'pointFrom':{'locationName': leg['departurePortName'],'locationCode': leg['departurePort']},
-        'pointTo':{'locationName': leg['arrivalPortName'],'locationCode': leg['arrivalPort']},
-        'etd':(etd := leg['departureDate']),
-        'eta':(eta := leg['arrivalDate']),
-        'transitTime':int((datetime.datetime.fromisoformat(eta) - datetime.datetime.fromisoformat(etd)).days),
-        'transportations':{'transportType': (transport:=TRANSPORT_TYPE.get(leg['vesselName'],'Vessel')),'transportName': (vessel_name :=leg['vesselName']),'referenceType': 'IMO',
-                           'reference':  map_imo(leg_imo = leg.get('lloydsCode'),vessel_name = vessel_name,line=leg.get('line'),transport=transport)},
-        'services':{'serviceCode': leg['line']} if (voyage_num := leg.get('voyage')) else None,
-        'cutoffs':{'cyCutoffDate': cyoff,'docCutoffDate': leg.get('docClosingDate'),'vgmCutoffDate': leg.get('vgmClosingDate')}
+    leg_list:list  = [Leg.model_construct(pointFrom=PointBase.model_construct(locationName= leg['departurePortName'],locationCode= leg['departurePort']),
+        pointTo=PointBase.model_construct(locationName=leg['arrivalPortName'],locationCode=leg['arrivalPort']),
+        etd=(etd := leg['departureDate']),
+        eta=(eta := leg['arrivalDate']),
+        transitTime=int((datetime.datetime.fromisoformat(eta) - datetime.datetime.fromisoformat(etd)).days),
+        transportations=Transportation.model_construct(transportType= (transport:=TRANSPORT_TYPE.get(leg['vesselName'],'Vessel')),transportName=(vessel_name :=leg['vesselName']),referenceType= 'IMO',
+                                                       reference=map_imo(leg_imo = leg.get('lloydsCode'),vessel_name = vessel_name,line=leg.get('line'),transport=transport)),
+        services=Service.model_construct(serviceCode= leg['line']) if (voyage_num := leg.get('voyage')) else None,
+        cutoffs=Cutoff.model_construct(cyCutoffDate= cyoff,docCutoffDate= leg.get('docClosingDate'),vgmCutoffDate= leg.get('vgmClosingDate'))
         if (cyoff := leg.get('containerClosingDate')) or leg.get('docClosingDate') or leg.get('vgmClosingDate') else None,
-        'voyages':{'internalVoyage': voyage_num + leg['leg'] if voyage_num else None,'externalVoyage': leg.get('consortSailingNumber')}},warnings=False) for leg in leg_task if leg['legOrder'] >= check_nearest_pol_etd[0]]
+        voyages=Voyage.model_construct(internalVoyage= voyage_num + leg['leg'] if voyage_num else None,externalVoyage= leg.get('consortSailingNumber'))) for leg in leg_task if leg['legOrder'] >= check_nearest_pol_etd[0]]
     return leg_list
 
 def process_schedule_data(task: dict, direct_only:bool |None,vessel_imo: str, service: str, tsp: str) -> Iterator:
@@ -46,9 +45,8 @@ def process_schedule_data(task: dict, direct_only:bool |None,vessel_imo: str, se
         check_nearest_pol_etd:tuple = next((leg['legOrder'],leg['departureDate']) for leg in task['routeLegs'][::-1] if leg['departurePort'] == first_point_from)
         last_point_to: str = task['arrivalPort']
         last_eta: str = task['arrivalDate']
-        schedule_body: dict = schema_response.SCHEDULE_ADAPTER.dump_python({'scac':'ZIMU','pointFrom':first_point_from,'pointTo':last_point_to, 'etd':check_nearest_pol_etd[1],'eta':last_eta,
-           'transitTime':transit_time,'transshipment':check_transshipment,
-           'legs': process_leg_data(leg_task=task['routeLegs'],check_nearest_pol_etd=check_nearest_pol_etd)},warnings=False)
+        schedule_body = Schedule.model_construct(scac='ZIMU',pointFrom=first_point_from,pointTo=last_point_to, etd=check_nearest_pol_etd[1],eta=last_eta,
+                                                 transitTime=transit_time,transshipment=check_transshipment,legs=process_leg_data(leg_task=task['routeLegs'],check_nearest_pol_etd=check_nearest_pol_etd))
         yield schedule_body
 
 

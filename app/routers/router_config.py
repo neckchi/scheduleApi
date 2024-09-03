@@ -177,15 +177,14 @@ class HTTPClientWrapper:
         flat_list:list = [item for row in matrix if not isinstance(row, Exception) and row is not None for item in row]
         logging.info(f'mapping_time = {time.time() - mapping_time:.2f}s Gathering all the schedule files obtained from carriers and mapping to our data format')
         count_schedules:int = len(flat_list)
-        response.headers.update({"X-Correlation-ID": str(correlation),"Connection":"Keep-Alive", "Cache-Control": "public, max-age=7200" if count_schedules >0 else "no-cache, no-store, max-age=0, must-revalidate",
-                                 "KN-Count-Schedules": str(count_schedules)})
+        response.headers.update({"X-Correlation-ID": str(correlation),"Connection":"Keep-Alive", "Cache-Control": "public, max-age=7200" if count_schedules > 0 else "no-cache, no-store, max-age=0, must-revalidate","KN-Count-Schedules": str(count_schedules)})
         # response.headers.update({"X-Correlation-ID": str(correlation), "Cache-Control": "public, max-age=7200" if count_schedules >0 else "no-cache, no-store, max-age=0, must-revalidate",
         #                          "KN-Count-Schedules": str(count_schedules),"Carrier-Response-Time":str(self.carrier_response_time)})
         if count_schedules == 0:
             final_result = JSONResponse(status_code=status.HTTP_200_OK,content=jsonable_encoder(schema_response.Error(productid=product_id,details=f"{point_from}-{point_to} schedule not found")))
         else:
             validation_start_time = time.time()
-            sorted_schedules: list = sorted(flat_list, key=lambda tt: (tt['etd'], tt['transitTime']))
+            sorted_schedules: list = sorted(flat_list, key=lambda schedule: (schedule.etd, schedule.transitTime))
             final_set:dict = {'productid':product_id,'origin':point_from,'destination':point_to, 'noofSchedule':count_schedules,'schedules':sorted_schedules}
             final_validation = schema_response.PRODUCT_ADAPTER.validate_python(final_set)
             logging.info(f'validation_time={time.time() - validation_start_time:.2f}s Validated the schedule ')

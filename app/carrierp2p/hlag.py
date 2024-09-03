@@ -1,5 +1,5 @@
 from app.routers.router_config import HTTPClientWrapper
-from app.schemas import schema_response
+from app.schemas.schema_response import Schedule,Leg,PointBase,Voyage,Service,Transportation
 from app.background_tasks import db
 from datetime import datetime,timedelta
 from fastapi import BackgroundTasks
@@ -7,22 +7,19 @@ from typing import Generator,Iterator
 
 
 def process_leg_data(leg_task:list)->list:
-    leg_list: list = [schema_response.LEG_ADAPTER.dump_python({
-        'pointFrom': {'locationName': leg['departure']['location']['locationName'],
-                      'locationCode': leg['departure']['location']['UNLocationCode'],
-                      'terminalCode': leg['departure']['location'].get('facilitySMDGCode')},
-        'pointTo': {'locationName': leg['arrival']['location']['locationName'],
-                    'locationCode': leg['arrival']['location']['UNLocationCode'],
-                    'terminalCode': leg['arrival']['location'].get('facilitySMDGCode')},
-        'etd': (etd := leg['departure']['dateTime']),
-        'eta': (eta := leg['arrival']['dateTime']),
-        'transitTime': int((datetime.fromisoformat(eta) - datetime.fromisoformat(etd)).days),
-        'transportations': {'transportType': str(leg.get('modeOfTransport')).title(),
-                            'transportName': leg['vesselName'] if (vessel_imo := leg.get('vesselIMONumber')) else None,
-                            'referenceType': 'IMO' if vessel_imo and vessel_imo != '0000000' else None,
-                            'reference': vessel_imo if vessel_imo and vessel_imo != '0000000' else None},
-        'services': {'serviceCode': check_service_code, 'serviceName': leg.get('carrierServiceName')} if (check_service_code := leg.get('carrierServiceCode')) else None,
-        'voyages': {'internalVoyage': internal_voy if (internal_voy := leg.get('universalExportVoyageReference')) else None}},warnings=False) for leg in leg_task]
+    leg_list: list = [Leg.model_construct(pointFrom = PointBase.model_construct(locationName =  leg['departure']['location']['locationName'],locationCode = leg['departure']['location']['UNLocationCode'],
+                                                                                terminalCode = leg['departure']['location'].get('facilitySMDGCode')),
+                                          pointTo = PointBase.model_construct(locationName = leg['arrival']['location']['locationName'],locationCode = leg['arrival']['location']['UNLocationCode'],
+                                                                              terminalCode = leg['arrival']['location'].get('facilitySMDGCode')),
+                                          etd = (etd := leg['departure']['dateTime']),
+                                          eta = (eta := leg['arrival']['dateTime']),
+                                          transitTime = int((datetime.fromisoformat(eta) - datetime.fromisoformat(etd)).days),
+                                          transportations = Transportation.model_construct(transportType = str(leg.get('modeOfTransport')).title(),
+                                                                                           transportName = leg['vesselName'] if (vessel_imo := leg.get('vesselIMONumber')) else None,
+                                                                                           referenceType = 'IMO' if vessel_imo and vessel_imo != '0000000' else None,
+                                                                                           reference = vessel_imo if vessel_imo and vessel_imo != '0000000' else None),
+        services = Service.model_construct(serviceCode = check_service_code, serviceName = leg.get('carrierServiceName')) if (check_service_code := leg.get('carrierServiceCode')) else None,
+        voyages = Voyage.model_construct(internalVoyage = internal_voy if (internal_voy := leg.get('universalExportVoyageReference')) else None)) for leg in leg_task]
     return leg_list
 
 def process_schedule_data(task: dict, service: str, tsp: str) -> Iterator:
@@ -35,9 +32,9 @@ def process_schedule_data(task: dict, service: str, tsp: str) -> Iterator:
     check_transshipment: bool = len(task['legs']) > 1
     transshipment_port: bool = any(tsport['departure']['location']['UNLocationCode'] == tsp for tsport in task['legs']) if check_transshipment and tsp else False
     if (transshipment_port or not tsp) and (check_service_code or not service) :
-        schedule_body: dict = schema_response.SCHEDULE_ADAPTER.dump_python({'scac': 'HLCU', 'pointFrom': first_point_from,'pointTo': last_point_to, 'etd': first_etd,
-                                                                        'eta': last_eta,'transitTime': transit_time,
-                                                                        'transshipment': check_transshipment,'legs': process_leg_data(leg_task=task['legs'])},warnings=False)
+        schedule_body = Schedule.model_construct(scac = 'HLCU', pointFrom = first_point_from,pointTo = last_point_to, etd = first_etd,
+                                                       eta = last_eta, transitTime = transit_time,
+                                                       transshipment = check_transshipment, legs =  process_leg_data(leg_task=task['legs']))
         yield schedule_body
 async def get_hlag_p2p(client:HTTPClientWrapper,background_task:BackgroundTasks,url: str, client_id: str,client_secret:str,pol: str, pod: str,search_range: int,
                        etd: datetime.date = None, eta: datetime.date = None, direct_only: bool|None = None,service: str | None = None, tsp: str | None = None):

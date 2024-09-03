@@ -2,7 +2,7 @@ import asyncio
 from app.carrierp2p.helpers import deepget
 from app.routers.router_config import HTTPClientWrapper
 from app.background_tasks import db
-from app.schemas import schema_response
+from app.schemas.schema_response import Schedule,Leg,PointBase,Cutoff,Voyage,Service,Transportation
 from uuid import uuid5,NAMESPACE_DNS
 from datetime import timedelta,datetime
 from fastapi import BackgroundTasks
@@ -12,23 +12,18 @@ from app.schemas.schema_request import TRANSPORT_TYPE
 
 
 def process_leg_data(leg_task:list,first_cut_off:dict):
-    leg_list: list = [schema_response.LEG_ADAPTER.dump_python({
-        'pointFrom': {'locationName': (pol_name := leg['facilities']['startLocation']['cityName']),
-                      'locationCode': pol_code,
-                      'terminalName': leg['facilities']['startLocation']['locationName']},
-        'pointTo': {'locationName': leg['facilities']['endLocation']['cityName'],
-                    'locationCode': pod_code,
-                    'terminalName': leg['facilities']['endLocation']['locationName']},
-        'etd': (etd := leg['departureDateTime']),
-        'eta': (eta := leg['arrivalDateTime']),
-        'transitTime': int((datetime.fromisoformat(eta) - datetime.fromisoformat(etd)).days),
-        'transportations': {'transportType': TRANSPORT_TYPE.get(leg['transport']['transportMode']),
-                            'transportName': deepget(leg['transport'], 'vessel', 'vesselName'),
-                            'referenceType': 'IMO' if (imo_code := str(deepget(leg['transport'], 'vessel', 'vesselIMONumber'))) and imo_code not in ('9999999', 'None') else None,
-                            'reference': imo_code if imo_code not in ('9999999', 'None', '') else None},
-        'services': {'serviceCode': service_name} if (service_name := leg['transport'].get('carrierServiceName',leg['transport'].get('carrierServiceCode'))) else None,
-        'voyages': {'internalVoyage': voyage_num if (voyage_num := leg['transport'].get('carrierDepartureVoyageNumber')) else None},
-        'cutoffs': first_cut_off.get(hash(leg['facilities']['startLocation']['countryCode'] + pol_name + imo_code + voyage_num)) if pol_name and imo_code and voyage_num else None},warnings=False) for leg in leg_task
+    leg_list: list = [Leg.model_construct(
+        pointFrom=PointBase.model_construct(locationName = (pol_name := leg['facilities']['startLocation']['cityName']),locationCode=pol_code,terminalName=leg['facilities']['startLocation']['locationName']),
+        pointTo=PointBase.model_construct(locationName = leg['facilities']['endLocation']['cityName'],locationCode=pod_code,terminalName = leg['facilities']['endLocation']['locationName']),
+        etd = (etd := leg['departureDateTime']),
+        eta = (eta := leg['arrivalDateTime']),
+        transitTime = int((datetime.fromisoformat(eta) - datetime.fromisoformat(etd)).days),
+        transportations = Transportation.model_construct(transportType=TRANSPORT_TYPE.get(leg['transport']['transportMode']),transportName=deepget(leg['transport'], 'vessel', 'vesselName'),
+                                                         referenceType = 'IMO' if (imo_code := str(deepget(leg['transport'], 'vessel', 'vesselIMONumber'))) and imo_code not in ('9999999', 'None') else None,
+                                                         reference = imo_code if imo_code not in ('9999999', 'None', '') else None),
+        services = Service.model_construct(serviceCode= service_name) if (service_name := leg['transport'].get('carrierServiceName',leg['transport'].get('carrierServiceCode'))) else None,
+        voyages = Voyage.model_construct(internalVoyage = voyage_num if (voyage_num := leg['transport'].get('carrierDepartureVoyageNumber')) else None),
+        cutoffs = first_cut_off.get(hash(leg['facilities']['startLocation']['countryCode'] + pol_name + imo_code + voyage_num)) if pol_name and imo_code and voyage_num else None) for leg in leg_task
         if (pol_code:=leg['facilities']['startLocation'].get('cityUNLocationCode') or leg['facilities']['startLocation'].get('siteUNLocationCode')) !=
            (pod_code:=leg['facilities']['endLocation'].get('cityUNLocationCode') or leg['facilities']['endLocation'].get('siteUNLocationCode'))]
     return leg_list
@@ -50,10 +45,9 @@ def process_schedule_data(resp: dict,first_cut_off:dict, direct_only:bool |None,
             first_etd:str = task['departureDateTime']
             last_eta:str = task['arrivalDateTime']
             leg_list = process_leg_data(leg_task= task['transportLegs'],first_cut_off=first_cut_off)
-            schedule_body: dict = schema_response.SCHEDULE_ADAPTER.dump_python({'scac':carrier_code,'pointFrom':first_point_from,'pointTo':last_point_to,
-                                                                                'etd':first_etd,'eta':last_eta,
-                                                                                'transitTime':transit_time,'transshipment':check_transshipment,
-                                                                                'legs':sorted(leg_list, key=lambda d: d['etd']) if check_transshipment else leg_list},warnings=False)
+            schedule_body = Schedule.model_construct(scac = carrier_code,pointFrom = first_point_from,pointTo = last_point_to,etd = first_etd,eta = last_eta,
+                                                           transitTime = transit_time,transshipment = check_transshipment,
+                                                           legs = sorted(leg_list, key=lambda leg: leg.etd) if check_transshipment else leg_list)
             yield schedule_body
 
 async def get_cutoff_first_leg(client:HTTPClientWrapper,cut_off_url:str,cut_off_pw:str,response_data:list) -> dict:
@@ -77,12 +71,12 @@ async def get_maersk_cutoff(client:HTTPClientWrapper, url: str, headers: dict, c
             cut_off_body: dict = {}
             for cutoff in response_json[0]['shipmentDeadlines']['deadlines']:
                 if cutoff.get('deadlineName') == 'Commercial Cargo Cutoff':
-                    cut_off_body.update({'cyCutoffDate': cutoff.get('deadlineLocal')})
+                    cut_off_body.update(Cutoff.model_construct(cyCutoffDate = cutoff.get('deadlineLocal')))
                 if cutoff.get('deadlineName') in ('Shipping Instructions Deadline','Shipping Instructions Deadline for Advance Manifest Cargo','Special Cargo Documentation Deadline'):
-                    cut_off_body.update({'docCutoffDate': cutoff.get('deadlineLocal')})
+                    cut_off_body.update(Cutoff.model_construct(docCutoffDate = cutoff.get('deadlineLocal')))
                 if cutoff.get('deadlineName') == 'Commercial Verified Gross Mass Deadline':
-                    cut_off_body.update({'vgmCutoffDate': cutoff.get('deadlineLocal')})
-            return {lookup_key: cut_off_body}
+                    cut_off_body.update(Cutoff.model_construct(vgmCutoffDate = cutoff.get('deadlineLocal')))
+            return {lookup_key:  cut_off_body}
         return None
 
 async def retrieve_geo_locations(client:HTTPClientWrapper, background_task:BackgroundTasks, pol:str, pod:str, location_url:str, pw:str):

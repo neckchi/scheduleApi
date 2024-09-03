@@ -5,32 +5,31 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 from app.routers.router_config import HTTPClientWrapper
 from app.background_tasks import db
-from app.schemas import schema_response
+from app.schemas.schema_response import Schedule,Leg,PointBase,Cutoff,Voyage,Service,Transportation
 from uuid import uuid5,NAMESPACE_DNS,UUID
 from fastapi import BackgroundTasks
 from base64 import b64decode
 from typing import Generator,Iterator,AsyncIterator
 
 def process_leg_data(leg_task:list)->list:
-    leg_list: list = [schema_response.LEG_ADAPTER.dump_python({
-            'pointFrom':{'locationName': leg['Calls'][0]['Name'], 'locationCode': leg['Calls'][0]['Code'],
-                       'terminalName': leg['Calls'][0]['EHF']['Description'],
-                       'terminalCode': leg['Calls'][0]['DepartureEHFSMDGCode'] if leg['Calls'][0]['DepartureEHFSMDGCode'] != '' else None},
-            'pointTo':{'locationName': leg['Calls'][-1]['Name'], 'locationCode': leg['Calls'][-1]['Code'],
-                     'terminalName': leg['Calls'][-1]['EHF']['Description'],
-                     'terminalCode': leg['Calls'][-1]['ArrivalEHFSMDGCode'] if leg['Calls'][-1]['ArrivalEHFSMDGCode'] != '' else None},
-            'etd':(etd := next(led['CallDateTime'] for led in leg['Calls'][0]['CallDates'] if led['Type'] == 'ETD')),
-            'eta':(eta := next(lea['CallDateTime'] for lea in leg['Calls'][-1]['CallDates'] if lea['Type'] == 'ETA')),
-            'transitTime':int((datetime.fromisoformat(eta) - datetime.fromisoformat(etd)).days),
-            'cutoffs':{'docCutoffDate': si_cutoff,
-                     'cyCutoffDate': next((led['CallDateTime'] for led in leg['Calls'][0]['CallDates'] if led.get('CallDateTime') and led['Type'] == 'CYCUTOFF'), None),
-                     'vgmCutoffDate': next((led['CallDateTime'] for led in leg['Calls'][0]['CallDates'] if led.get('CallDateTime') and led['Type'] == 'VGM'), None)}
+    leg_list: list = [Leg.model_construct(
+            pointFrom=PointBase.model_construct(locationName= leg['Calls'][0]['Name'], locationCode= leg['Calls'][0]['Code'],
+                       terminalName=leg['Calls'][0]['EHF']['Description'],
+                       terminalCode=leg['Calls'][0]['DepartureEHFSMDGCode'] if leg['Calls'][0]['DepartureEHFSMDGCode'] != '' else None),
+            pointTo=PointBase.model_construct(locationName= leg['Calls'][-1]['Name'], locationCode= leg['Calls'][-1]['Code'],
+                     terminalName= leg['Calls'][-1]['EHF']['Description'],
+                     terminalCode= leg['Calls'][-1]['ArrivalEHFSMDGCode'] if leg['Calls'][-1]['ArrivalEHFSMDGCode'] != '' else None),
+            etd=(etd := next(led['CallDateTime'] for led in leg['Calls'][0]['CallDates'] if led['Type'] == 'ETD')),
+            eta=(eta := next(lea['CallDateTime'] for lea in leg['Calls'][-1]['CallDates'] if lea['Type'] == 'ETA')),
+            transitTime= int((datetime.fromisoformat(eta) - datetime.fromisoformat(etd)).days),
+            cutoffs=Cutoff.model_construct(docCutoffDate=si_cutoff,cyCutoffDate=next((led['CallDateTime'] for led in leg['Calls'][0]['CallDates'] if led.get('CallDateTime') and led['Type'] == 'CYCUTOFF'), None),
+                                           vgmCutoffDate=next((led['CallDateTime'] for led in leg['Calls'][0]['CallDates'] if led.get('CallDateTime') and led['Type'] == 'VGM'), None))
             if (si_cutoff := next((led['CallDateTime'] for led in leg['Calls'][0]['CallDates'] if led['Type'] == 'SI' and led.get('CallDateTime')), None)) else None,
-            'transportations':{'transportType': 'Vessel', 'transportName': leg.get('TransportationMeansName'),
-                             'referenceType': 'IMO' if (imo_code := leg.get('IMONumber')) and imo_code != '' else None,
-                             'reference': imo_code if imo_code != '' else None},
-            'services':{'serviceCode': leg['Service']['Description']} if leg.get('Service') else None,
-            'voyages':{'internalVoyage': leg['Voyages'][0]['Description'] if leg.get('Voyages') else None}},warnings=False) for leg in leg_task]
+            transportations=Transportation.model_construct(transportType='Vessel', transportName= leg.get('TransportationMeansName'),
+                                                           referenceType='IMO' if (imo_code := leg.get('IMONumber')) and imo_code != '' else None,
+                                                           reference=imo_code if imo_code != '' else None),
+            services=Service.model_construct(serviceCode= leg['Service']['Description']) if leg.get('Service') else None,
+            voyages=Voyage.model_construct(internalVoyage=leg['Voyages'][0]['Description'] if leg.get('Voyages') else None)) for leg in leg_task]
     return leg_list
 
 
@@ -47,9 +46,8 @@ def process_schedule_data(task: dict, direct_only:bool |None,vessel_imo: str, se
         first_etd: str = next(ed['CallDateTime'] for ed in task['Schedules'][0]['Calls'][0]['CallDates'] if ed['Type'] == 'ETD')
         last_eta: str = next(ed['CallDateTime'] for ed in task['Schedules'][-1]['Calls'][-1]['CallDates'] if ed['Type'] == 'ETA')
         transit_time:int = int((datetime.fromisoformat(last_eta) - datetime.fromisoformat(first_etd)).days)
-        schedule_body: dict = schema_response.SCHEDULE_ADAPTER.dump_python({'scac': 'MSCU','pointFrom': first_point_from,'pointTo': last_point_to, 'etd' : first_etd,'eta':last_eta,'transitTime': transit_time,
-                                                                            'transshipment': check_transshipment,
-                                                                            'legs': process_leg_data(leg_task=task['Schedules'])},warnings=False)
+        schedule_body = Schedule.model_construct(scac='MSCU',pointFrom= first_point_from,pointTo= last_point_to, etd= first_etd,eta=last_eta,transitTime=transit_time,
+                                                                            transshipment=check_transshipment,legs=process_leg_data(leg_task=task['Schedules']))
         yield schedule_body
 
 
