@@ -62,21 +62,22 @@ async def get_cutoff_first_leg(client:HTTPClientWrapper,cut_off_url:str,cut_off_
     first_cut_off: dict = {key: value for cutoff in get_cut_offs if cutoff is not None for key, value in cutoff.items()}
     return first_cut_off
 
-async def get_maersk_cutoff(client:HTTPClientWrapper, url: str, headers: dict, country: str, pol: str, imo: str, voyage: str)-> dict|None:
-    """this is the Maersk API to get the cutOffDate """
-    params: dict = {'ISOCountryCode': country, 'portOfLoad': pol, 'vesselIMONumber': imo, 'voyage': voyage}
-    async for response_json in client.parse(scac='maersk',url=url,method ='GET',stream=True,headers=headers, params=params):
-        if response_json:
-            lookup_key = hash(country+pol+imo+voyage)
-            cut_off_body: dict = {}
-            for cutoff in response_json[0]['shipmentDeadlines']['deadlines']:
-                if cutoff.get('deadlineName') == 'Commercial Cargo Cutoff':
-                    cut_off_body.update(Cutoff.model_construct(cyCutoffDate = cutoff.get('deadlineLocal')))
-                if cutoff.get('deadlineName') in ('Shipping Instructions Deadline','Shipping Instructions Deadline for Advance Manifest Cargo','Special Cargo Documentation Deadline'):
-                    cut_off_body.update(Cutoff.model_construct(docCutoffDate = cutoff.get('deadlineLocal')))
-                if cutoff.get('deadlineName') == 'Commercial Verified Gross Mass Deadline':
-                    cut_off_body.update(Cutoff.model_construct(vgmCutoffDate = cutoff.get('deadlineLocal')))
-            return {lookup_key:  cut_off_body}
+async def get_maersk_cutoff(client: HTTPClientWrapper,url: str,headers: dict,country: str,pol: str,imo: str,voyage: str) -> dict | None:
+    """Fetches the cutoff dates from the Maersk API."""
+    params:dict = {'ISOCountryCode': country,'portOfLoad': pol,'vesselIMONumber': imo,'voyage': voyage}
+    async for response_json in client.parse(scac='maersk', url=url, method='GET', stream=True, headers=headers,params=params):
+        if not response_json:
+            return None
+        lookup_key = hash(f"{country}{pol}{imo}{voyage}")
+        cutoff_dates:dict = {}
+        deadline_mappings:dict = {'Commercial Cargo Cutoff': 'cyCutoffDate','Shipping Instructions Deadline': 'docCutoffDate','Shipping Instructions Deadline for Advance Manifest Cargo': 'docCutoffDate',
+                                  'Special Cargo Documentation Deadline': 'docCutoffDate','Commercial Verified Gross Mass Deadline': 'vgmCutoffDate'}
+        for cutoff in response_json[0].get('shipmentDeadlines', {}).get('deadlines', []):
+            deadline_name = cutoff.get('deadlineName')
+            if deadline_name in deadline_mappings:
+                cutoff_dates[deadline_mappings[deadline_name]] = cutoff.get('deadlineLocal')
+        if cutoff_dates:
+            return {lookup_key: Cutoff.model_construct(cyCutoffDate=cutoff_dates.get('cyCutoffDate'),docCutoffDate=cutoff_dates.get('docCutoffDate'),vgmCutoffDate=cutoff_dates.get('vgmCutoffDate'))}
         return None
 
 async def retrieve_geo_locations(client:HTTPClientWrapper, background_task:BackgroundTasks, pol:str, pod:str, location_url:str, pw:str):
