@@ -124,7 +124,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                           client_id= settings.hlcu_client_id.get_secret_value(),client_secret=settings.hlcu_client_secret.get_secret_value(),
                                           pol=point_from,pod=point_to,search_range= search_range.duration,
                                           etd= start_date if start_date_type == StartDateType.departure  else None ,
-                                          eta =start_date if start_date_type == StartDateType.arrival else None,tsp=tsp,
+                                          eta =start_date if start_date_type == StartDateType.arrival else None,tsp=tsp,service=service,vessel_imo=vessel_imo,
                                           direct_only=direct_only))
         final_schedules = client.gen_all_valid_schedules(response=response,correlation=X_Correlation_ID,matrix=task_group.results,product_id=product_id,point_from=point_from,point_to=point_to,background_tasks=background_tasks,task_exception=task_group.error)
         process_time = time.time() - start_time
