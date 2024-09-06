@@ -79,6 +79,7 @@ class Service(BaseModel):
     serviceName: Optional[Any] = None
 
 class Leg(BaseModel):
+    model_config = ConfigDict(cache_strings=False)
     pointFrom: PointBase
     pointTo: PointBase
     etd: DateTimeReformat
@@ -102,6 +103,7 @@ class Leg(BaseModel):
         return self
 
 class Schedule(BaseModel):
+    model_config = ConfigDict(cache_strings=False)
     scac: CarrierCode
     pointFrom: Annotated[str,Field(max_length=5, title="Port Of Loading", example='HKHKG', pattern =r"[A-Z]{2}[A-Z0-9]{3}")]
     pointTo:Annotated[str,Field(max_length=5, title="Port Of Discharge", example='HKHKG', pattern =r"[A-Z]{2}[A-Z0-9]{3}")]
