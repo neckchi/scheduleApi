@@ -1,38 +1,47 @@
 import logging
 from uuid import UUID
 from datetime import datetime
-from pydantic import BaseModel, Field, PositiveInt,model_validator,ConfigDict,TypeAdapter
+from pydantic import BaseModel, Field, NonNegativeInt ,model_validator,ConfigDict,TypeAdapter,AfterValidator
 from .schema_request import CarrierCode
-from typing import Literal
+from typing import Literal,Optional,Annotated,Union,Any
 
 
+def convert_datetime_to_iso_8601(date_string: str) -> str:
+    reformat_date_string = date_string.split("+")[0]
+    if "." in reformat_date_string:
+        reformat_date_string = reformat_date_string.split(".")[0]
+    try:
+        if "T" in reformat_date_string:
+            date_object = datetime.strptime(reformat_date_string, "%Y-%m-%dT%H:%M:%S")
+        else:
+            date_object = datetime.strptime(reformat_date_string, "%Y-%m-%d %H:%M:%S")
+        return date_object.strftime('%Y-%m-%dT%H:%M:%S')
+    except ValueError:
+        return reformat_date_string
 
-def convert_datetime_to_iso_8601(dt: datetime) -> str:
-    return dt.strftime('%Y-%m-%dT%H:%M:%S')
+DateTimeReformat =  Annotated[str, AfterValidator(convert_datetime_to_iso_8601)]
 
 class PointBase(BaseModel):
     model_config = ConfigDict(cache_strings='all')
-    locationName: str | None = Field(max_length=100, default=None, example='Hong Kong')
-    locationCode: str = Field(max_length=5, title="Port Of Discharge", example='HKHKG', pattern =r"[A-Z]{2}[A-Z0-9]{3}")
-    terminalName: str | None = Field(max_length=100, default=None, example='HONG KONG INTL TERMINAL (HIT4)')
-    terminalCode: str | None = Field(default=None, example='HIT4')
-
+    locationName: Optional[Any] = None
+    locationCode: Annotated[str,Field(max_length=5, title="Port Of Discharge", example='HKHKG', pattern =r"[A-Z]{2}[A-Z0-9]{3}")]
+    terminalName: Optional[Any] = None
+    terminalCode: Optional[Any] = None
 
 class Cutoff(BaseModel):
-    model_config = ConfigDict(json_encoders={datetime: convert_datetime_to_iso_8601},cache_strings=False)
-    cyCutoffDate: datetime | None = Field(default=None,example='2023-11-11T22:00:00')
-    docCutoffDate: datetime | None = Field(default=None,example='2023-11-11T22:00:00')
-    vgmCutoffDate: datetime | None = Field(default=None,example='2023-11-11T22:00:00')
+    cyCutoffDate: Optional[DateTimeReformat] = None
+    docCutoffDate: Optional[DateTimeReformat] = None
+    vgmCutoffDate: Optional[DateTimeReformat] = None
 
 
-TRANSPORT_TYPE = Literal['Vessel', 'Barge', 'Feeder', 'Truck', 'Rail', 'Truck / Rail','Road','Intermodal']
-REFERENCE_MAPPING: dict = {'Vessel': '1', 'Barge': '9', 'Feeder': '9', 'Truck': '3','Road': '3', 'Rail': '11', 'Truck / Rail': '11','Intermodal': '5'}
+TRANSPORT_TYPE = Literal['Vessel', 'Barge', 'Feeder', 'Truck', 'Rail', 'Truck / Rail','Road/Rail','Road','Intermodal']
+REFERENCE_MAPPING: dict = {'Vessel': '1', 'Barge': '9', 'Feeder': '9', 'Truck': '3','Road': '3','Road/Rail':'11','Rail': '11', 'Truck / Rail': '11','Intermodal': '5'}
 class Transportation(BaseModel):
     model_config = ConfigDict(cache_strings='all')
-    transportType: TRANSPORT_TYPE = Field(description='e.g:Vessel,Barge,Feeder,Truck,Rail,Truck / Rail,Intermodal', example='Vessel')
-    transportName: str | None = Field(title='Vehicle Type',max_length=40, description='e.g:VesselName', example='ISEACO WISDOM',default=None)
-    referenceType: str | None = Field(title='Reference Type', description='e.g:IMO', example='IMO',default=None)
-    reference: int | str | None = Field(title='Reference Value', description='e.g:Vessel IMO Code', example='9172301',default=None)
+    transportType: TRANSPORT_TYPE
+    transportName: Optional[Any] = None
+    referenceType: Optional[str] = None
+    reference: Optional[Union[str, list]] = None
 
     @model_validator(mode = 'after')
     def check_reference_type_or_reference(self) -> 'Transportation':
@@ -54,31 +63,32 @@ class Transportation(BaseModel):
 
 class Voyage(BaseModel):
     model_config = ConfigDict(cache_strings=False)
-    internalVoyage: str | None = Field(default=None,max_length=20, example='126W')
-    externalVoyage: str | None = Field(default=None,max_length=20, example='126W')
+    internalVoyage: Optional[Any] = None
+    externalVoyage: Optional[Any] = None
+
     @model_validator(mode='after')
     def check_voyage(self) -> 'Voyage':
         if self.internalVoyage is None:
             self.internalVoyage = '001'
         return self
 
+
 class Service(BaseModel):
     model_config = ConfigDict(cache_strings='all')
-    serviceCode: str | None = Field(default=None,max_length=100, example='NVS')
-    serviceName: str | None = Field(default=None,max_length=100, example='EAST ASIA TRADE')
+    serviceCode: Optional[Any] = None
+    serviceName: Optional[Any] = None
 
 class Leg(BaseModel):
-    model_config = ConfigDict(json_encoders={datetime: convert_datetime_to_iso_8601},cache_strings=False)
-    pointFrom: PointBase = Field(description="This could be point/port")
-    pointTo: PointBase = Field(description="This could be point/port")
-    etd: datetime = Field(example='2023-11-13T18:00:00')
-    eta: datetime = Field(example='2023-12-15T07:00:00')
-    cutoffs: Cutoff | None = Field(default=None, title="A Series Of Cut Off date")
-    transitTime: int = Field(ge=0, title="Leg Transit Time",
-                             description="Transit Time on Leg Level",example='31')
-    transportations: Transportation | None
-    voyages: Voyage = Field(title="Voyage Number.Keep in mind that voyage number is mandatory")
-    services: Service | None = Field(default=None, title="Service Loop")
+    model_config = ConfigDict(cache_strings=False)
+    pointFrom: PointBase
+    pointTo: PointBase
+    etd: DateTimeReformat
+    eta: DateTimeReformat
+    cutoffs: Optional[Cutoff] = None
+    transitTime: NonNegativeInt
+    transportations: Optional[Transportation] = None
+    voyages: Voyage
+    services: Optional[Service] = None
 
     @model_validator(mode='after')
     def check_leg_details(self) -> 'Leg':
@@ -93,16 +103,14 @@ class Leg(BaseModel):
         return self
 
 class Schedule(BaseModel):
-    model_config = ConfigDict(json_encoders={datetime: convert_datetime_to_iso_8601},cache_strings=False)
-    scac: CarrierCode = Field(max_length=4, title="Carrier Code", description="This is SCAC.It must be 4 characters",
-                              example="MAEU")
-    pointFrom: str = Field(max_length=5, title="First Port Of Loading", example='HKHKG', pattern =r"[A-Z]{2}[A-Z0-9]{3}")
-    pointTo: str = Field(max_length=5, title="Last Port Of Discharge", example='DEHAM', pattern =r"[A-Z]{2}[A-Z0-9]{3}")
-    etd: datetime = Field(example='2023-11-13T18:00:00')
-    eta: datetime = Field(example='2023-12-15T07:00:00')
-    transitTime: int = Field(ge=0, alias='transitTime', title="Schedule Transit Time",
-                             description="Transit Time on Schedule Level")
-    transshipment: bool = Field(title="Is transshipment?",example=False)
+    model_config = ConfigDict(cache_strings=False)
+    scac: CarrierCode
+    pointFrom: Annotated[str,Field(max_length=5, title="Port Of Loading", example='HKHKG', pattern =r"[A-Z]{2}[A-Z0-9]{3}")]
+    pointTo:Annotated[str,Field(max_length=5, title="Port Of Discharge", example='HKHKG', pattern =r"[A-Z]{2}[A-Z0-9]{3}")]
+    etd: DateTimeReformat
+    eta: DateTimeReformat
+    transitTime: NonNegativeInt
+    transshipment: bool
     legs: list[Leg] = Field(default_factory=list)
 
     @model_validator(mode='after')
@@ -115,17 +123,11 @@ class Schedule(BaseModel):
 
 class Product(BaseModel):
     model_config = ConfigDict(cache_strings=False)
-    productid: UUID = Field(description='Generate UUID based on the request params',
-                            example='27d23af3-36be-57ce-9dbf-7813e672076c')
-    origin: str = Field(max_length=5, title="Origin ",
-                        description="This is the origin of country presented in UNECE standard", example="HKHKG",
-                        pattern =r"[A-Z]{2}[A-Z0-9]{3}")
-    destination: str = Field(max_length=5, title="Origin ",
-                             description="This is the origin of country presented in UNECE standard ", example="DEHAM",
-                             pattern =r"[A-Z]{2}[A-Z0-9]{3}")
-    noofSchedule: PositiveInt = Field(ge=0,title='Number Of Schedule', example=1)
-    schedules: list[Schedule] | None = Field(default=None, title='Number Of Schedules',
-                                             description="The number of p2p schedule offered by carrier")
+    productid: UUID
+    origin: Annotated[str,Field(max_length=5, title="Port Of Loading", example='HKHKG', pattern =r"[A-Z]{2}[A-Z0-9]{3}")]
+    destination: Annotated[str,Field(max_length=5, title="Port Of Discharge", example='HKHKG', pattern =r"[A-Z]{2}[A-Z0-9]{3}")]
+    noofSchedule:NonNegativeInt
+    schedules: Optional[list[Schedule]] = None
 
 class Error(BaseModel):
     productid: UUID
@@ -135,7 +137,6 @@ class HealthCheck(BaseModel):
     status: str = "OK"
 
 PRODUCT_ADAPTER = TypeAdapter(Product)
-SCHEDULE_ADAPTER = TypeAdapter(Schedule)
-LEG_ADAPTER = TypeAdapter(Leg)
+
 
 
