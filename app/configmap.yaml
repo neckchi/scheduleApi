@@ -13,9 +13,9 @@ data:
     maxConnectionPerHost: 700
     maxKeepAliveConnection: 3000
     dnsCache: 5000
-    keepAliveExpiry: 35
+    keepAliveExpiry: 40
     retryNumber: 2
-    asyncDefaultTimeOut: 12
+    asyncDefaultTimeOut: 10
   activeCarriers:
     cma:  True
     hlag: True

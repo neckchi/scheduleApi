@@ -7,7 +7,7 @@ from typing import Literal,Optional,Annotated,Union,Any
 
 
 def convert_datetime_to_iso_8601(date_string: str) -> str:
-    reformat_date_string = date_string.split("+")[0]
+    reformat_date_string = date_string.split("+")[0] if "+" in date_string else date_string[:19]
     if "." in reformat_date_string:
         reformat_date_string = reformat_date_string.split(".")[0]
     try:
