@@ -10,12 +10,12 @@ data:
     poolTimeOut: 15
     elswhereTimeOut: 20
     maxClientConnection: 8000
-    maxConnectionPerHost: 700
+    maxConnectionPerHost: 0
     maxKeepAliveConnection: 3000
     dnsCache: 5000
-    keepAliveExpiry: 35
+    keepAliveExpiry: 40
     retryNumber: 2
-    asyncDefaultTimeOut: 12
+    asyncDefaultTimeOut: 10
   activeCarriers:
     cma:  True
     hlag: True
