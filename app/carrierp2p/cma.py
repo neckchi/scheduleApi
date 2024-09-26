@@ -11,7 +11,7 @@ from typing import Generator,Iterator
 DEFAULT_ETD_ETA = datetime.now().astimezone().replace(microsecond=0).isoformat()
 def extract_transportation(transportation:dict):
     """Map the transportation Details"""
-    mean_of_transport:str = str(transportation['meanOfTransport']).title()
+    mean_of_transport: str = '/'.join(part.strip() for part in str(transportation['meanOfTransport']).title().split('/'))
     vehicule:dict = transportation.get('vehicule', {})
     vessel_imo:str = vehicule.get('reference')
     vehicule_type:str = vehicule.get('vehiculeType')

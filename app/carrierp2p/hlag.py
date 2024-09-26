@@ -14,7 +14,7 @@ def process_leg_data(leg_task:list)->list:
                                           etd = (etd := leg['departure']['dateTime']),
                                           eta = (eta := leg['arrival']['dateTime']),
                                           transitTime = int((datetime.fromisoformat(eta) - datetime.fromisoformat(etd)).days),
-                                          transportations = Transportation.model_construct(transportType = str(leg.get('modeOfTransport')).title(),
+                                          transportations = Transportation.model_construct(transportType = str(leg.get('modeOfTransport','Vessel')).title(),
                                                                                            transportName = leg['vesselName'] if (vessel_imo := leg.get('vesselIMONumber')) else None,
                                                                                            referenceType = 'IMO' if vessel_imo and vessel_imo != '0000000' else None,
                                                                                            reference = vessel_imo if vessel_imo and vessel_imo != '0000000' else None),
