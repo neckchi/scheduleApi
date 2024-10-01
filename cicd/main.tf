@@ -141,6 +141,7 @@ module "ecs_cluster" {
   source = "git::ssh://git@gitlab.tools.apim.eu-central-1.aws.int.kn/sea-schedule/terraform-modules//aws/ecs-cluster?ref=main"
   ecs_cluster = {
     name = "${local.project_name}-cluster"
+    container_insights = true
   }
 }
 
