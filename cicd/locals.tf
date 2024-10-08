@@ -377,4 +377,5 @@ locals {
   ]
   project_name       = "p2p-schedule-api-of-carriers"
   project_name_abreb = "p2papicarriers"
+  alb_name    = "p2papicarriers-alb"
 }

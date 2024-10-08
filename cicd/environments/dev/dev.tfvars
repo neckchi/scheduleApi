@@ -31,5 +31,6 @@ static_variables = {
   no_proxy    = "172.20.0.0/16,localhost,127.0.0.1,10.59.244.0/25,169.254.169.254,.internal,s3.amazonaws.com,.s3.eu-central-1.amazonaws.com,api.ecr.eu-central-1.amazonaws.com,.dkr.ecr.eu-central-1.amazonaws.com,.ec2.eu-central-1.amazonaws.com,169.254.170.2,.int.kn,.eks.amazonaws.com,.cluster.local"
 }
 alerting_subscriptions = [
-  "sea_schedule_internals@kuehne-nagel.com"
+  "Global_MI-DB_SeaSchedule_Externals@Kuehne-Nagel.com",
+  "Global_MI-DB_SeaSchedule_Internals@Kuehne-Nagel.com",
 ]

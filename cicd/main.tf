@@ -104,7 +104,7 @@ module "security_group_lb" {
 module "alb" {
   source = "git::ssh://git@gitlab.tools.apim.eu-central-1.aws.int.kn/sea-schedule/terraform-modules//aws/lb?ref=main"
   lb = {
-    name                       = "${local.project_name_abreb}-alb"
+    name                       = "${local.alb_name}"
     internal                   = true
     load_balancer_type         = "application"
     subnet_ids                 = var.subnet_ids
@@ -145,7 +145,7 @@ module "lb_listener" {
 module "ecs_cluster" {
   source = "git::ssh://git@gitlab.tools.apim.eu-central-1.aws.int.kn/sea-schedule/terraform-modules//aws/ecs-cluster?ref=main"
   ecs_cluster = {
-    name = "${local.project_name}-cluster"
+    name               = "${local.project_name}-cluster"
     container_insights = true
   }
 }

@@ -9,6 +9,6 @@ data "sops_file" "sops-secret" {
 
 data "aws_lb" "lb" {
   name = "${local.project_name_abreb}-alb"
-  arn =  module.alb.lb_arn
+  arn  = module.alb.lb_arn
 }
 
