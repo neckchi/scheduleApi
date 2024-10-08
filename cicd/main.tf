@@ -110,6 +110,11 @@ module "alb" {
     subnet_ids                 = var.subnet_ids
     security_groups            = [module.security_group_lb.security_group_id]
     enable_deletion_protection = false
+    access_logs = {
+      bucket = aws_s3_bucket.logsAlb.id
+      prefix = "logs"
+      enabled = true
+    }
   }
 }
 
