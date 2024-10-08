@@ -253,7 +253,7 @@ resource "aws_s3_bucket_policy" "logsAlb" {
         {
             "Effect": "Allow",
             "Principal": {
-                 "AWS": "arn:aws:iam::054676820928:root"
+                 "AWS": "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
             },
             "Action": "s3:*",
             "Resource": "arn:aws:s3:::${aws_s3_bucket.logsAlb.id}/*"
