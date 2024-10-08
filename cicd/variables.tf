@@ -111,6 +111,6 @@ variable "static_variables" {
 
 
 variable "alerting_subscriptions" {
-  type = list(string)
+  type        = list(string)
   description = "email subscriptions for alerting"
 }
