@@ -281,6 +281,11 @@ resource "aws_s3_bucket" "logsAlb" {
 
 }
 
+/**
+054676820928 is the id of aws loadbalance service account
+https://docs.aws.amazon.com/elasticloadbalancing/latest/application/enable-access-logging.html#access-log-create-bucket
+
+*/
 
 resource "aws_s3_bucket_policy" "logsAlb" {
   bucket = aws_s3_bucket.logsAlb.id
@@ -291,7 +296,7 @@ resource "aws_s3_bucket_policy" "logsAlb" {
         {
             "Effect": "Allow",
             "Principal": {
-                 "AWS": "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+                 "AWS": "arn:aws:iam::054676820928:root" 
             },
             "Action": "s3:*",
             "Resource": "arn:aws:s3:::${aws_s3_bucket.logsAlb.id}/*"
