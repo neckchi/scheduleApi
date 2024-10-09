@@ -18,23 +18,39 @@ resource "aws_cloudwatch_dashboard" "this" {
         {
           type = "metric"
           properties = {
-            metrics = [["AWS/ApplicationELB", "HealthyHostCount", "TargetGroup", "${data.aws_lb.lb.arn_suffix}"]]
-            view    = "singleValue",
+            metrics = [["AWS/ApplicationELB", "HealthyHostCount", "TargetGroup", "${data.aws_lb_target_group.tg.arn_suffix}", "LoadBalancer", "${data.aws_lb.lb.arn_suffix}",]]
+            view    = "timeSeries",
             region  = "eu-central-1",
             period  = 300,
             stat    = "Average",
             title   = "Healthy hosts count (Average)"
+            stacked = false
+            yAxis = {
+              "left" : {
+                "min" : 0,
+                "showUnits" : false,
+                "label" : "Percent"
+              }
+            },
           }
         },
         {
           type = "metric"
           properties = {
-            metrics = [["AWS/ApplicationELB", "UnHealthyHostCount", "TargetGroup", "${data.aws_lb.lb.arn_suffix}"]]
-            view    = "singleValue",
+            metrics = [["AWS/ApplicationELB", "UnHealthyHostCount", "TargetGroup", "${data.aws_lb_target_group.tg.arn_suffix}", "LoadBalancer", "${data.aws_lb.lb.arn_suffix}"]]
+            view    = "timeSeries",
             region  = "eu-central-1",
             period  = 300,
             stat    = "Average",
             title   = "UnHealthy hosts count (Average)"
+            stacked = false
+            yAxis = {
+              "left" : {
+                "min" : 0,
+                "showUnits" : false,
+                "label" : "Percent"
+              }
+            },
           }
         },
         {
@@ -68,6 +84,12 @@ resource "aws_cloudwatch_dashboard" "this" {
             stacked = false,
             region  = "eu-central-1",
             title   = "Total number of 5XX errors in ELB",
+            stat    = "Sum",
+            yAxis = {
+              "left" : {
+                "min" : 0,
+              }
+            }
           }
         },
         {
@@ -78,6 +100,12 @@ resource "aws_cloudwatch_dashboard" "this" {
             stacked = false,
             region  = "eu-central-1",
             title   = "Total number of 5XX errors in Target",
+            stat    = "Sum",
+            yAxis = {
+              "left" : {
+                "min" : 0,
+              }
+            }
           }
         },
         {
@@ -90,6 +118,11 @@ resource "aws_cloudwatch_dashboard" "this" {
             period  = 60,
             stat    = "Sum",
             title   = "Success requests per seconds in Target (2XXs)"
+            yAxis = {
+              "left" : {
+                "min" : 0,
+              }
+            }
           }
         },
         {
@@ -105,6 +138,11 @@ resource "aws_cloudwatch_dashboard" "this" {
             period    = 60,
             stat      = "Sum",
             title     = "Success requests per seconds LB (2XXs and 4XXs)"
+            yAxis = {
+              "left" : {
+                "min" : 0,
+              }
+            }
           }
         },
         {

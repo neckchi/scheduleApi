@@ -1,5 +1,5 @@
 module "tagging" {
-  source = "git::ssh://git@gitlab.tools.apim.eu-central-1.aws.int.kn/sea-schedule/terraform-modules//aws/tagging?ref=main"
+  source = "git::ssh://git@gitlab.tools.apim.eu-central-1.aws.int.kn/sea-schedule/terraform-modules//aws/tagging?ref=0.0.3"
   classification = {
     confidentiality = "medium"
     availability    = "medium"
@@ -38,7 +38,7 @@ module "tagging" {
 }
 
 module "security_group" {
-  source = "git::ssh://git@gitlab.tools.apim.eu-central-1.aws.int.kn/sea-schedule/terraform-modules//aws/security-group?ref=main"
+  source = "git::ssh://git@gitlab.tools.apim.eu-central-1.aws.int.kn/sea-schedule/terraform-modules//aws/security-group?ref=0.0.3"
   common = {
     vpc_id       = var.vpc_id
     subnet_ids   = var.subnet_ids
@@ -70,7 +70,7 @@ module "security_group" {
 }
 
 module "security_group_lb" {
-  source = "git::ssh://git@gitlab.tools.apim.eu-central-1.aws.int.kn/sea-schedule/terraform-modules//aws/security-group?ref=main"
+  source = "git::ssh://git@gitlab.tools.apim.eu-central-1.aws.int.kn/sea-schedule/terraform-modules//aws/security-group?ref=0.0.3"
   common = {
     vpc_id       = var.vpc_id
     subnet_ids   = var.subnet_ids
@@ -102,7 +102,7 @@ module "security_group_lb" {
 }
 
 module "alb" {
-  source = "git::ssh://git@gitlab.tools.apim.eu-central-1.aws.int.kn/sea-schedule/terraform-modules//aws/lb?ref=main"
+  source = "git::ssh://git@gitlab.tools.apim.eu-central-1.aws.int.kn/sea-schedule/terraform-modules//aws/lb?ref=0.0.3"
   lb = {
     name                       = "${local.alb_name}"
     internal                   = true
@@ -119,7 +119,7 @@ module "alb" {
 }
 
 module "lb_target_group" {
-  source = "git::ssh://git@gitlab.tools.apim.eu-central-1.aws.int.kn/sea-schedule/terraform-modules//aws/lb-target-group?ref=main"
+  source = "git::ssh://git@gitlab.tools.apim.eu-central-1.aws.int.kn/sea-schedule/terraform-modules//aws/lb-target-group?ref=0.0.3"
   lb_target_group = {
     name                  = "${local.project_name_abreb}-lbtg"
     protocol              = "HTTP"
@@ -132,7 +132,7 @@ module "lb_target_group" {
 }
 
 module "lb_listener" {
-  source = "git::ssh://git@gitlab.tools.apim.eu-central-1.aws.int.kn/sea-schedule/terraform-modules//aws/lb-listener?ref=main"
+  source = "git::ssh://git@gitlab.tools.apim.eu-central-1.aws.int.kn/sea-schedule/terraform-modules//aws/lb-listener?ref=0.0.3"
   lb_listener = {
     load_balancer_arn = module.alb.lb_arn
     target_group_arn  = module.lb_target_group.lb_target_group_arn
@@ -143,7 +143,7 @@ module "lb_listener" {
 }
 
 module "ecs_cluster" {
-  source = "git::ssh://git@gitlab.tools.apim.eu-central-1.aws.int.kn/sea-schedule/terraform-modules//aws/ecs-cluster?ref=main"
+  source = "git::ssh://git@gitlab.tools.apim.eu-central-1.aws.int.kn/sea-schedule/terraform-modules//aws/ecs-cluster?ref=0.0.3"
   ecs_cluster = {
     name               = "${local.project_name}-cluster"
     container_insights = true
@@ -151,7 +151,7 @@ module "ecs_cluster" {
 }
 
 module "ecs_service_task" {
-  source = "git::ssh://git@gitlab.tools.apim.eu-central-1.aws.int.kn/sea-schedule/terraform-modules//aws/ecs-service?ref=main"
+  source = "git::ssh://git@gitlab.tools.apim.eu-central-1.aws.int.kn/sea-schedule/terraform-modules//aws/ecs-service?ref=0.0.3"
   # Required variables
   ecs_service = {
     name                           = "${local.project_name}-service"
