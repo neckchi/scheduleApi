@@ -8,11 +8,12 @@
 
 .before_script_plublish: &before_script_plublish
   - apk update && apk add --update --no-cache --force-overwrite gc-dev pcre-dev libevent-dev git curl
-  - curl -LO https://github.com/codacy/git-version/releases/download/2.8.0/git-version 
+  - curl -LO https://github.com/codacy/git-version/releases/download/2.8.0/git-version
   - mv git-version /usr/bin
   - chmod +x /usr/bin/git-version
   - curl --location --output /usr/local/bin/release-cli "https://gitlab.com/api/v4/projects/gitlab-org%2Frelease-cli/packages/generic/release-cli/latest/release-cli-linux-amd64"
   - chmod +x /usr/local/bin/release-cli
+  - git fetch --all
   - git checkout $CI_COMMIT_BRANCH
 
 .terraform_image: &terraform_image
@@ -43,6 +44,8 @@ stages:
   - Test
   - GetRC
   - PublishRC
+  - PlanSandbox
+  - ApplySandbox
   - PlanDev
   - ApplyDev
   - PlanUat
@@ -57,18 +60,20 @@ stages:
 Flake8:
   stage: Checks
   image: python:3.9
-  allow_failure: true
   script:
     - python --version
     - pip install flake8
     - flake8 app/
+  rules:
+    - when: always
 
 YamlLint:
   stage: Checks
   image: registry.gitlab.com/pipeline-components/yamllint:latest
-  allow_failure: true
   script:
     - yamllint .
+  rules:
+    - when: always
 
 ## Tests
 Testing:
@@ -86,19 +91,16 @@ Testing:
   artifacts:
     paths:
       - coverage.xml
-  allow_failure: true
+  rules:
+    - when: always
 
 GetRC:
   stage: GetRC
   image: alpine
-  rules:
-    - if: $CI_COMMIT_TAG
-      when: never
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   before_script:
     *before_script_plublish
   tags:
-    - dev
+    - sandbox
   script:
     - export TAG_VERSION_RC=$(git-version -b $CI_COMMIT_BRANCH -r snapshot --minor-identifier "\"/(feat|feature)/\"" --major-identifier "\"/(break|breaking)/\"")
     - echo "ReleaseRC=$TAG_VERSION_RC" >> release.env
@@ -107,6 +109,12 @@ GetRC:
   artifacts:
     reports:
       dotenv: release.env
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "sandbox" || $CI_COMMIT_BRANCH =~ /^feature\/.*$/'
+      when: always
+    - when: never
 
 ## Pulish Release Candidate
 PublishRC:
@@ -114,12 +122,8 @@ PublishRC:
   image:
     name: gcr.io/kaniko-project/executor:v1.14.0-debug
     entrypoint: [""]
-  rules:
-    - if: $CI_COMMIT_TAG
-      when: never
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   tags:
-    - dev
+    - sandbox
   script:
     - echo $ReleaseRC
     - /kaniko/executor
@@ -136,23 +140,80 @@ PublishRC:
   artifacts:
     reports:
       dotenv: release.env
+  needs:
+    - GetRC
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "sandbox" || $CI_COMMIT_BRANCH =~ /^feature\/.*$/'
+      when: always
+    - when: never
 
 ## Terraform
 Validate:
   stage: Checks
-  rules:
-    - if: $CI_COMMIT_TAG
-      when: never
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   image:
     *terraform_image
   tags:
-    - dev
+    - sandbox
   before_script:
     *before_script_terraform
   script:
-    - terraform -chdir=cicd init -backend-config=environments/dev/backend.conf
+    - terraform -chdir=cicd init -backend-config=environments/sandbox/backend.conf
     - terraform validate
+  rules:
+    - when: always
+
+##Sandbox
+PlanSandbox:
+  stage: PlanSandbox
+  image:
+    *terraform_image
+  tags:
+    - sandbox
+  before_script:
+    *before_script_terraform
+  script:
+    - echo $ReleaseRC
+    - terraform -chdir=cicd init -backend-config=environments/sandbox/backend.conf
+    - terraform -chdir=cicd plan -var-file=environments/sandbox/sandbox.tfvars -var="image_tag=$ReleaseRC"
+    - echo "ReleaseRC=$ReleaseRC" >> release.env
+  artifacts:
+    reports:
+      dotenv: release.env
+  needs:
+    - PublishRC
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "sandbox" || $CI_COMMIT_BRANCH =~ /^feature\/.*$/'
+      when: always
+    - when: never
+
+ApplySandbox:
+  stage: ApplySandbox
+  image:
+    *terraform_image
+  tags:
+    - sandbox
+  before_script:
+    *before_script_terraform
+  script:
+    - echo $ReleaseRC
+    - terraform -chdir=cicd init -backend-config=environments/sandbox/backend.conf
+    - terraform -chdir=cicd apply -var-file=environments/sandbox/sandbox.tfvars -var="image_tag=$ReleaseRC" -auto-approve
+    - echo "ReleaseRC=$ReleaseRC" >> release.env
+  artifacts:
+    reports:
+      dotenv: release.env
+  needs:
+    - PlanSandbox
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "sandbox" || $CI_COMMIT_BRANCH =~ /^feature\/.*$/'
+      when: always
+    - when: never
 
 ## DEV
 PlanDev:
@@ -171,19 +232,21 @@ PlanDev:
   artifacts:
     reports:
       dotenv: release.env
+  needs:
+    - ApplySandbox
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_COMMIT_BRANCH == "dev"
+      when: always
+    - when: never
 
 ApplyDev:
   stage: ApplyDev
   image:
     *terraform_image
-  rules:
-    - if: $CI_COMMIT_TAG
-      when: never
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   tags:
     - dev
-  needs:
-    - PlanDev
   before_script:
     *before_script_terraform
   script:
@@ -194,6 +257,14 @@ ApplyDev:
   artifacts:
     reports:
       dotenv: release.env
+  needs:
+    - PlanDev
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_COMMIT_BRANCH == "dev"
+      when: always
+    - when: never
   allow_failure: false
 
 ## UAT
@@ -201,14 +272,8 @@ PlanUat:
   stage: PlanUat
   image:
     *terraform_image
-  rules:
-    - if: $CI_COMMIT_TAG
-      when: never
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   tags:
     - uat
-  needs:
-    - ApplyDev
   before_script:
     *before_script_terraform
   script:
@@ -218,20 +283,21 @@ PlanUat:
   artifacts:
     reports:
       dotenv: release.env
+  needs:
+    - ApplyDev
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_COMMIT_BRANCH == "uat"
+      when: always
+    - when: never
 
 ApplyUat:
   stage: ApplyUat
   image:
     *terraform_image
-  rules:
-    - if: $CI_COMMIT_TAG
-      when: never
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   tags:
     - uat
-  needs:
-    - PlanUat
-  when: manual
   before_script:
     *before_script_terraform
   script:
@@ -239,6 +305,15 @@ ApplyUat:
     - terraform -chdir=cicd init -backend-config=environments/uat/backend.conf
     - terraform -chdir=cicd apply -var-file=environments/uat/uat.tfvars -var="image_tag=$ReleaseRC" -auto-approve
   allow_failure: true
+  needs:
+    - PlanUat
+  when: manual
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_COMMIT_BRANCH == "uat"
+      when: always
+    - when: never
 
 #DestroyDev:
 #  stage: DestroyDev_Manual
@@ -259,16 +334,10 @@ ApplyUat:
 GetRelease:
   stage: GetRelease
   image: alpine
-  rules:
-    - if: $CI_COMMIT_TAG
-      when: never
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   before_script:
     *before_script_plublish
-  needs:
-    - ApplyUat
   tags:
-    - dev
+    - production
   script:
     - export TAG_VERSION=$(git-version -b $CI_COMMIT_BRANCH --minor-identifier "\"/(feat|feature)/\"" --major-identifier "\"/(break|breaking)/\"")
     - echo "Release=$TAG_VERSION" >> release.env
@@ -277,6 +346,14 @@ GetRelease:
   artifacts:
     reports:
       dotenv: release.env
+  needs:
+    - ApplyUat
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_COMMIT_BRANCH == "master"
+      when: always
+    - when: never
 
 ## Pulish Release Candidate
 PublishRelease:
@@ -284,14 +361,8 @@ PublishRelease:
   image:
     name: gcr.io/kaniko-project/executor:v1.14.0-debug
     entrypoint: [""]
-  rules:
-    - if: $CI_COMMIT_TAG
-      when: never
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-  needs:
-    - GetRelease
   tags:
-    - dev
+    - production
   script:
     - echo $Release
     - /kaniko/executor
@@ -308,20 +379,22 @@ PublishRelease:
   artifacts:
     reports:
       dotenv: release.env
+  needs:
+    - GetRelease
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_COMMIT_BRANCH == "master"
+      when: always
+    - when: never
 
 ## PRD
 PlanPRD:
   stage: PlanPRD
   image:
     *terraform_image
-  rules:
-    - if: $CI_COMMIT_TAG
-      when: never
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   tags:
     - production
-  needs:
-    - PublishRelease
   before_script:
     *before_script_terraform
   script:
@@ -331,23 +404,33 @@ PlanPRD:
   artifacts:
     reports:
       dotenv: release.env
+  needs:
+    - PublishRelease
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_COMMIT_BRANCH == "master"
+      when: always
+    - when: never
 
 ApplyPRD:
   stage: ApplyPRD
   image:
     *terraform_image
-  rules:
-    - if: $CI_COMMIT_TAG
-      when: never
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-  needs:
-    - PlanPRD
   tags:
     - production
-  when: manual
   before_script:
     *before_script_terraform
   script:
     - echo $Release
     - terraform -chdir=cicd init -backend-config=environments/prod/backend.conf
     - terraform -chdir=cicd apply -var-file=environments/prod/prod.tfvars -var="image_tag=$Release" --auto-approve
+  needs:
+    - PlanPRD
+  when: manual
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_COMMIT_BRANCH == "master"
+      when: always
+    - when: never
