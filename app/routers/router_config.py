@@ -258,11 +258,11 @@ class AsyncTaskManager():
                 return await asyncio.wait_for(coro(), timeout=self.default_timeout)
             except (asyncio.TimeoutError,asyncio.CancelledError,aiohttp.ClientConnectionError,aiohttp.ServerConnectionError):
                 """Due to timeout, the coroutine task is cancelled. Once its cancelled, we retry it"""
-                logging.error(f"{task_name} timed out after {self.default_timeout} seconds. Retrying {retries + 1}/{self.max_retries}...")
+                logging.warning(f"{task_name} timed out after {self.default_timeout} seconds. Retrying {retries + 1}/{self.max_retries}...")
                 retries += 1
                 adjusted_timeout += 2
                 await asyncio.sleep(1)  # Wait for 1 sec before the next retry
-        logging.error(f"{task_name} reached maximum retries. the schedule  wont be cached anything")
+        logging.error(f"{task_name} reached maximum retries. Nothing will be cached.")
         self.error = True
         return None
 
