@@ -41,7 +41,7 @@ class Transportation(BaseModel):
     transportType: TRANSPORT_TYPE
     transportName: Optional[Any] = None
     referenceType: Optional[str] = None
-    reference: Optional[Union[str, list]] = None
+    reference: Optional[Union[str, int]] = None
 
     @model_validator(mode = 'after')
     def check_reference_type_or_reference(self) -> 'Transportation':
