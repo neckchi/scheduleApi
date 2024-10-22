@@ -56,9 +56,9 @@ async def get_schedules(background_tasks: BackgroundTasks,
                                         pod=point_to,
                                         departure_date=start_date.strftime('%Y-%m-%d') if start_date_type == StartDateType.departure else None,
                                         arrival_date=start_date.strftime('%Y-%m-%d') if start_date_type == StartDateType.arrival else None,
-                                        search_range=search_range.duration, direct_only=direct_only,vessel_imo = vessel_imo,
-                                        tsp=tsp,
-                                        service=service, pw=settings.cma_token.get_secret_value()))
+                                        search_range=search_range.duration, direct_only=direct_only,
+                                        vessel_imo=vessel_imo,service=service,
+                                        tsp=tsp, pw=settings.cma_token.get_secret_value()))
 
                 if carrier_status['data']['activeCarriers']['one'] and (carriers == 'ONEY' or carriers is None):
                     task_group.create_task(name='ONE_task',coro=lambda :one.get_one_p2p(client=client,background_task = background_tasks, url=settings.oney_url, turl=settings.oney_turl,

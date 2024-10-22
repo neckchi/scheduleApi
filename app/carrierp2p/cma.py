@@ -45,7 +45,7 @@ def process_leg_data(leg_task:list)->list:
                                          vgmCutoffDate = deepget(leg['pointFrom']['cutOff'], 'vgm', 'local')) if leg['pointFrom'].get('cutOff') else None) for leg in leg_task]
     return leg_list
 
-def process_schedule_data(task: dict,direct_only:bool |None,) -> Iterator:
+def process_schedule_data(task: dict,direct_only:bool |None,service_filter:str|None,vessel_imo_filter:str|None) -> Iterator:
     """Map the schedule and leg body"""
     transit_time:int = task['transitTime']
     first_point_from:str = task['routingDetails'][0]['pointFrom']['location'].get('internalCode') or task['routingDetails'][0]['pointFrom']['location']['locationCodifications'][0]['codification']
@@ -53,7 +53,12 @@ def process_schedule_data(task: dict,direct_only:bool |None,) -> Iterator:
     first_etd = next((ed['pointFrom']['departureDateLocal'] for ed in task['routingDetails'] if ed['pointFrom'].get('departureDateLocal')), DEFAULT_ETD_ETA)
     last_eta = next((ea['pointTo']['arrivalDateLocal'] for ea in task['routingDetails'][::-1] if ea['pointTo'].get('arrivalDateLocal')), DEFAULT_ETD_ETA)
     check_transshipment:bool = len(task['routingDetails']) > 1
-    if (direct_only is None or direct_only != check_transshipment):
+    check_service_code: bool = any(leg for leg in task['routingDetails'] if
+                                   deepget(leg['transportation'], 'voyage', 'service',
+                                           'code') == service_filter) if service_filter else True
+    check_vessel_imo: bool = any(leg for leg in task['routingDetails'] if deepget(leg['transportation'], 'vehicule',
+                                                                                  'reference') == vessel_imo_filter) if vessel_imo_filter else True
+    if (direct_only is None or direct_only != check_transshipment) and check_vessel_imo and check_service_code:
         schedule_body= Schedule.model_construct(scac = CMA_GROUP.get(task['shippingCompany']), pointFrom = first_point_from,pointTo = last_point_to,
                                                        etd = first_etd,eta = last_eta,
                                                        transitTime = transit_time,transshipment = check_transshipment,legs = process_leg_data(leg_task=task['routingDetails']))
@@ -89,17 +94,17 @@ async def fetch_initial_schedules(client: HTTPClientWrapper, cma_list: list, url
                 all_schedule.extend(await fetch_additional_schedules(client, url, headers, params, awaited_response))
     return all_schedule
 
-async def get_cma_p2p(client:HTTPClientWrapper,url: str, pw: str, pol: str, pod: str, search_range: int, direct_only: bool | None,tsp: str | None = None,vessel_imo:str | None = None,
-                          departure_date: datetime.date = None,arrival_date: datetime.date = None, scac: str | None = None, service: str | None = None) -> Generator:
+async def get_cma_p2p(client:HTTPClientWrapper,url: str, pw: str, pol: str, pod: str, search_range: int, direct_only: bool | None,tsp: str | None = None,
+                          vessel_imo:str | None = None,service: str | None = None,departure_date: datetime.date = None,arrival_date: datetime.date = None, scac: str | None = None) -> Generator:
     api_carrier_code: str = next(k for k, v in CMA_GROUP.items() if v == scac.upper()) if scac else None
     headers: dict = {'keyID': pw}
-    carrier_params: dict = {'placeOfLoading': pol, 'placeOfDischarge': pod,'departureDate': departure_date,'searchRange': search_range, 'arrivalDate': arrival_date, 'polVesselIMO':vessel_imo,'polServiceCode': service, 'tsPortCode': tsp}
+    carrier_params: dict = {'placeOfLoading': pol, 'placeOfDischarge': pod,'departureDate': departure_date,'searchRange': search_range, 'arrivalDate': arrival_date, 'tsPortCode': tsp}
     params:dict = {k: v for k, v in carrier_params.items() if v is not None} # Remove the key if its value is None
     extra_condition: bool = pol.startswith('US') and pod.startswith('US')
     cma_list:list = [None, '0015'] if api_carrier_code is None else [api_carrier_code]
     response_json = await fetch_initial_schedules(client=client,url=url,headers=headers,params=params,cma_list=cma_list,extra_condition=extra_condition)
     if response_json:
-        p2p_schedule: Generator = (schedule_result for task in  response_json for schedule_result in process_schedule_data(task=task,direct_only=direct_only))
+        p2p_schedule: Generator = (schedule_result for task in  response_json for schedule_result in process_schedule_data(task=task,direct_only=direct_only,service_filter=service,vessel_imo_filter=vessel_imo))
         return p2p_schedule
 
 
