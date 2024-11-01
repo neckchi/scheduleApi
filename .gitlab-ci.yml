@@ -1,3 +1,4 @@
+# Global Definitions
 .before_script_terraform: &before_script_terraform
   - 'which ssh-agent || ( apt-get update -y && apt-get install openssh-client -y )'
   - eval $(ssh-agent -s)
@@ -5,16 +6,6 @@
   - mkdir -p ~/.ssh
   - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
   - terraform --version
-
-.before_script_plublish: &before_script_plublish
-  - apk update && apk add --update --no-cache --force-overwrite gc-dev pcre-dev libevent-dev git curl
-  - curl -LO https://github.com/codacy/git-version/releases/download/2.8.0/git-version
-  - mv git-version /usr/bin
-  - chmod +x /usr/bin/git-version
-  - curl --location --output /usr/local/bin/release-cli "https://gitlab.com/api/v4/projects/gitlab-org%2Frelease-cli/packages/generic/release-cli/latest/release-cli-linux-amd64"
-  - chmod +x /usr/local/bin/release-cli
-  - git fetch --all
-  - git checkout $CI_COMMIT_BRANCH
 
 .terraform_image: &terraform_image
   name: hashicorp/terraform:1.9.3
@@ -31,6 +22,7 @@ variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   POETRY_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pypoetry"
   POETRY_VIRTUALENVS_IN_PROJECT: "true"
+  IMAGE_TAG: $CI_COMMIT_SHORT_SHA
 
 cache:
   paths:
@@ -40,25 +32,16 @@ cache:
     - .venv
 
 stages:
-  - Checks
-  - Test
-  - GetRC
-  - PublishRC
-  - PlanSandbox
-  - ApplySandbox
-  - PlanDev
-  - ApplyDev
-  - PlanUat
-  - ApplyUat
-  - GetRelease
-  - PublishRelease
-  - PlanPRD
-  - ApplyPRD
+  - checks
+  - test
+  - build
+  - deploy
 
-# Stages Defenition
-## Lint
-Flake8:
-  stage: Checks
+# Jobs Definition
+
+# Checks Stage
+flake8:
+  stage: checks
   image: python:3.9
   script:
     - python --version
@@ -67,17 +50,28 @@ Flake8:
   rules:
     - when: always
 
-YamlLint:
-  stage: Checks
+yamllint:
+  stage: checks
   image: registry.gitlab.com/pipeline-components/yamllint:latest
   script:
     - yamllint .
   rules:
     - when: always
 
-## Tests
-Testing:
-  stage: Test
+validate:
+  stage: checks
+  image: *terraform_image
+  before_script:
+    *before_script_terraform
+  script:
+    - terraform -chdir=cicd init -backend-config=environments/${CI_COMMIT_BRANCH}/backend.conf
+    - terraform validate
+  rules:
+    - when: always
+
+# Test Stage
+testing:
+  stage: test
   image:
     name: python:3.8-slim
   before_script:
@@ -94,343 +88,101 @@ Testing:
   rules:
     - when: always
 
-GetRC:
-  stage: GetRC
-  image: alpine
-  before_script:
-    *before_script_plublish
-  tags:
-    - sandbox
-  script:
-    - export TAG_VERSION_RC=$(git-version -b $CI_COMMIT_BRANCH -r snapshot --minor-identifier "\"/(feat|feature)/\"" --major-identifier "\"/(break|breaking)/\"")
-    - echo "ReleaseRC=$TAG_VERSION_RC" >> release.env
-    - cat release.env
-    - release-cli create --name "Release $CI_COMMIT_MESSAGE" --description "Created by user $CI_COMMIT_AUTHOR" --tag-name "$TAG_VERSION_RC"
-  artifacts:
-    reports:
-      dotenv: release.env
-  rules:
-    - if: $CI_COMMIT_TAG
-      when: never
-    - if: '$CI_COMMIT_BRANCH == "sandbox" || $CI_COMMIT_BRANCH =~ /^feature\/.*$/'
-      when: always
-    - when: never
-
-## Pulish Release Candidate
-PublishRC:
-  stage: PublishRC
+# Build Stage
+build_image:
+  stage: build
   image:
-    name: gcr.io/kaniko-project/executor:v1.14.0-debug
-    entrypoint: [""]
-  tags:
-    - sandbox
+    name: docker:latest
+  services:
+    - docker:dind
+  variables:
+    DOCKER_DRIVER: overlay2
   script:
-    - echo $ReleaseRC
-    - /kaniko/executor
-      --context .
-      --build-arg HTTP_PROXY=$HTTP_PROXY
-      --build-arg HTTPS_PROXY=$HTTP_PROXY
-      --build-arg http_proxy=$HTTP_PROXY
-      --build-arg https_proxy=$HTTP_PROXY
-      --build-arg no_proxy=$NO_PROXY
-      --build-arg NO_PROXY=$NO_PROXY
-      --dockerfile Dockerfile
-      --destination $REPO_URL/$PROJECT_NAME:$ReleaseRC
-    - echo "ReleaseRC=$ReleaseRC" >> release.env
-  artifacts:
-    reports:
-      dotenv: release.env
-  needs:
-    - GetRC
-  rules:
-    - if: $CI_COMMIT_TAG
-      when: never
-    - if: '$CI_COMMIT_BRANCH == "sandbox" || $CI_COMMIT_BRANCH =~ /^feature\/.*$/'
-      when: always
-    - when: never
-
-## Terraform
-Validate:
-  stage: Checks
-  image:
-    *terraform_image
-  tags:
-    - sandbox
-  before_script:
-    *before_script_terraform
-  script:
-    - terraform -chdir=cicd init -backend-config=environments/sandbox/backend.conf
-    - terraform validate
+    - echo "Building Docker image"
+    - docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD" $REPO_URL
+    - docker build -t $REPO_URL/$PROJECT_NAME:$IMAGE_TAG .
+    - docker push $REPO_URL/$PROJECT_NAME:$IMAGE_TAG
   rules:
     - when: always
 
-##Sandbox
-PlanSandbox:
-  stage: PlanSandbox
-  image:
-    *terraform_image
+# Deploy Stage for Each Environment
+
+# Sandbox Environment
+deploy_sandbox:
+  stage: deploy
+  image: *terraform_image
+  before_script:
+    *before_script_terraform
+  script:
+    - echo "Deploying to Sandbox environment"
+    - terraform -chdir=cicd init -backend-config=environments/sandbox/backend.conf
+    - terraform -chdir=cicd plan -var-file=environments/sandbox/sandbox.tfvars -var="image_tag=$IMAGE_TAG" -out=tfplan
+    - terraform -chdir=cicd apply "tfplan"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "sandbox"'
+      when: always
+    - when: never
+  needs:
+    - build_image
   tags:
     - sandbox
+
+# Development Environment
+deploy_dev:
+  stage: deploy
+  image: *terraform_image
   before_script:
     *before_script_terraform
   script:
-    - echo $ReleaseRC
-    - terraform -chdir=cicd init -backend-config=environments/sandbox/backend.conf
-    - terraform -chdir=cicd plan -var-file=environments/sandbox/sandbox.tfvars -var="image_tag=$ReleaseRC"
-    - echo "ReleaseRC=$ReleaseRC" >> release.env
-  artifacts:
-    reports:
-      dotenv: release.env
-  needs:
-    - PublishRC
+    - echo "Deploying to Development environment"
+    - terraform -chdir=cicd init -backend-config=environments/dev/backend.conf
+    - terraform -chdir=cicd plan -var-file=environments/dev/dev.tfvars -var="image_tag=$IMAGE_TAG" -out=tfplan
+    - terraform -chdir=cicd apply "tfplan"
   rules:
-    - if: $CI_COMMIT_TAG
-      when: never
-    - if: '$CI_COMMIT_BRANCH == "sandbox" || $CI_COMMIT_BRANCH =~ /^feature\/.*$/'
+    - if: '$CI_COMMIT_BRANCH == "dev"'
       when: always
     - when: never
-
-ApplySandbox:
-  stage: ApplySandbox
-  image:
-    *terraform_image
-  tags:
-    - sandbox
-  before_script:
-    *before_script_terraform
-  script:
-    - echo $ReleaseRC
-    - terraform -chdir=cicd init -backend-config=environments/sandbox/backend.conf
-    - terraform -chdir=cicd apply -var-file=environments/sandbox/sandbox.tfvars -var="image_tag=$ReleaseRC" -auto-approve
-    - echo "ReleaseRC=$ReleaseRC" >> release.env
-  artifacts:
-    reports:
-      dotenv: release.env
   needs:
-    - PlanSandbox
-  rules:
-    - if: $CI_COMMIT_TAG
-      when: never
-    - if: '$CI_COMMIT_BRANCH == "sandbox" || $CI_COMMIT_BRANCH =~ /^feature\/.*$/'
-      when: always
-    - when: never
-
-## DEV
-PlanDev:
-  stage: PlanDev
-  image:
-    *terraform_image
+    - build_image
   tags:
     - dev
+
+# UAT Environment
+deploy_uat:
+  stage: deploy
+  image: *terraform_image
   before_script:
     *before_script_terraform
   script:
-    - echo $ReleaseRC
-    - terraform -chdir=cicd init -backend-config=environments/dev/backend.conf
-    - terraform -chdir=cicd plan -var-file=environments/dev/sandbox.tfvars -var="image_tag=$ReleaseRC"
-    - echo "ReleaseRC=$ReleaseRC" >> release.env
-  artifacts:
-    reports:
-      dotenv: release.env
-  needs:
-    - ApplySandbox
+    - echo "Deploying to UAT environment"
+    - terraform -chdir=cicd init -backend-config=environments/uat/backend.conf
+    - terraform -chdir=cicd plan -var-file=environments/uat/uat.tfvars -var="image_tag=$IMAGE_TAG" -out=tfplan
+    - terraform -chdir=cicd apply "tfplan"
   rules:
-    - if: $CI_COMMIT_TAG
-      when: never
-    - if: $CI_COMMIT_BRANCH == "dev"
+    - if: '$CI_COMMIT_BRANCH == "uat"'
       when: always
     - when: never
-
-ApplyDev:
-  stage: ApplyDev
-  image:
-    *terraform_image
-  tags:
-    - dev
-  before_script:
-    *before_script_terraform
-  script:
-    - echo $ReleaseRC
-    - terraform -chdir=cicd init -backend-config=environments/dev/backend.conf
-    - terraform -chdir=cicd apply -var-file=environments/dev/sandbox.tfvars -var="image_tag=$ReleaseRC" -auto-approve
-    - echo "ReleaseRC=$ReleaseRC" >> release.env
-  artifacts:
-    reports:
-      dotenv: release.env
   needs:
-    - PlanDev
-  rules:
-    - if: $CI_COMMIT_TAG
-      when: never
-    - if: $CI_COMMIT_BRANCH == "dev"
-      when: always
-    - when: never
-  allow_failure: false
-
-## UAT
-PlanUat:
-  stage: PlanUat
-  image:
-    *terraform_image
+    - build_image
   tags:
     - uat
+
+# Production Environment
+deploy_production:
+  stage: deploy
+  image: *terraform_image
   before_script:
     *before_script_terraform
   script:
-    - terraform -chdir=cicd init -backend-config=environments/uat/backend.conf
-    - terraform -chdir=cicd plan -var-file=environments/uat/uat.tfvars -var="image_tag=$ReleaseRC"
-    - echo "ReleaseRC=$ReleaseRC" >> release.env
-  artifacts:
-    reports:
-      dotenv: release.env
-  needs:
-    - ApplyDev
-  rules:
-    - if: $CI_COMMIT_TAG
-      when: never
-    - if: $CI_COMMIT_BRANCH == "uat"
-      when: always
-    - when: never
-
-ApplyUat:
-  stage: ApplyUat
-  image:
-    *terraform_image
-  tags:
-    - uat
-  before_script:
-    *before_script_terraform
-  script:
-    - echo $ReleaseRC
-    - terraform -chdir=cicd init -backend-config=environments/uat/backend.conf
-    - terraform -chdir=cicd apply -var-file=environments/uat/uat.tfvars -var="image_tag=$ReleaseRC" -auto-approve
-  allow_failure: true
-  needs:
-    - PlanUat
-  when: manual
-  rules:
-    - if: $CI_COMMIT_TAG
-      when: never
-    - if: $CI_COMMIT_BRANCH == "uat"
-      when: always
-    - when: never
-
-#DestroyDev:
-#  stage: DestroyDev_Manual
-#  image:
-#    *terraform_image
-#  rules:
-#    - if: $CI_COMMIT_TAG
-#      when: never
-#    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-#  tags:
-#    - dev
-#  when: manual
-#  before_script:
-#    *before_script_terraform
-#  script:
-#    - terraform -chdir=cicd destroy -var-file=environments/dev/sandbox.tfvars -var="image_tag=$ReleaseRC" -auto-approve
-
-GetRelease:
-  stage: GetRelease
-  image: alpine
-  before_script:
-    *before_script_plublish
-  tags:
-    - production
-  script:
-    - export TAG_VERSION=$(git-version -b $CI_COMMIT_BRANCH --minor-identifier "\"/(feat|feature)/\"" --major-identifier "\"/(break|breaking)/\"")
-    - echo "Release=$TAG_VERSION" >> release.env
-    - cat release.env
-    - release-cli create --name "Release $CI_COMMIT_MESSAGE" --description "Created by user $CI_COMMIT_AUTHOR" --tag-name "$TAG_VERSION"
-  artifacts:
-    reports:
-      dotenv: release.env
-  needs:
-    - ApplyUat
-  rules:
-    - if: $CI_COMMIT_TAG
-      when: never
-    - if: $CI_COMMIT_BRANCH == "master"
-      when: always
-    - when: never
-
-## Pulish Release Candidate
-PublishRelease:
-  stage: PublishRelease
-  image:
-    name: gcr.io/kaniko-project/executor:v1.14.0-debug
-    entrypoint: [""]
-  tags:
-    - production
-  script:
-    - echo $Release
-    - /kaniko/executor
-      --context .
-      --build-arg HTTP_PROXY=$HTTP_PROXY
-      --build-arg HTTPS_PROXY=$HTTP_PROXY
-      --build-arg http_proxy=$HTTP_PROXY
-      --build-arg https_proxy=$HTTP_PROXY
-      --build-arg no_proxy=$NO_PROXY
-      --build-arg NO_PROXY=$NO_PROXY
-      --dockerfile Dockerfile
-      --destination $REPO_URL/$PROJECT_NAME:$Release
-    - echo "Release=$Release" >> release.env
-  artifacts:
-    reports:
-      dotenv: release.env
-  needs:
-    - GetRelease
-  rules:
-    - if: $CI_COMMIT_TAG
-      when: never
-    - if: $CI_COMMIT_BRANCH == "master"
-      when: always
-    - when: never
-
-## PRD
-PlanPRD:
-  stage: PlanPRD
-  image:
-    *terraform_image
-  tags:
-    - production
-  before_script:
-    *before_script_terraform
-  script:
+    - echo "Deploying to Production environment"
     - terraform -chdir=cicd init -backend-config=environments/prod/backend.conf
-    - terraform -chdir=cicd plan -var-file=environments/prod/prod.tfvars -var="image_tag=$Release"
-    - echo "Release=$Release" >> release.env
-  artifacts:
-    reports:
-      dotenv: release.env
-  needs:
-    - PublishRelease
+    - terraform -chdir=cicd plan -var-file=environments/prod/prod.tfvars -var="image_tag=$IMAGE_TAG" -out=tfplan
+    - terraform -chdir=cicd apply "tfplan"
   rules:
-    - if: $CI_COMMIT_TAG
-      when: never
-    - if: $CI_COMMIT_BRANCH == "master"
-      when: always
+    - if: '$CI_COMMIT_BRANCH == "master"'
+      when: manual
     - when: never
-
-ApplyPRD:
-  stage: ApplyPRD
-  image:
-    *terraform_image
+  needs:
+    - build_image
   tags:
     - production
-  before_script:
-    *before_script_terraform
-  script:
-    - echo $Release
-    - terraform -chdir=cicd init -backend-config=environments/prod/backend.conf
-    - terraform -chdir=cicd apply -var-file=environments/prod/prod.tfvars -var="image_tag=$Release" --auto-approve
-  needs:
-    - PlanPRD
-  when: manual
-  rules:
-    - if: $CI_COMMIT_TAG
-      when: never
-    - if: $CI_COMMIT_BRANCH == "master"
-      when: always
-    - when: never
