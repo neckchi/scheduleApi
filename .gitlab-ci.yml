@@ -227,7 +227,7 @@ PlanDev:
   script:
     - echo $ReleaseRC
     - terraform -chdir=cicd init -backend-config=environments/dev/backend.conf
-    - terraform -chdir=cicd plan -var-file=environments/dev/dev.tfvars -var="image_tag=$ReleaseRC"
+    - terraform -chdir=cicd plan -var-file=environments/dev/sandbox.tfvars -var="image_tag=$ReleaseRC"
     - echo "ReleaseRC=$ReleaseRC" >> release.env
   artifacts:
     reports:
@@ -252,7 +252,7 @@ ApplyDev:
   script:
     - echo $ReleaseRC
     - terraform -chdir=cicd init -backend-config=environments/dev/backend.conf
-    - terraform -chdir=cicd apply -var-file=environments/dev/dev.tfvars -var="image_tag=$ReleaseRC" -auto-approve
+    - terraform -chdir=cicd apply -var-file=environments/dev/sandbox.tfvars -var="image_tag=$ReleaseRC" -auto-approve
     - echo "ReleaseRC=$ReleaseRC" >> release.env
   artifacts:
     reports:
@@ -329,7 +329,7 @@ ApplyUat:
 #  before_script:
 #    *before_script_terraform
 #  script:
-#    - terraform -chdir=cicd destroy -var-file=environments/dev/dev.tfvars -var="image_tag=$ReleaseRC" -auto-approve
+#    - terraform -chdir=cicd destroy -var-file=environments/dev/sandbox.tfvars -var="image_tag=$ReleaseRC" -auto-approve
 
 GetRelease:
   stage: GetRelease
