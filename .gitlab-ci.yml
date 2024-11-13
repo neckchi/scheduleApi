@@ -92,6 +92,8 @@ validate:
   script:
     - terraform -chdir=cicd init -backend-config=environments/sandbox/backend.conf
     - terraform validate
+  tags:
+    - sandbox
 
 # Test Stage
 testing:
