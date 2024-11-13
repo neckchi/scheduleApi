@@ -219,6 +219,10 @@ plan_dev:
       - cicd/tfplan
   needs:
     - apply_sandbox
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   when: manual
   tags:
     - dev
@@ -236,6 +240,10 @@ apply_dev:
     - plan_dev
   needs:
     - plan_dev
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   when: manual
   tags:
     - dev
@@ -255,6 +263,10 @@ plan_uat:
       - cicd/tfplan
   needs:
     - apply_dev
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   when: manual
   tags:
     - uat
@@ -272,6 +284,10 @@ apply_uat:
     - plan_uat
   needs:
     - plan_uat
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   when: manual
   tags:
     - uat
@@ -366,10 +382,10 @@ apply_production:
     - plan_production
   needs:
     - plan_production
-  when: manual
   rules:
     - if: $CI_COMMIT_TAG
       when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  when: manual
   tags:
     - production
