@@ -31,7 +31,7 @@ variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   POETRY_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pypoetry"
   POETRY_VIRTUALENVS_IN_PROJECT: "true"
-  # Variables for test runs
+  #variables for test runs
   BASIC_PW: "mock"
   BASIC_USER: "mock"
   CMA_TOKEN: "mock"
@@ -167,7 +167,7 @@ get_rc:
     - export TAG_VERSION_RC=$(git-version -b $CI_COMMIT_BRANCH -r snapshot --minor-identifier "/(feat|feature)/" --major-identifier "/(break|breaking)/")
     - echo "ReleaseRC=$TAG_VERSION_RC" >> release.env
     - cat release.env
-    - release-cli create --name "ReleaseRC $CI_COMMIT_MESSAGE" --description "Created by $GITLAB_USER_LOGIN" --tag-name "$TAG_VERSION_RC"
+    - release-cli create --name "Release $CI_COMMIT_MESSAGE" --description "Created by $GITLAB_USER_LOGIN" --tag-name "$TAG_VERSION_RC"
   artifacts:
     reports:
       dotenv: release.env
@@ -185,20 +185,18 @@ publish_rc:
       when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   script:
-    # Use block scalar for multi-line script
-    - |
-      /kaniko/executor \
-        --context . \
-        --build-arg HTTP_PROXY=$HTTP_PROXY \
-        --build-arg HTTPS_PROXY=$HTTP_PROXY \
-        --build-arg http_proxy=$HTTP_PROXY \
-        --build-arg https_proxy=$HTTP_PROXY \
-        --build-arg no_proxy=$NO_PROXY \
-        --build-arg NO_PROXY=$NO_PROXY \
-        --dockerfile Dockerfile \
-        --destination $REPO_URL/$PROJECT_NAME:$ReleaseRC
-    # Create 'release.env' for downstream dotenv artifact
-    - echo "ReleaseRC=$ReleaseRC" > release.env
+    - source release.env
+    - /kaniko/executor
+      --context .
+      --build-arg HTTP_PROXY=$HTTP_PROXY
+      --build-arg HTTPS_PROXY=$HTTP_PROXY
+      --build-arg http_proxy=$HTTP_PROXY
+      --build-arg https_proxy=$HTTP_PROXY
+      --build-arg no_proxy=$NO_PROXY
+      --build-arg NO_PROXY=$NO_PROXY
+      --dockerfile Dockerfile
+      --destination $REPO_URL/$PROJECT_NAME:$ReleaseRC
+    - echo "ReleaseRC=$ReleaseRC" >> release.env
   artifacts:
     reports:
       dotenv: release.env
@@ -214,7 +212,7 @@ plan_sandbox:
   before_script:
     *before_script_terraform
   script:
-    # Directly use $ReleaseRC
+    - source release.env
     - terraform -chdir=cicd init -backend-config=environments/sandbox/backend.conf
     - terraform -chdir=cicd plan -var-file=environments/sandbox/sandbox.tfvars -var="image_tag=$ReleaseRC" -out=tfplan
   artifacts:
@@ -235,7 +233,7 @@ apply_sandbox:
   before_script:
     *before_script_terraform
   script:
-    # Directly use $ReleaseRC
+    - source release.env
     - terraform -chdir=cicd init -backend-config=environments/sandbox/backend.conf
     - terraform -chdir=cicd apply -input=false tfplan
   dependencies:
@@ -256,7 +254,7 @@ plan_dev:
   before_script:
     *before_script_terraform
   script:
-    # Directly use $ReleaseRC
+    - source release.env
     - terraform -chdir=cicd init -backend-config=environments/dev/backend.conf
     - terraform -chdir=cicd plan -var-file=environments/dev/dev.tfvars -var="image_tag=$ReleaseRC" -out=tfplan
   artifacts:
@@ -278,7 +276,7 @@ apply_dev:
   before_script:
     *before_script_terraform
   script:
-    # Directly use $ReleaseRC
+    - source release.env
     - terraform -chdir=cicd init -backend-config=environments/dev/backend.conf
     - terraform -chdir=cicd apply -input=false tfplan
   dependencies:
@@ -300,7 +298,7 @@ plan_uat:
   before_script:
     *before_script_terraform
   script:
-    # Directly use $ReleaseRC
+    - source release.env
     - terraform -chdir=cicd init -backend-config=environments/uat/backend.conf
     - terraform -chdir=cicd plan -var-file=environments/uat/uat.tfvars -var="image_tag=$ReleaseRC" -out=tfplan
   artifacts:
@@ -322,7 +320,7 @@ apply_uat:
   before_script:
     *before_script_terraform
   script:
-    # Directly use $ReleaseRC
+    - source release.env
     - terraform -chdir=cicd init -backend-config=environments/uat/backend.conf
     - terraform -chdir=cicd apply -input=false tfplan
   dependencies:
@@ -371,20 +369,18 @@ publish_release:
       when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   script:
-    # Use block scalar for multi-line script
-    - |
-      /kaniko/executor \
-        --context . \
-        --build-arg HTTP_PROXY=$HTTP_PROXY \
-        --build-arg HTTPS_PROXY=$HTTP_PROXY \
-        --build-arg http_proxy=$HTTP_PROXY \
-        --build-arg https_proxy=$HTTP_PROXY \
-        --build-arg no_proxy=$NO_PROXY \
-        --build-arg NO_PROXY=$NO_PROXY \
-        --dockerfile Dockerfile \
-        --destination $REPO_URL/$PROJECT_NAME:$Release
-    # Create 'release.env' for downstream dotenv artifact
-    - echo "Release=$Release" > release.env
+    - source release.env
+    - /kaniko/executor
+      --context .
+      --build-arg HTTP_PROXY=$HTTP_PROXY
+      --build-arg HTTPS_PROXY=$HTTP_PROXY
+      --build-arg http_proxy=$HTTP_PROXY
+      --build-arg https_proxy=$HTTP_PROXY
+      --build-arg no_proxy=$NO_PROXY
+      --build-arg NO_PROXY=$NO_PROXY
+      --dockerfile Dockerfile
+      --destination $REPO_URL/$PROJECT_NAME:$Release
+    - echo "Release=$Release" >> release.env
   artifacts:
     reports:
       dotenv: release.env
@@ -400,7 +396,7 @@ plan_production:
   before_script:
     *before_script_terraform
   script:
-    # Directly use $Release
+    - source release.env
     - terraform -chdir=cicd init -backend-config=environments/prod/backend.conf
     - terraform -chdir=cicd plan -var-file=environments/prod/prod.tfvars -var="image_tag=$Release" -out=tfplan
   artifacts:
@@ -422,7 +418,7 @@ apply_production:
   before_script:
     *before_script_terraform
   script:
-    # Directly use $Release
+    - source release.env
     - terraform -chdir=cicd init -backend-config=environments/prod/backend.conf
     - terraform -chdir=cicd apply -input=false tfplan
   dependencies:
