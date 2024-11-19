@@ -31,6 +31,47 @@ variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   POETRY_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pypoetry"
   POETRY_VIRTUALENVS_IN_PROJECT: "true"
+  #variables for test runs
+  BASIC_PW: "mock"
+  BASIC_USER: "mock"
+  CMA_TOKEN: "mock"
+  CMA_URL: "mock"
+  HLCU_CLIENT_ID: "mock"
+  HLCU_CLIENT_SECRET: "mock"
+  HLCU_URL: "mock"
+  HMM_TOKEN: "mock"
+  HMM_URL: "mock"
+  IQAX_TOKEN: "mock"
+  IQAX_URL: "mock"
+  MAEU_CUTOFF: "mock"
+  MAEU_LOCATION: "mock"
+  MAEU_P2P: "mock"
+  MAEU_TOKEN: "mock"
+  MAEU_TOKEN2: "mock"
+  MSCU_AUD: "mock"
+  MSCU_CLIENT: "mock"
+  MSCU_OAUTH: "mock"
+  MSCU_RSA_KEY: "mock"
+  MSCU_SCOPE: "mock"
+  MSCU_THUMBPRINT: "mock"
+  MSCU_URL: "mock"
+  ONEY_AUTH: "mock"
+  ONEY_TOKEN: "mock"
+  ONEY_TURL: "mock"
+  ONEY_URL: "mock"
+  REDIS_HOST: "mock"
+  REDIS_PORT: "mock"
+  REDIS_DB: "mock"
+  REDIS_USER: "mock"
+  REDIS_PW: "mock"
+  SUDU_TOKEN: "mock"
+  SUDU_URL: "mock"
+  ZIM_CLIENT: "mock"
+  ZIM_SECRET: "mock"
+  ZIM_TOKEN: "mock"
+  ZIM_TURL: "mock"
+  ZIM_URL: "mock"
+
 
 # Workflow Rules
 workflow:
@@ -71,7 +112,7 @@ stages:
 # Checks Stage
 flake8:
   stage: checks
-  image: python:3.9
+  image: python:3.10
   script:
     - python --version
     - pip install flake8
@@ -99,7 +140,7 @@ validate:
 testing:
   stage: test
   image:
-    name: python:3.8-slim
+    name: python:3.11-slim
   before_script:
     - pip install pytest pytest-cov coverage
     - pip install --no-cache-dir -r requirements.txt
@@ -138,7 +179,7 @@ publish_rc:
   stage: publish_rc
   image:
     name: gcr.io/kaniko-project/executor:v1.14.0-debug
-    entrypoint: [""]
+    entrypoint: [ "" ]
   rules:
     - if: $CI_COMMIT_TAG
       when: never
@@ -322,7 +363,7 @@ publish_release:
   stage: publish_release
   image:
     name: gcr.io/kaniko-project/executor:v1.14.0-debug
-    entrypoint: [""]
+    entrypoint: [ "" ]
   rules:
     - if: $CI_COMMIT_TAG
       when: never

@@ -1,10 +1,12 @@
+from app.carrierp2p.cma import get_cma_p2p, process_schedule_data, process_leg_data, \
+    DEFAULT_ETD_ETA
+import app.config as config
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime, timedelta
 import sys
 import os
 import yaml
-from types import GeneratorType, SimpleNamespace
+from types import GeneratorType
 
 # Get the absolute path to the config.py file
 config_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'app', 'config.py'))
@@ -13,7 +15,6 @@ config_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'app
 sys.path.insert(0, os.path.dirname(os.path.dirname(config_path)))
 
 # Import the actual config module
-import app.config as config
 
 # Read the actual configmap.yaml file
 configmap_path = os.path.join(os.path.dirname(config_path), 'configmap.yaml')
@@ -25,9 +26,6 @@ config.load_yaml = lambda: configmap_content
 
 # Mock the redis_mgr module
 sys.modules['app.background_tasks.redis_mgr'] = MagicMock()
-
-from app.carrierp2p.cma import get_cma_p2p, CMA_GROUP, fetch_initial_schedules, process_schedule_data, process_leg_data, \
-    DEFAULT_ETD_ETA
 
 
 # Mock HTTPClientWrapper
@@ -132,7 +130,7 @@ class TestGetCmaP2p:
             # Check if fetch_initial_schedules was called with correct parameters
             mock_fetch.assert_called_once()
             call_args = mock_fetch.call_args[1]
-            assert call_args['extra_condition'] == True
+            assert call_args['extra_condition']
 
             # Check the content of the generator
             result_list = list(result)
