@@ -5,8 +5,8 @@ import time
 athena_client = boto3.client('athena')
 cloudwatch_client = boto3.client('cloudwatch')
 
-def lambda_handler(event, context):
 
+def lambda_handler(event, context):
     query = f""" SELECT client_ip, request_processing_time
             FROM {os.environ['ATHENA_TABLE']}
             WHERE from_iso8601_timestamp("time") BETWEEN date_add('minute', -5, current_timestamp) AND current_timestamp
@@ -24,7 +24,7 @@ def lambda_handler(event, context):
     # Wait for Query Execution
     query_status = 'RUNNING'
     while query_status in ['RUNNING', 'QUEUED']:
-        time.sleep(5) # give time to query execute and update
+        time.sleep(5)  # give time to query execute and update
         query_execution = athena_client.get_query_execution(QueryExecutionId=query_execution_id)
         query_status = query_execution['QueryExecution']['Status']['State']
 
