@@ -17,9 +17,9 @@ data:
     retryNumber: 2
     asyncDefaultTimeOut: 10
   activeCarriers:
-    cma:  True
+    cma: True
     hlag: True
-    hmm: False
+    hmm: True
     iqax: True
     maersk: True
     msc: True

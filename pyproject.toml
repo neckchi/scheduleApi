@@ -7,19 +7,19 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "3.12.3"
-cryptography="41.0.1"
-fastapi="0.111.0"
-aiohttp="3.9.5"
-orjson="3.10.6"
-pydantic="2.8.2"
-pydantic_settings="2.3.4"
-PyJWT="2.8.0"
-pytest="8.2.0"
-PyYAML="6.0.1"
-redis="5.0.4"
-starlette="0.37.2"
-uvicorn="0.30.1"
-
+cryptography = "43.0.1"
+fastapi = "0.115.0"
+aiohttp = "3.10.10"
+orjson = "3.10.7"
+pydantic = "2.9.2"
+pydantic_settings = "2.3.4"
+PyJWT = "2.8.0"
+pytest = "8.2.0"
+PyYAML = "6.0.1"
+redis = "5.0.4"
+starlette = "0.41.1"
+uvicorn = "0.31.1"
+httpx = "0.27.0"
 
 [build-system]
 requires = ["poetry-core"]

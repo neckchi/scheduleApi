@@ -5,6 +5,8 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from app.config import get_settings
 
 security = HTTPBasic()
+
+
 def basic_auth(credentials: HTTPBasicCredentials = Depends(security)):
     current_username_bytes = credentials.username.encode("utf8")
     correct_username_bytes = bytes(get_settings().basic_user.get_secret_value(), encoding='utf-8')
