@@ -4,17 +4,19 @@ import logging.config
 from pydantic import SecretStr
 from functools import cache
 from os import path
-from pydantic_settings import BaseSettings,SettingsConfigDict
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from logging.handlers import QueueHandler, QueueListener
+from contextvars import ContextVar
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file='./app/.env', env_file_encoding='utf-8')
     # model_config = SettingsConfigDict(secrets_dir='/run/secrets')
-    redis_host:SecretStr
-    redis_port:SecretStr
-    redis_db:SecretStr
-    redis_user:SecretStr
-    redis_pw:SecretStr
+    redis_host: SecretStr
+    redis_port: SecretStr
+    redis_db: SecretStr
+    redis_user: SecretStr
+    redis_pw: SecretStr
     cma_url: str
     cma_token: SecretStr
     sudu_url: str
@@ -47,8 +49,9 @@ class Settings(BaseSettings):
     hlcu_url: str
     hlcu_client_id: SecretStr
     hlcu_client_secret: SecretStr
-    basic_user : SecretStr
-    basic_pw : SecretStr
+    basic_user: SecretStr
+    basic_pw: SecretStr
+
 
 @cache
 def get_settings():
@@ -59,11 +62,13 @@ def get_settings():
     """
     return Settings()
 
+
 @cache
 def load_yaml() -> dict:
-    with open(file='./app/configmap.yaml',mode='r') as yml_file:
-        config = yaml.load(yml_file,Loader=yaml.FullLoader)
+    with open(file='./app/configmap.yaml', mode='r') as yml_file:
+        config = yaml.load(yml_file, Loader=yaml.FullLoader)
     return config
+
 
 # Define a function to add extra information to the log records
 def log_queue_listener() -> QueueListener:
@@ -78,11 +83,15 @@ def log_queue_listener() -> QueueListener:
     listener = QueueListener(log_que, stream_handler, queue_handler, respect_handler_level=True)
     return listener
 
+
 old_factory = logging.getLogRecordFactory()
-def log_correlation(correlation:str |None = None):
+correlation_context = ContextVar('correlation', default=None)
+
+
+def log_correlation():
     def record_factory(*args, **kwargs):
         record = old_factory(*args, **kwargs)
-        record.custom_attribute = correlation
+        record.custom_attribute = correlation_context.get()
         return record
-    return record_factory
 
+    return record_factory

@@ -14,6 +14,7 @@ resource "aws_cloudwatch_metric_alarm" "cpu_alarm" {
   alarm_actions             = [aws_sns_topic.this.arn]
   insufficient_data_actions = [aws_sns_topic.this.arn]
   ok_actions                = [aws_sns_topic.this.arn]
+  depends_on = [module.ecs_cluster]
 }
 
 resource "aws_cloudwatch_metric_alarm" "memory_alarm" {
@@ -32,6 +33,7 @@ resource "aws_cloudwatch_metric_alarm" "memory_alarm" {
   alarm_actions             = [aws_sns_topic.this.arn]
   insufficient_data_actions = [aws_sns_topic.this.arn]
   ok_actions                = [aws_sns_topic.this.arn]
+  depends_on = [module.ecs_cluster]
 }
 
 resource "aws_cloudwatch_metric_alarm" "UnHealthyHostCount" {
@@ -50,6 +52,7 @@ resource "aws_cloudwatch_metric_alarm" "UnHealthyHostCount" {
   alarm_actions             = [aws_sns_topic.this.arn]
   insufficient_data_actions = [aws_sns_topic.this.arn]
   ok_actions                = [aws_sns_topic.this.arn]
+  depends_on = [module.ecs_cluster]
 }
 
 
@@ -57,6 +60,7 @@ resource "aws_cloudwatch_metric_alarm" "UnHealthyHostCount" {
 
 resource "aws_sns_topic" "this" {
   name = "${local.project_name}-alerting"
+  depends_on = [module.ecs_cluster]
 }
 
 resource "aws_sns_topic_subscription" "this" {
@@ -64,7 +68,7 @@ resource "aws_sns_topic_subscription" "this" {
   topic_arn  = aws_sns_topic.this.arn
   protocol   = "email"
   endpoint   = each.value
-  depends_on = [aws_sns_topic.this]
+  depends_on = [aws_sns_topic.this, module.ecs_cluster]
 }
 
 resource "aws_cloudwatch_metric_alarm" "ProcessingTime" {
@@ -84,7 +88,7 @@ resource "aws_cloudwatch_metric_alarm" "ProcessingTime" {
   alarm_actions             = [aws_sns_topic.this.arn]
   insufficient_data_actions = [aws_sns_topic.this.arn]
   ok_actions                = [aws_sns_topic.this.arn]
-
+  depends_on = [module.ecs_cluster]
 }
 
 
@@ -99,6 +103,7 @@ resource "aws_cloudwatch_log_metric_filter" "ecs_error_filter" {
     namespace = local.project_name
     value     = "1"
   }
+  depends_on = [module.ecs_cluster, module.ecs_service_task]
 }
 
 
@@ -116,4 +121,5 @@ resource "aws_cloudwatch_metric_alarm" "ecs_error_alarm" {
   actions_enabled     = true
 
   alarm_actions       = [aws_sns_topic.this.arn]
+  depends_on = [module.ecs_cluster]
 }

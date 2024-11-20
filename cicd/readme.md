@@ -1,6 +1,7 @@
 # Transport Emission Measurement (TEM)
 
 # Table of contents
+
 1. [Introduction](#introduction)
 2. [Requirements](#requirements)
 3. [Running Terraform](#runningTerraform)
@@ -9,9 +10,11 @@
 5. [FAQs](#faqs)
 
 # Introduction <a name="introduction"></a>
+
 This creates an ECS task and service to receive the image stored in the ECR created by `tem-infra-config` repository.
 
 # Requirements <a name="requirements"></a>
+
 - Terraform CLI version ~> v1.4.2 (to plan and run terraform)
     - `brew install terraform`
 - AWS Permissions to the DEV and PROD accounts
@@ -50,11 +53,13 @@ There are mainly four ways to define parametres for the application:
 - Environment Variables in the deployment config
 
 The way it is being used in TEM depends on the scope they have for the environment:
+
 - Application.properties for a parameter, which is the same for all environments (i.e. ECP Endpoint)
 - AWS Parameter Store for Parametres, which differ for each environment (i.e. Dev, Prod), like Kafka Connection Strings
-  - those are being defined in a separate Terraform Module
+    - those are being defined in a separate Terraform Module
 - AWS SecretsManager for all kinds of secrets
-- Environment Variables for parametres, which are same for each environment and usually close to the container (such as CPU, etc)
+- Environment Variables for parametres, which are same for each environment and usually close to the container (such as
+  CPU, etc)
 
 ## FAQs <a name="FAQs"></a>
 
@@ -63,13 +68,16 @@ The way it is being used in TEM depends on the scope they have for the environme
     1. Also: `terraform init -backend-config=environments/<env>/backend.tf`
     1. why: this happens when you init the terraform when you have initiated previously on other environment
 
-
 # Helpers Terraform
+
 ## Init
+
 ´´´
 terraform -chdir=cicd init -backend-config=environments/dev/backend.conf
 ´´´
+
 ## Plan
+
 ´´´
 terraform -chdir=cicd plan -var-file=environments/dev/dev.tfvars
 ´´´
