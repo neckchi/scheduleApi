@@ -344,7 +344,7 @@ get_release:
   rules:
     - if: $CI_COMMIT_TAG
       when: never
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH == "uat"
   before_script:
     *before_script_publish
   script:
@@ -371,7 +371,7 @@ publish_release:
   rules:
     - if: $CI_COMMIT_TAG
       when: never
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH == "uat"
   script:
     - |
       /kaniko/executor \
