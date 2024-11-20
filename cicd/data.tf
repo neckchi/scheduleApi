@@ -11,8 +11,3 @@ data "aws_lb" "lb" {
   name = "${local.project_name_abreb}-alb"
   arn  = module.alb.lb_arn
 }
-
-
-data "aws_lb_target_group" "tg" {
-  name = "${local.project_name_abreb}-lbtg"
-}
