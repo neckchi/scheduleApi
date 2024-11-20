@@ -91,7 +91,7 @@ resource "aws_cloudwatch_metric_alarm" "ProcessingTime" {
 
 resource "aws_cloudwatch_log_metric_filter" "ecs_error_filter" {
   name           = "ecsErrorFilter"
-  log_group_name = aws_cloudwatch_log_group.ecs_error_filter.name
+  log_group_name = "/ecs/p2p_schedule_api_of_carriers_service"
   pattern        = "ERROR"
 
   metric_transformation {
@@ -99,10 +99,6 @@ resource "aws_cloudwatch_log_metric_filter" "ecs_error_filter" {
     namespace = local.project_name
     value     = "1"
   }
-}
-
-resource "aws_cloudwatch_log_group" "ecs_error_filter" {
-  name = "/ecs/p2p_schedule_api_of_carriers_service"
 }
 
 resource "aws_cloudwatch_metric_alarm" "ecs_error_alarm" {
