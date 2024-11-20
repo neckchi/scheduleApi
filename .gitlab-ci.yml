@@ -169,7 +169,8 @@ plan_sandbox:
   rules:
     - if: $CI_COMMIT_TAG
       when: never
-    - if: $CI_COMMIT_BRANCH == "sandbox"
+    - if: '$CI_COMMIT_BRANCH =~ /^feature\//'
+      when: on_success
   tags:
     - sandbox
 
@@ -188,7 +189,8 @@ apply_sandbox:
   rules:
     - if: $CI_COMMIT_TAG
       when: never
-    - if: $CI_COMMIT_BRANCH == "sandbox"
+    - if: '$CI_COMMIT_BRANCH =~ /^feature\//'
+      when: on_success
   tags:
     - sandbox
 
