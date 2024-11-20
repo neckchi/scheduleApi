@@ -161,7 +161,6 @@ plan_sandbox:
   script:
     - terraform -chdir=cicd init -backend-config=environments/sandbox/backend.conf
     - terraform -chdir=cicd plan -var-file=environments/sandbox/sandbox.tfvars -var="image_tag=$ReleaseRC" -out=tfplan
-    - ls -la cicd/lambda
   artifacts:
     paths:
       - cicd/tfplan
@@ -170,7 +169,7 @@ plan_sandbox:
   rules:
     - if: $CI_COMMIT_TAG
       when: never
-    - when: always
+    - if: $CI_COMMIT_BRANCH == "sandbox"
   tags:
     - sandbox
 
@@ -189,7 +188,7 @@ apply_sandbox:
   rules:
     - if: $CI_COMMIT_TAG
       when: never
-    - when: always
+    - if: $CI_COMMIT_BRANCH == "sandbox"
   tags:
     - sandbox
 
@@ -265,6 +264,7 @@ plan_dev:
   artifacts:
     paths:
       - cicd/tfplan
+      - cicd/lambda/lambda_function.zip
   needs:
     - publish_rc
   rules:
@@ -307,6 +307,7 @@ plan_uat:
   artifacts:
     paths:
       - cicd/tfplan
+      - cicd/lambda/lambda_function.zip
   needs:
     - apply_dev
   rules:
@@ -405,6 +406,7 @@ plan_production:
   artifacts:
     paths:
       - cicd/tfplan
+      - cicd/lambda/lambda_function.zip
   needs:
     - publish_release
   rules:
