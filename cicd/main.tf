@@ -195,5 +195,5 @@ module "ecs_service_task" {
 
 
 output "alb_arn_suffix" {
-  value = module.alb.lb_arn
+  value = data.aws_lb.lb.arn_suffix
 }
