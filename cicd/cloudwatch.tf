@@ -6,7 +6,7 @@ resource "aws_cloudwatch_dashboard" "this" {
         {
           type = "metric",
           properties = {
-            metrics   = [["AWS/ApplicationELB", "RequestCount", "LoadBalancer", "${data.aws_lb.lb.arn_suffix}"]]
+            metrics   = [["AWS/ApplicationELB", "RequestCount", "LoadBalancer", "${module.alb.lb_arn_suffix}"]]
             sparkline = true,
             view      = "singleValue",
             region    = "eu-central-1",
@@ -18,7 +18,7 @@ resource "aws_cloudwatch_dashboard" "this" {
         {
           type = "metric"
           properties = {
-            metrics = [["AWS/ApplicationELB", "HealthyHostCount", "TargetGroup", "${data.aws_lb_target_group.tg.arn_suffix}", "LoadBalancer", "${data.aws_lb.lb.arn_suffix}",]]
+            metrics = [["AWS/ApplicationELB", "HealthyHostCount", "TargetGroup", "${module.lb_target_group.lb_target_group_suffix}", "LoadBalancer", "${module.alb.lb_arn_suffix}",]]
             view    = "timeSeries",
             region  = "eu-central-1",
             period  = 300,
@@ -37,7 +37,7 @@ resource "aws_cloudwatch_dashboard" "this" {
         {
           type = "metric"
           properties = {
-            metrics = [["AWS/ApplicationELB", "UnHealthyHostCount", "TargetGroup", "${data.aws_lb_target_group.tg.arn_suffix}", "LoadBalancer", "${data.aws_lb.lb.arn_suffix}"]]
+            metrics = [["AWS/ApplicationELB", "UnHealthyHostCount", "TargetGroup", "${module.lb_target_group.lb_target_group_suffix}", "LoadBalancer", "${module.alb.lb_arn_suffix}"]]
             view    = "timeSeries",
             region  = "eu-central-1",
             period  = 300,
@@ -56,7 +56,7 @@ resource "aws_cloudwatch_dashboard" "this" {
         {
           type = "metric",
           properties = {
-            metrics = [["AWS/ApplicationELB", "RequestCount", "LoadBalancer", "${data.aws_lb.lb.arn_suffix}"]]
+            metrics = [["AWS/ApplicationELB", "RequestCount", "LoadBalancer", "${module.alb.lb_arn_suffix}"]]
             view    = "timeSeries",
             region  = "eu-central-1",
             period  = 1,
@@ -67,7 +67,7 @@ resource "aws_cloudwatch_dashboard" "this" {
         {
           type = "metric"
           properties = {
-            metrics = [["AWS/ApplicationELB", "TargetResponseTime", "LoadBalancer", "${data.aws_lb.lb.arn_suffix}"]]
+            metrics = [["AWS/ApplicationELB", "TargetResponseTime", "LoadBalancer", "${module.alb.lb_arn_suffix}"]]
             view    = "timeSeries",
             stacked = false,
             region  = "eu-central-1",
@@ -78,7 +78,7 @@ resource "aws_cloudwatch_dashboard" "this" {
           type = "metric"
           properties = {
             metrics = [
-              ["AWS/ApplicationELB", "HTTPCode_ELB_5XX_Count", "LoadBalancer", "${data.aws_lb.lb.arn_suffix}"],
+              ["AWS/ApplicationELB", "HTTPCode_ELB_5XX_Count", "LoadBalancer", "${module.alb.lb_arn_suffix}"],
             ],
             view    = "timeSeries",
             stacked = false,
@@ -95,7 +95,7 @@ resource "aws_cloudwatch_dashboard" "this" {
         {
           type = "metric"
           properties = {
-            metrics = [["AWS/ApplicationELB", "HTTPCode_Target_5XX_Count", "LoadBalancer", "${data.aws_lb.lb.arn_suffix}"]],
+            metrics = [["AWS/ApplicationELB", "HTTPCode_Target_5XX_Count", "LoadBalancer", "${module.alb.lb_arn_suffix}"]],
             view    = "timeSeries",
             stacked = false,
             region  = "eu-central-1",
@@ -111,7 +111,7 @@ resource "aws_cloudwatch_dashboard" "this" {
         {
           type = "metric",
           properties = {
-            metrics = [["AWS/ApplicationELB", "HTTPCode_Target_2XX_Count", "LoadBalancer", "${data.aws_lb.lb.arn_suffix}"]]
+            metrics = [["AWS/ApplicationELB", "HTTPCode_Target_2XX_Count", "LoadBalancer", "${module.alb.lb_arn_suffix}"]]
             stacked = false,
             view    = "timeSeries",
             region  = "eu-central-1",
@@ -129,8 +129,8 @@ resource "aws_cloudwatch_dashboard" "this" {
           type = "metric",
           properties = {
             metrics = [
-              ["AWS/ApplicationELB", "HTTPCode_ELB_4XX_Count", "LoadBalancer", "${data.aws_lb.lb.arn_suffix}"],
-              ["AWS/ApplicationELB", "HTTPCode_ELB_2XX_Count", "LoadBalancer", "${data.aws_lb.lb.arn_suffix}"]
+              ["AWS/ApplicationELB", "HTTPCode_ELB_4XX_Count", "LoadBalancer", "${module.alb.lb_arn_suffix}"],
+              ["AWS/ApplicationELB", "HTTPCode_ELB_2XX_Count", "LoadBalancer", "${module.alb.lb_arn_suffix}"]
             ]
             sparkline = true,
             view      = "timeSeries",
@@ -206,7 +206,7 @@ resource "aws_cloudwatch_dashboard" "this" {
             stat    = "Sum",
             region  = "eu-central-1"
             dimensions = {
-              "LoadBalancerName" = "${data.aws_lb.lb.arn_suffix}"
+              "LoadBalancerName" = "${module.alb.lb_arn_suffix}"
               "ClientIP" = "*"
             }
             yAxis = {
@@ -232,7 +232,7 @@ resource "aws_cloudwatch_dashboard" "this" {
             stat    = "Average",
             region  = "eu-central-1"
             dimensions = {
-              "LoadBalancerName" = "${data.aws_lb.lb.arn_suffix}"
+              "LoadBalancerName" = "${module.alb.lb_arn_suffix}"
               "ClientIP" = "*"
             }
             yAxis = {
@@ -258,7 +258,7 @@ resource "aws_cloudwatch_dashboard" "this" {
             stat    = "Average",
             region  = "eu-central-1"
             dimensions = {
-              "LoadBalancerName" = "${data.aws_lb.lb.arn_suffix}"
+              "LoadBalancerName" = "${module.alb.lb_arn_suffix}"
               "ClientIP" = "*"
             }
             yAxis = {
@@ -614,6 +614,7 @@ resource "aws_lambda_function" "athena_to_cloudwatch" {
             ALB_NAME = local.alb_name
         }
     }
+  depends_on = [data.archive_file.code]
 
 
 }

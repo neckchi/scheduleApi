@@ -1,5 +1,3 @@
-
-
 def deepget(dct: dict, *keys):
     """
     Use function to check the json properties
@@ -10,5 +8,3 @@ def deepget(dct: dict, *keys):
         except (TypeError, KeyError):
             return None
     return dct
-
-
