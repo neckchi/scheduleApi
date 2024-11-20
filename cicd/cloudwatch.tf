@@ -614,6 +614,7 @@ resource "aws_lambda_function" "athena_to_cloudwatch" {
             ALB_NAME = local.alb_name
         }
     }
+  depends_on = [data.archive_file.code]
 
 
 }
