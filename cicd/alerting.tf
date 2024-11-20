@@ -103,7 +103,7 @@ resource "aws_cloudwatch_log_metric_filter" "ecs_error_filter" {
     namespace = local.project_name
     value     = "1"
   }
-  depends_on = [module.ecs_cluster]
+  depends_on = [module.ecs_cluster, module.ecs_service_task]
 }
 
 
