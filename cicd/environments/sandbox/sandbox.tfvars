@@ -1,6 +1,6 @@
 environment            = "sandbox"
 vpc_id                 = "vpc-01e6f4610910de513"
-subnet_ids             = ["subnet-0b8ef9b48843eb1c9", "subnet-052b0bdfea54c1ec8", "subnet-0ea44d436ce283003", "subnet-06e208aee26a888ad"]
+subnet_ids             = ["subnet-0b8ef9b48843eb1c9", "subnet-052b0bdfea54c1ec8", "subnet-0ea44d436ce283003"]
 sg_inboud_rules_cidrs  = ["10.0.0.0/8", "10.59.227.0/24"]
 sg_outboud_rules_cidrs = ["0.0.0.0/0"]
 # ECS Service
