@@ -101,6 +101,9 @@ resource "aws_cloudwatch_log_metric_filter" "ecs_error_filter" {
   }
 }
 
+resource "aws_cloudwatch_group" "ecs_error_filter" {
+  name = "/ecs/p2p_schedule_api_of_carriers_service"
+}
 
 resource "aws_cloudwatch_metric_alarm" "ecs_error_alarm" {
   alarm_name          = "HighErrorRateECSAlarm"
