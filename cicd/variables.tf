@@ -1,6 +1,6 @@
 variable "environment" {
   type    = string
-  default = "sandbox"
+  default = "dev"
 }
 
 variable "vpc_id" {
