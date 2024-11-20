@@ -310,8 +310,7 @@ plan_uat:
     paths:
       - cicd/tfplan
       - cicd/lambda/lambda_function.zip
-  needs:
-    - apply_dev
+  needs: []
   rules:
     - if: $CI_COMMIT_TAG
       when: never
@@ -347,7 +346,7 @@ get_release:
   rules:
     - if: $CI_COMMIT_TAG
       when: never
-    - if: $CI_COMMIT_BRANCH == "uat"
+    - if: $CI_COMMIT_BRANCH == "production"
   before_script:
     *before_script_publish
   script:
@@ -360,8 +359,7 @@ get_release:
   artifacts:
     reports:
       dotenv: release.env
-  needs:
-    - apply_uat
+  needs: []
   tags:
     - dev
 
@@ -374,7 +372,7 @@ publish_release:
   rules:
     - if: $CI_COMMIT_TAG
       when: never
-    - if: $CI_COMMIT_BRANCH == "uat"
+    - if: $CI_COMMIT_BRANCH == "production"
   script:
     - |
       /kaniko/executor \
