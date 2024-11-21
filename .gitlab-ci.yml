@@ -23,9 +23,14 @@
     - 'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
 
 
-.script_terraform: &script_terraform
-  - terraform -chdir=cicd init -backend-config=environments/$CI_ENVIRONMENT_NAME/backend.conf
-  - terraform -chdir=cicd plan -var-file=environments/$CI_ENVIRONMENT_NAME/$CI_ENVIRONMENT_NAME.tfvars -var="image_tag=$IMAGE_TAG" -out=tfplan
+.terraform_plan_job: &terraform_plan_job
+  script:
+    - terraform -chdir=cicd init -backend-config=environments/$CI_ENVIRONMENT_NAME/backend.conf
+    - terraform -chdir=cicd plan -var-file=environments/$CI_ENVIRONMENT_NAME/$CI_ENVIRONMENT_NAME.tfvars -var="image_tag=$IMAGE_TAG" -out=tfplan
+  artifacts:
+    paths:
+      - cicd/tfplan
+      - cicd/lambda/lambda_function.zip
 
 variables:
   PROJECT_NAME: p2p-schedule-api-of-carriers
@@ -228,12 +233,7 @@ plan_sandbox:
   environment: sandbox
   before_script:
     *before_script_terraform
-  script:
-    *script_terraform
-  artifacts:
-    paths:
-      - cicd/tfplan
-      - cicd/lambda/lambda_function.zip
+  *terraform_plan_job
   needs: []
   rules:
     - if: $CI_COMMIT_TAG
