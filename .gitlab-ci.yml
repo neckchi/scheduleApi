@@ -292,7 +292,7 @@ plan_dev:
     - if: '$CI_COMMIT_BRANCH =~ /^(feature\/|SCHEDU-)/'
 
 apply_dev:
-  stage: apply_dev
+  stage: apply
   environment: dev
   <<: *terraform_apply_job
   dependencies:
@@ -306,7 +306,7 @@ apply_dev:
 
 # # Plan and Apply for UAT Environment
 plan_uat:
-  stage: plan_uat
+  stage: plan
   <<: *terraform_plan_job
   needs:
     - publish
