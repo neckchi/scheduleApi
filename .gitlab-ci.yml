@@ -212,7 +212,7 @@ get_rc:
         echo "ReleaseRC=$TAG_VERSION_RC" >> release.env
         release-cli create --name "Release $CI_COMMIT_MESSAGE" --description "Created by $GITLAB_USER_LOGIN" --tag-name "$TAG_VERSION_RC"
       else
-        export TAG_VERSION_RC="${CI_COMMIT_BRANCH}-${CI_COMMIT_SHORT_SHA}"
+        export TAG_VERSION_RC="${CI_COMMIT_SHORT_SHA}"
         echo $TAG_VERSION_RC
         echo "ReleaseRC=$TAG_VERSION_RC" >> release.env
       fi
