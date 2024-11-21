@@ -20,7 +20,7 @@ ecs_task_container_definitions_cpu    = 1
 ecs_task_container_definitions_memory = 1024
 ecs_task_container_definitions_image  = "934536729814.dkr.ecr.eu-central-1.amazonaws.com/p2p-schedule-api-of-carriers"
 # Secret Configuration
-api_secret_config = "arn:aws:secretsmanager:eu-central-1:544980404659:secret:sandbox/p2p-schedule-api-of-carriers-doD0kt"
+# api_secret_config = "arn:aws:secretsmanager:eu-central-1:544980404659:secret:sandbox/p2p-schedule-api-of-carriers-doD0kt"
 # Static Variables
 static_variables = {
   HTTP_PROXY  = "http://proxy.eu-central-1.aws.int.kn:80"
