@@ -24,6 +24,7 @@
 
 
 .terraform_plan_job: &terraform_plan_job
+  image: *terraform_image
   before_script:
     - 'which ssh-agent || ( apt-get update -y && apt-get install openssh-client -y )'
     - eval $(ssh-agent -s)
@@ -238,7 +239,7 @@ publish_rc:
 # Plan and Apply for Sandbox Environment
 plan_sandbox:
   stage: plan
-  image: *terraform_image
+ 
   environment: sandbox
   <<: *terraform_plan_job
   needs: []
@@ -273,185 +274,185 @@ apply_sandbox:
 
 
 
-# Plan and Apply for Development Environment
-plan_dev:
-  stage: plan
-  image: *terraform_image
-  before_script:
-    *before_script_terraform
-  script:
-    - terraform -chdir=cicd init -backend-config=environments/dev/backend.conf
-    - terraform -chdir=cicd plan -var-file=environments/dev/dev.tfvars -var="image_tag=$ReleaseRC" -out=tfplan
-  artifacts:
-    paths:
-      - cicd/tfplan
-      - cicd/lambda/lambda_function.zip
-  needs:
-    - publish_rc
-  rules:
-    - if: $CI_COMMIT_TAG
-      when: never
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-  when: manual
-  tags:
-    - dev
+# # Plan and Apply for Development Environment
+# plan_dev:
+#   stage: plan
+#   image: *terraform_image
+#   before_script:
+#     *before_script_terraform
+#   script:
+#     - terraform -chdir=cicd init -backend-config=environments/dev/backend.conf
+#     - terraform -chdir=cicd plan -var-file=environments/dev/dev.tfvars -var="image_tag=$ReleaseRC" -out=tfplan
+#   artifacts:
+#     paths:
+#       - cicd/tfplan
+#       - cicd/lambda/lambda_function.zip
+#   needs:
+#     - publish_rc
+#   rules:
+#     - if: $CI_COMMIT_TAG
+#       when: never
+#     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+#   when: manual
+#   tags:
+#     - dev
 
-apply_dev:
-  stage: apply_dev
-  image: *terraform_image
-  before_script:
-    *before_script_terraform
-  script:
-    - terraform -chdir=cicd init -backend-config=environments/dev/backend.conf
-    - terraform -chdir=cicd apply -input=false tfplan
-  dependencies:
-    - plan_dev
-  needs:
-    - plan_dev
-  rules:
-    - if: $CI_COMMIT_TAG
-      when: never
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-  when: manual
-  tags:
-    - dev
+# apply_dev:
+#   stage: apply_dev
+#   image: *terraform_image
+#   before_script:
+#     *before_script_terraform
+#   script:
+#     - terraform -chdir=cicd init -backend-config=environments/dev/backend.conf
+#     - terraform -chdir=cicd apply -input=false tfplan
+#   dependencies:
+#     - plan_dev
+#   needs:
+#     - plan_dev
+#   rules:
+#     - if: $CI_COMMIT_TAG
+#       when: never
+#     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+#   when: manual
+#   tags:
+#     - dev
 
-# Plan and Apply for UAT Environment
-plan_uat:
-  stage: plan_uat
-  image: *terraform_image
-  before_script:
-    *before_script_terraform
-  script:
-    - terraform -chdir=cicd init -backend-config=environments/uat/backend.conf
-    - terraform -chdir=cicd plan -var-file=environments/uat/uat.tfvars -var="image_tag=$ReleaseRC" -out=tfplan
-  artifacts:
-    paths:
-      - cicd/tfplan
-      - cicd/lambda/lambda_function.zip
-  needs: []
-  rules:
-    - if: $CI_COMMIT_TAG
-      when: never
-    - if: $CI_COMMIT_BRANCH == "uat"
-  when: manual
-  tags:
-    - uat
+# # Plan and Apply for UAT Environment
+# plan_uat:
+#   stage: plan_uat
+#   image: *terraform_image
+#   before_script:
+#     *before_script_terraform
+#   script:
+#     - terraform -chdir=cicd init -backend-config=environments/uat/backend.conf
+#     - terraform -chdir=cicd plan -var-file=environments/uat/uat.tfvars -var="image_tag=$ReleaseRC" -out=tfplan
+#   artifacts:
+#     paths:
+#       - cicd/tfplan
+#       - cicd/lambda/lambda_function.zip
+#   needs: []
+#   rules:
+#     - if: $CI_COMMIT_TAG
+#       when: never
+#     - if: $CI_COMMIT_BRANCH == "uat"
+#   when: manual
+#   tags:
+#     - uat
 
-apply_uat:
-  stage: apply_uat
-  image: *terraform_image
-  before_script:
-    *before_script_terraform
-  script:
-    - terraform -chdir=cicd init -backend-config=environments/uat/backend.conf
-    - terraform -chdir=cicd apply -input=false tfplan
-  dependencies:
-    - plan_uat
-  needs:
-    - plan_uat
-  rules:
-    - if: $CI_COMMIT_TAG
-      when: never
-    - if: $CI_COMMIT_BRANCH == "uat"
-  when: manual
-  tags:
-    - uat
+# apply_uat:
+#   stage: apply_uat
+#   image: *terraform_image
+#   before_script:
+#     *before_script_terraform
+#   script:
+#     - terraform -chdir=cicd init -backend-config=environments/uat/backend.conf
+#     - terraform -chdir=cicd apply -input=false tfplan
+#   dependencies:
+#     - plan_uat
+#   needs:
+#     - plan_uat
+#   rules:
+#     - if: $CI_COMMIT_TAG
+#       when: never
+#     - if: $CI_COMMIT_BRANCH == "uat"
+#   when: manual
+#   tags:
+#     - uat
 
-# Get Final Release Stage
-get_release:
-  stage: get_release
-  image: alpine
-  rules:
-    - if: $CI_COMMIT_TAG
-      when: never
-    - if: $CI_COMMIT_BRANCH == "master"
-  before_script:
-    *before_script_publish
-  script:
-    - |
-      export TAG_VERSION=$(git-version -b $CI_COMMIT_BRANCH --minor-identifier "/(feat|feature)/" --major-identifier "/(break|breaking)/")
-      echo "Release=$TAG_VERSION" >> release.env
-      release-cli create --name "Release $CI_COMMIT_MESSAGE" --description "Created by $GITLAB_USER_LOGIN" --tag-name "$TAG_VERSION"
-    - echo "Release=$Release" > release.env
-    - cat release.env
-  artifacts:
-    reports:
-      dotenv: release.env
-  needs: []
-  tags:
-    - dev
+# # Get Final Release Stage
+# get_release:
+#   stage: get_release
+#   image: alpine
+#   rules:
+#     - if: $CI_COMMIT_TAG
+#       when: never
+#     - if: $CI_COMMIT_BRANCH == "master"
+#   before_script:
+#     *before_script_publish
+#   script:
+#     - |
+#       export TAG_VERSION=$(git-version -b $CI_COMMIT_BRANCH --minor-identifier "/(feat|feature)/" --major-identifier "/(break|breaking)/")
+#       echo "Release=$TAG_VERSION" >> release.env
+#       release-cli create --name "Release $CI_COMMIT_MESSAGE" --description "Created by $GITLAB_USER_LOGIN" --tag-name "$TAG_VERSION"
+#     - echo "Release=$Release" > release.env
+#     - cat release.env
+#   artifacts:
+#     reports:
+#       dotenv: release.env
+#   needs: []
+#   tags:
+#     - dev
 
-# Publish Final Release Stage
-publish_release:
-  stage: publish_release
-  image:
-    name: gcr.io/kaniko-project/executor:v1.14.0-debug
-    entrypoint: [""]
-  rules:
-    - if: $CI_COMMIT_TAG
-      when: never
-    - if: $CI_COMMIT_BRANCH == "master"
-  script:
-    - |
-      /kaniko/executor \
-        --context . \
-        --build-arg HTTP_PROXY=$HTTP_PROXY \
-        --build-arg HTTPS_PROXY=$HTTP_PROXY \
-        --build-arg http_proxy=$HTTP_PROXY \
-        --build-arg https_proxy=$HTTP_PROXY \
-        --build-arg no_proxy=$NO_PROXY \
-        --build-arg NO_PROXY=$NO_PROXY \
-        --dockerfile Dockerfile \
-        --destination $REPO_URL/$PROJECT_NAME:$Release
-    - echo "Release=$Release" > release.env
-  artifacts:
-    reports:
-      dotenv: release.env
-  needs:
-    - get_release
-  tags:
-    - dev
+# # Publish Final Release Stage
+# publish_release:
+#   stage: publish_release
+#   image:
+#     name: gcr.io/kaniko-project/executor:v1.14.0-debug
+#     entrypoint: [""]
+#   rules:
+#     - if: $CI_COMMIT_TAG
+#       when: never
+#     - if: $CI_COMMIT_BRANCH == "master"
+#   script:
+#     - |
+#       /kaniko/executor \
+#         --context . \
+#         --build-arg HTTP_PROXY=$HTTP_PROXY \
+#         --build-arg HTTPS_PROXY=$HTTP_PROXY \
+#         --build-arg http_proxy=$HTTP_PROXY \
+#         --build-arg https_proxy=$HTTP_PROXY \
+#         --build-arg no_proxy=$NO_PROXY \
+#         --build-arg NO_PROXY=$NO_PROXY \
+#         --dockerfile Dockerfile \
+#         --destination $REPO_URL/$PROJECT_NAME:$Release
+#     - echo "Release=$Release" > release.env
+#   artifacts:
+#     reports:
+#       dotenv: release.env
+#   needs:
+#     - get_release
+#   tags:
+#     - dev
 
-# Plan and Apply for Production Environment
-plan_production:
-  stage: plan_production
-  image: *terraform_image
-  before_script:
-    *before_script_terraform
-  script:
-    - terraform -chdir=cicd init -backend-config=environments/prod/backend.conf
-    - terraform -chdir=cicd plan -var-file=environments/prod/prod.tfvars -var="image_tag=$Release" -out=tfplan
-  artifacts:
-    paths:
-      - cicd/tfplan
-      - cicd/lambda/lambda_function.zip
-  needs:
-    - publish_release
-  rules:
-    - if: $CI_COMMIT_TAG
-      when: never
-    - if: $CI_COMMIT_BRANCH == "master"
-  when: manual
-  tags:
-    - production
+# # Plan and Apply for Production Environment
+# plan_production:
+#   stage: plan_production
+#   image: *terraform_image
+#   before_script:
+#     *before_script_terraform
+#   script:
+#     - terraform -chdir=cicd init -backend-config=environments/prod/backend.conf
+#     - terraform -chdir=cicd plan -var-file=environments/prod/prod.tfvars -var="image_tag=$Release" -out=tfplan
+#   artifacts:
+#     paths:
+#       - cicd/tfplan
+#       - cicd/lambda/lambda_function.zip
+#   needs:
+#     - publish_release
+#   rules:
+#     - if: $CI_COMMIT_TAG
+#       when: never
+#     - if: $CI_COMMIT_BRANCH == "master"
+#   when: manual
+#   tags:
+#     - production
 
-apply_production:
-  stage: apply_production
-  image: *terraform_image
-  before_script:
-    *before_script_terraform
-  script:
-    - terraform -chdir=cicd init -backend-config=environments/prod/backend.conf
-    - terraform -chdir=cicd apply -input=false tfplan
-  dependencies:
-    - plan_production
-  needs:
-    - plan_production
-  rules:
-    - if: $CI_COMMIT_TAG
-      when: never
-    - if: $CI_COMMIT_BRANCH == "master"
-  when: manual
-  tags:
-    - production
+# apply_production:
+#   stage: apply_production
+#   image: *terraform_image
+#   before_script:
+#     *before_script_terraform
+#   script:
+#     - terraform -chdir=cicd init -backend-config=environments/prod/backend.conf
+#     - terraform -chdir=cicd apply -input=false tfplan
+#   dependencies:
+#     - plan_production
+#   needs:
+#     - plan_production
+#   rules:
+#     - if: $CI_COMMIT_TAG
+#       when: never
+#     - if: $CI_COMMIT_BRANCH == "master"
+#   when: manual
+#   tags:
+#     - production
