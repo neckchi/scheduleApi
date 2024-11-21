@@ -22,6 +22,11 @@
     - '/usr/bin/env'
     - 'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
 
+
+.script_terraform: &script_terraform
+  - terraform -chdir=cicd init -backend-config=environments/$CI_ENVIRONMENT_NAME/backend.conf
+  - terraform -chdir=cicd plan -var-file=environments/$CI_ENVIRONMENT_NAME/$CI_ENVIRONMENT_NAME.tfvars -var="image_tag=$IMAGE_TAG" -out=tfplan
+
 variables:
   PROJECT_NAME: p2p-schedule-api-of-carriers
   REPO_URL: 934536729814.dkr.ecr.eu-central-1.amazonaws.com
@@ -204,8 +209,7 @@ publish_rc:
         --build-arg NO_PROXY=$NO_PROXY \
         --dockerfile Dockerfile \
         --destination $REPO_URL/$PROJECT_NAME:$ReleaseRC
-    - echo "ReleaseRC=$ReleaseRC" > release.env
-    - ls -la
+    - echo "IMAGE_TAG=$ReleaseRC" > release.env
   artifacts:
     reports:
       dotenv: release.env
@@ -224,9 +228,7 @@ plan_sandbox:
   before_script:
     *before_script_terraform
   script:
-    - env | grep -i release
-    - terraform -chdir=cicd init -backend-config=environments/$CI_ENVIRONMENT_NAME/backend.conf
-    - terraform -chdir=cicd plan -var-file=environments/$CI_ENVIRONMENT_NAME/$CI_ENVIRONMENT_NAME.tfvars -var="image_tag=$ReleaseRC" -out=tfplan
+    *script_terraform
   artifacts:
     paths:
       - cicd/tfplan
