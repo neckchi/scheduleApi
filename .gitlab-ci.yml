@@ -169,7 +169,7 @@ plan_sandbox:
   rules:
     - if: $CI_COMMIT_TAG
       when: never
-    - if: '$CI_COMMIT_BRANCH =~ /^SCHEDU-/'
+    - if: '$CI_COMMIT_BRANCH =~ /^(feature\/|SCHEDU-)/'
       when: on_success
   when: manual
   tags:
@@ -190,7 +190,7 @@ apply_sandbox:
   rules:
     - if: $CI_COMMIT_TAG
       when: never
-    - if: '$CI_COMMIT_BRANCH =~ /^SCHEDU-/'
+    - if: '$CI_COMMIT_BRANCH =~ /^(feature\/|SCHEDU-)/'
       when: on_success
   when: manual
   tags:
@@ -274,7 +274,7 @@ plan_dev:
   rules:
     - if: $CI_COMMIT_TAG
       when: never
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: '$CI_COMMIT_BRANCH =~ /^(feature\/|SCHEDU-)/'
   when: manual
   tags:
     - dev
