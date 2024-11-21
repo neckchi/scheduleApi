@@ -93,10 +93,10 @@ cache:
 stages:
   - checks
   - test
-  - plan_sandbox
-  - apply_sandbox
   - get_rc
   - publish_rc
+  - plan_sandbox
+  - apply_sandbox
   - plan_dev
   - apply_dev
   - plan_uat
@@ -201,7 +201,7 @@ get_rc:
   rules:
     - if: $CI_COMMIT_TAG
       when: never
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: '$CI_COMMIT_BRANCH =~ /^(feature\/|SCHEDU-)/'
   before_script:
     *before_script_publish
   script:
@@ -221,7 +221,7 @@ get_rc:
       dotenv: release.env
   needs: []
   tags:
-    - dev
+    - sandbox
 
 # Publish Release Candidate Stage
 publish_rc:
@@ -232,7 +232,7 @@ publish_rc:
   rules:
     - if: $CI_COMMIT_TAG
       when: never
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH == '$CI_COMMIT_BRANCH =~ /^(feature\/|SCHEDU-)/'
   script:
     - |
       /kaniko/executor \
@@ -252,7 +252,7 @@ publish_rc:
   needs:
     - get_rc
   tags:
-    - dev
+    - sandbox
 
 # Plan and Apply for Development Environment
 plan_dev:
