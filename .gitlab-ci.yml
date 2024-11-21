@@ -39,6 +39,8 @@
     paths:
       - cicd/tfplan
       - cicd/lambda/lambda_function.zip
+  needs:
+    - publish
   tags:
     - $CI_ENVIRONMENT_NAME
   when: manual
@@ -53,15 +55,11 @@
     - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
     - terraform --version
   script:
-    - terraform -chdir=cicd init -backend-config=environments/sandbox/backend.conf
+    - terraform -chdir=cicd init -backend-config=environments/$CI_ENVIRONMENT_NAME/backend.conf
     - terraform -chdir=cicd apply -input=false tfplan
-  rules:
-    - if: $CI_COMMIT_TAG
-      when: never
-    - if: '$CI_COMMIT_BRANCH =~ /^(feature\/|SCHEDU-)/'
   when: manual
   tags:
-    - sandbox
+    - $CI_ENVIRONMENT_NAME
 
 variables:
   PROJECT_NAME: p2p-schedule-api-of-carriers
@@ -262,8 +260,6 @@ plan_sandbox:
   stage: plan
   environment: sandbox
   <<: *terraform_plan_job
-  needs: 
-    - publish
   rules:
     - if: $CI_COMMIT_TAG
       when: never
@@ -289,75 +285,50 @@ plan_dev:
   stage: plan
   environment: dev
   <<: *terraform_plan_job
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    # - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: '$CI_COMMIT_BRANCH =~ /^(feature\/|SCHEDU-)/'
+
+apply_dev:
+  stage: apply_dev
+  environment: dev
+  <<: *terraform_appy_job
+  dependencies:
+    - plan_dev
   needs:
-    - publish
+    - plan_dev
   rules:
     - if: $CI_COMMIT_TAG
       when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
-
-# apply_dev:
-#   stage: apply_dev
-#   image: *terraform_image
-#   before_script:
-#     *before_script_terraform
-#   script:
-#     - terraform -chdir=cicd init -backend-config=environments/dev/backend.conf
-#     - terraform -chdir=cicd apply -input=false tfplan
-#   dependencies:
-#     - plan_dev
-#   needs:
-#     - plan_dev
-#   rules:
-#     - if: $CI_COMMIT_TAG
-#       when: never
-#     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-#   when: manual
-#   tags:
-#     - dev
-
 # # Plan and Apply for UAT Environment
-# plan_uat:
-#   stage: plan_uat
-#   image: *terraform_image
-#   before_script:
-#     *before_script_terraform
-#   script:
-#     - terraform -chdir=cicd init -backend-config=environments/uat/backend.conf
-#     - terraform -chdir=cicd plan -var-file=environments/uat/uat.tfvars -var="image_tag=$ReleaseRC" -out=tfplan
-#   artifacts:
-#     paths:
-#       - cicd/tfplan
-#       - cicd/lambda/lambda_function.zip
-#   needs: []
-#   rules:
-#     - if: $CI_COMMIT_TAG
-#       when: never
-#     - if: $CI_COMMIT_BRANCH == "uat"
-#   when: manual
-#   tags:
-#     - uat
+plan_uat:
+  staage: plan_uat
+  <<: *terraform_plan_job
+  needs:
+    - publish
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_ENVIRONMENT_NAME
 
-# apply_uat:
-#   stage: apply_uat
-#   image: *terraform_image
-#   before_script:
-#     *before_script_terraform
-#   script:
-#     - terraform -chdir=cicd init -backend-config=environments/uat/backend.conf
-#     - terraform -chdir=cicd apply -input=false tfplan
-#   dependencies:
-#     - plan_uat
-#   needs:
-#     - plan_uat
-#   rules:
-#     - if: $CI_COMMIT_TAG
-#       when: never
-#     - if: $CI_COMMIT_BRANCH == "uat"
-#   when: manual
-#   tags:
-#     - uat
+
+apply_uat:
+  stage: apply_uat
+  environment: uat
+  <<: *terraform_appy_job
+  dependencies:
+    - plan_uat
+  needs:
+    - plan_uat
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_ENVIRONMENT_NAME
+
 
 # # Get Final Release Stage
 # get_release:
