@@ -24,6 +24,13 @@
 
 
 .terraform_plan_job: &terraform_plan_job
+  before_script:
+    - 'which ssh-agent || ( apt-get update -y && apt-get install openssh-client -y )'
+    - eval $(ssh-agent -s)
+    - ssh-add <(echo "$SSH_PRIVATE_KEY" | base64 -d | tr -d "\r")
+    - mkdir -p ~/.ssh
+    - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
+    - terraform --version
   script:
     - terraform -chdir=cicd init -backend-config=environments/$CI_ENVIRONMENT_NAME/backend.conf
     - terraform -chdir=cicd plan -var-file=environments/$CI_ENVIRONMENT_NAME/$CI_ENVIRONMENT_NAME.tfvars -var="image_tag=$IMAGE_TAG" -out=tfplan
@@ -31,6 +38,8 @@
     paths:
       - cicd/tfplan
       - cicd/lambda/lambda_function.zip
+  tags:
+    - $CI_ENVIRONMENT_NAME
 
 variables:
   PROJECT_NAME: p2p-schedule-api-of-carriers
@@ -108,14 +117,14 @@ stages:
   # - publish_rc
   - plan
   - apply
-  - plan_dev
-  - apply_dev
-  - plan_uat
-  - apply_uat
-  - get_release
-  - publish_release
-  - plan_production
-  - apply_production
+  # - plan_dev
+  # - apply_dev
+  # - plan_uat
+  # - apply_uat
+  # - get_release
+  # - publish_release
+  # - plan_production
+  # - apply_production
 
 # Jobs Definition
 
@@ -231,8 +240,6 @@ plan_sandbox:
   stage: plan
   image: *terraform_image
   environment: sandbox
-  before_script:
-    *before_script_terraform
   *terraform_plan_job
   needs: []
   rules:
@@ -240,8 +247,7 @@ plan_sandbox:
       when: never
     - if: '$CI_COMMIT_BRANCH =~ /^(feature\/|SCHEDU-)/'
   when: manual
-  tags:
-    - $CI_ENVIRONMENT_NAME
+ 
 
 apply_sandbox:
   stage: apply
