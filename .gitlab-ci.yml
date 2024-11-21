@@ -101,8 +101,8 @@ stages:
   - publish
   # - get_rc
   # - publish_rc
-  - plan_sandbox
-  - apply_sandbox
+  - plan
+  - apply
   - plan_dev
   - apply_dev
   - plan_uat
@@ -223,7 +223,7 @@ publish_rc:
 
 # Plan and Apply for Sandbox Environment
 plan_sandbox:
-  stage: plan_sandbox
+  stage: plan
   image: *terraform_image
   environment: sandbox
   before_script:
@@ -244,7 +244,7 @@ plan_sandbox:
     - $CI_ENVIRONMENT_NAME
 
 apply_sandbox:
-  stage: apply_sandbox
+  stage: apply
   environment: sandbox
   image: *terraform_image
   before_script:
@@ -269,7 +269,7 @@ apply_sandbox:
 
 # Plan and Apply for Development Environment
 plan_dev:
-  stage: plan_dev
+  stage: plan
   image: *terraform_image
   before_script:
     *before_script_terraform
