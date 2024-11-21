@@ -294,7 +294,7 @@ plan_dev:
 apply_dev:
   stage: apply_dev
   environment: dev
-  <<: *terraform_appy_job
+  <<: *terraform_apply_job
   dependencies:
     - plan_dev
   needs:
@@ -319,7 +319,7 @@ plan_uat:
 apply_uat:
   stage: apply_uat
   environment: uat
-  <<: *terraform_appy_job
+  <<: *terraform_apply_job
   dependencies:
     - plan_uat
   needs:
