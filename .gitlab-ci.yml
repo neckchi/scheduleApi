@@ -417,7 +417,7 @@ plan_production:
     - if: $CI_COMMIT_BRANCH == "master"
   when: manual
   tags:
-    - production
+    - prod
 
 apply_production:
   stage: apply_production
@@ -437,4 +437,4 @@ apply_production:
     - if: $CI_COMMIT_BRANCH == "master"
   when: manual
   tags:
-    - production
+    - prod
