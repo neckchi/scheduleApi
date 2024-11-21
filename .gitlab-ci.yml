@@ -225,7 +225,7 @@ get_rc:
     - dev
 
 # Publish Release Candidate Stage
-publish_rc:
+publish:
   stage: publish
   image:
     name: gcr.io/kaniko-project/executor:v1.14.0-debug
