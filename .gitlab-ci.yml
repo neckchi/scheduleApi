@@ -232,7 +232,7 @@ publish_rc:
   rules:
     - if: $CI_COMMIT_TAG
       when: never
-    - if: $CI_COMMIT_BRANCH == '$CI_COMMIT_BRANCH =~ /^(feature\/|SCHEDU-)/'
+    - if: '$CI_COMMIT_BRANCH =~ /^(feature\/|SCHEDU-)/'
   script:
     - |
       /kaniko/executor \
