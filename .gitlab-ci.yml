@@ -133,8 +133,6 @@ stages:
   - checks
   - test
   - publish
-  # - get_rc
-  # - publish_rc
   - plan
   - apply
   # - plan_dev
