@@ -274,7 +274,7 @@ plan_dev:
   rules:
     - if: $CI_COMMIT_TAG
       when: never
-    - if: '$CI_COMMIT_BRANCH =~ /^(feature\/|SCHEDU-)/'
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   when: manual
   tags:
     - dev
