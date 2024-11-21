@@ -221,7 +221,7 @@ get_rc:
       dotenv: release.env
   needs: []
   tags:
-    - sandbox
+    - dev
 
 # Publish Release Candidate Stage
 publish_rc:
@@ -253,7 +253,7 @@ publish_rc:
   needs:
     - get_rc
   tags:
-    - sandbox
+    - dev
 
 # Plan and Apply for Development Environment
 plan_dev:
