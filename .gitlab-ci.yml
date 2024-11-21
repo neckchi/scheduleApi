@@ -161,7 +161,7 @@ plan_sandbox:
   script:
     - env | grep -i release
     - terraform -chdir=cicd init -backend-config=environments/sandbox/backend.conf
-    - terraform -chdir=cicd plan -var-file=environments/sandbox/sandbox.tfvars -var="image_tag=$ReleaseRC" -out=tfplan
+    - terraform -chdir=cicd plan -var-file=environments/sandbox/sandbox.tfvars -var="image_tag=$CI_COMMIT_SHORT_SHA" -out=tfplan
   artifacts:
     paths:
       - cicd/tfplan
