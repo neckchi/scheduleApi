@@ -246,6 +246,7 @@ publish_rc:
         --dockerfile Dockerfile \
         --destination $REPO_URL/$PROJECT_NAME:$ReleaseRC
     - echo "ReleaseRC=$ReleaseRC" > release.env
+    - ls -la
   artifacts:
     reports:
       dotenv: release.env
