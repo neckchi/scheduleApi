@@ -306,7 +306,7 @@ apply_dev:
 
 # # Plan and Apply for UAT Environment
 plan_uat:
-  staage: plan_uat
+  stage: plan_uat
   <<: *terraform_plan_job
   needs:
     - publish
