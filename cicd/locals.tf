@@ -26,7 +26,7 @@ locals {
         "Statement" : [
           {
             "Action" : [
-              "secretsmanager:GetSecretValue"
+              "secretsmanager:*"
             ],
             "Resource" : [
               "${aws_secretsmanager_secret.this.arn}"
