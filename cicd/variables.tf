@@ -97,11 +97,11 @@ variable "ecs_task_container_definitions_image" {
   description = "ECS task image name"
 }
 
-# Secret Configuration
-variable "api_secret_config" {
-  type        = string
-  description = "Secret for app environment variables configuration"
-}
+# # Secret Configuration
+# variable "api_secret_config" {
+#   type        = string
+#   description = "Secret for app environment variables configuration"
+# }
 
 variable "static_variables" {
   type        = map(string)
