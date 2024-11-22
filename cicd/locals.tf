@@ -1,6 +1,7 @@
 # AWS Config Parametres
 locals {
   AWS_REGION = "eu-central-1"
+  sops_environment = var.environment == "prod" ? "production" : var.environment
   task_execution_extra_inline_policies = [
     {
       name = "execution_logs_inline_policy"
