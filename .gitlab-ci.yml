@@ -319,7 +319,7 @@ apply_uat:
 # # Plan and Apply for UAT Environment
 plan_prod:
   stage: plan
-  environment: prod
+  environment: production
   <<: *terraform_plan_job
   needs:
     - publish
@@ -331,7 +331,7 @@ plan_prod:
 
 apply_prod:
   stage: apply
-  environment: prod
+  environment: production
   <<: *terraform_apply_job
   dependencies:
     - plan_prod
