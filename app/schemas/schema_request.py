@@ -52,7 +52,7 @@ class QueryParams(BaseModel):
     direct_only: Annotated[
         Optional[bool], Field(validation_alias='directOnly', serialization_alias='directOnly', default=None,
                               description='Direct means only show direct schedule Else show both(direct/transshipment)type of schedule')]
-    tsp: Annotated[Optional[str], Field(validation_alias='tsp', serialization_alias='tsp', max_length=5, default=None,
+    tsp: Annotated[Optional[str], Field(validation_alias='transhipmentPort', serialization_alias='transhipmentPort', max_length=5, default=None,
                                         description="Port Of Transshipment", example='SGSIN',
                                         pattern=r"[A-Z]{2}[A-Z0-9]{3}")]
     vessel_imo: Annotated[
