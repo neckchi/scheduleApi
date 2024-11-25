@@ -77,8 +77,8 @@ def process_leg_data(leg_task: list) -> list:
                     else None
                 ),
             ),
-            etd=leg["pointFrom"].get("departureDateLocal", DEFAULT_ETD_ETA),
-            eta=leg["pointTo"].get("arrivalDateLocal", DEFAULT_ETD_ETA),
+            etd=leg["pointFrom"].get("departureDateGmt", DEFAULT_ETD_ETA),
+            eta=leg["pointTo"].get("arrivalDateGmt", DEFAULT_ETD_ETA),
             transitTime=leg.get("legTransitTime", 0),
             transportations=extract_transportation(leg["transportation"]),
             services=(
@@ -106,12 +106,12 @@ def process_leg_data(leg_task: list) -> list:
                     docCutoffDate=deepget(
                         leg["pointFrom"]["cutOff"],
                         "shippingInstructionAcceptance",
-                        "local",
+                        "gmt",
                     ),
                     cyCutoffDate=deepget(
-                        leg["pointFrom"]["cutOff"], "portCutoff", "local"
+                        leg["pointFrom"]["cutOff"], "portCutoff", "gmt"
                     ),
-                    vgmCutoffDate=deepget(leg["pointFrom"]["cutOff"], "vgm", "local"),
+                    vgmCutoffDate=deepget(leg["pointFrom"]["cutOff"], "vgm", "gmt"),
                 )
                 if leg["pointFrom"].get("cutOff")
                 else None
