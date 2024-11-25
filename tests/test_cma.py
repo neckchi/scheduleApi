@@ -62,9 +62,9 @@ def sample_leg_data():
             },
             "departureDateLocal": "2024-01-01T12:00:00",
             "cutOff": {
-                "shippingInstructionAcceptance": {"local": "2024-01-01T10:00:00"},
-                "portCutoff": {"local": "2024-01-01T11:00:00"},
-                "vgm": {"local": "2024-01-01T09:00:00"}
+                "shippingInstructionAcceptance": {"gmt": "2024-01-01T10:00:00"},
+                "portCutoff": {"gmt": "2024-01-01T11:00:00"},
+                "vgm": {"gmt": "2024-01-01T09:00:00"}
             }
         },
         "pointTo": {
