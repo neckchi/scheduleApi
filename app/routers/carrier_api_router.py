@@ -17,6 +17,7 @@ async def route_to_carrier_api(product_id: UUID, client: HTTPClientWrapper, requ
             if carrier_status['data']['activeCarriers']['cma'] and (carriers in {'CMDU', 'ANNU', 'APLU', 'CHNL'} or carriers is None):
                 task_group.create_task(name='CMA_task' if carriers is None else f'{carriers}_task', coro=lambda cma_scac=carriers: cma.get_cma_p2p(
                     client=client,
+                    background_task=background_tasks,
                     url=settings.cma_url,
                     pw=settings.cma_token.get_secret_value(),
                     pol=query_params.point_from,

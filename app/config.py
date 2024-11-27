@@ -1,17 +1,17 @@
-import yaml
-import queue
 import logging.config
-from pydantic import SecretStr
-from functools import cache
-from os import path
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from logging.handlers import QueueHandler, QueueListener
+import queue
 from contextvars import ContextVar
+from functools import cache
+from logging.handlers import QueueHandler, QueueListener
+from os import path
+
+import yaml
+from pydantic import SecretStr
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file='./app/.env', env_file_encoding='utf-8')
-    # model_config = SettingsConfigDict(secrets_dir='/run/secrets')
     redis_host: SecretStr
     redis_port: SecretStr
     redis_db: SecretStr
