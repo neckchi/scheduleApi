@@ -16,12 +16,3 @@ data:
     keepAliveExpiry: 40
     retryNumber: 2
     asyncDefaultTimeOut: 10
-  activeCarriers:
-    cma: True
-    hlag: True
-    hmm: True
-    iqax: True
-    maersk: True
-    msc: True
-    one: True
-    zim: True
