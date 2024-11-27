@@ -21,7 +21,7 @@ archive.zip
 build
 logs
 verified network
-.env
+app/.env
 .csv
 .log
 app/test_main.py
