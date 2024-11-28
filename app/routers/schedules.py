@@ -59,7 +59,7 @@ async def get_schedules(background_tasks: BackgroundTasks,
     ttl_schedule = await db.get(key=product_id, log_component='the whole schedules')
     if not ttl_schedule:
         # 👇 Having this allows for waiting for all our tasks with strong safety guarantees,logic around cancellation for failures,coroutine-safe and grouping of exceptions.
-        final_schedule = await route_to_carrier_api(client=client, product_id=product_id, request=request, query_params=query_params, response=response, carrier_status=carrier_status, settings=settings, background_tasks=background_tasks)
+        final_schedule = await route_to_carrier_api(client=client, product_id=product_id, query_params=query_params, response=response, settings=settings, background_tasks=background_tasks)
         return final_schedule
     else:
         return ttl_schedule

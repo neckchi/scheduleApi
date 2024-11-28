@@ -2,7 +2,7 @@ import logging
 import time
 from uuid import UUID
 
-from fastapi import BackgroundTasks, Request, Response, Query
+from fastapi import BackgroundTasks, Response, Query
 
 from app.carrierp2p import cma, one, hmm, zim, maersk, msc, iqax, hlag
 from app.config import correlation_context
@@ -10,11 +10,11 @@ from app.routers.router_config import AsyncTaskManager, HTTPClientWrapper
 from app.schemas.schema_request import StartDateType
 
 
-async def route_to_carrier_api(product_id: UUID, client: HTTPClientWrapper, request: Request, query_params: Query, response: Response, carrier_status, settings, background_tasks: BackgroundTasks):
+async def route_to_carrier_api(product_id: UUID, client: HTTPClientWrapper, query_params: Query, response: Response, settings, background_tasks: BackgroundTasks):
     async with AsyncTaskManager() as task_group:
         start_time = time.time()
         for carriers in query_params.scac:
-            if carrier_status['data']['activeCarriers']['cma'] and (carriers in {'CMDU', 'ANNU', 'APLU', 'CHNL'} or carriers is None):
+            if carriers in {'CMDU', 'ANNU', 'APLU', 'CHNL'} or carriers is None:
                 task_group.create_task(name='CMA_task' if carriers is None else f'{carriers}_task', coro=lambda cma_scac=carriers: cma.get_cma_p2p(
                     client=client,
                     background_task=background_tasks,
@@ -32,7 +32,7 @@ async def route_to_carrier_api(product_id: UUID, client: HTTPClientWrapper, requ
                     scac=cma_scac
                 ))
 
-            if carrier_status['data']['activeCarriers']['one'] and (carriers == 'ONEY' or carriers is None):
+            if carriers == 'ONEY' or carriers is None:
                 task_group.create_task(name='ONE_task', coro=lambda: one.get_one_p2p(
                     client=client,
                     background_task=background_tasks,
@@ -52,7 +52,7 @@ async def route_to_carrier_api(product_id: UUID, client: HTTPClientWrapper, requ
                 ))
 
             # Missing Location Code from HDMU response
-            if carrier_status['data']['activeCarriers']['hmm'] and (carriers == 'HDMU' or carriers is None):
+            if carriers == 'HDMU' or carriers is None:
                 task_group.create_task(name='HMM_task', coro=lambda: hmm.get_hmm_p2p(
                     client=client,
                     background_task=background_tasks,
@@ -68,7 +68,7 @@ async def route_to_carrier_api(product_id: UUID, client: HTTPClientWrapper, requ
                     service=query_params.service
                 ))
 
-            if carrier_status['data']['activeCarriers']['zim'] and (carriers == 'ZIMU' or carriers is None):
+            if carriers == 'ZIMU' or carriers is None:
                 task_group.create_task(name='ZIM_task', coro=lambda: zim.get_zim_p2p(
                     client=client,
                     background_task=background_tasks,
@@ -88,7 +88,7 @@ async def route_to_carrier_api(product_id: UUID, client: HTTPClientWrapper, requ
                     tsp=query_params.tsp
                 ))
 
-            if carrier_status['data']['activeCarriers']['maersk'] and (carriers in {'MAEU', 'MAEI'} or carriers is None):
+            if carriers in {'MAEU', 'MAEI'} or carriers is None:
                 task_group.create_task(name='MAEU_task' if carriers is None else f'{carriers}_task', coro=lambda maersk_scac=carriers: maersk.get_maersk_p2p(
                     client=client,
                     background_task=background_tasks,
@@ -110,7 +110,7 @@ async def route_to_carrier_api(product_id: UUID, client: HTTPClientWrapper, requ
                     vessel_flag=query_params.vessel_flag_code
                 ))
 
-            if carrier_status['data']['activeCarriers']['msc'] and (carriers == 'MSCU' or carriers is None):
+            if carriers == 'MSCU' or carriers is None:
                 task_group.create_task(name='MSC_task', coro=lambda: msc.get_msc_p2p(
                     client=client,
                     background_task=background_tasks,
@@ -132,7 +132,7 @@ async def route_to_carrier_api(product_id: UUID, client: HTTPClientWrapper, requ
                     tsp=query_params.tsp
                 ))
 
-            if carrier_status['data']['activeCarriers']['iqax'] and (carriers in {'OOLU', 'COSU'} or carriers is None):
+            if carriers in {'OOLU', 'COSU'} or carriers is None:
                 task_group.create_task(name='IQAX_task' if carriers is None else f'{carriers}_task', coro=lambda cosco_scac=carriers: iqax.get_iqax_p2p(
                     client=client,
                     background_task=background_tasks,
@@ -150,7 +150,7 @@ async def route_to_carrier_api(product_id: UUID, client: HTTPClientWrapper, requ
                     service=query_params.service
                 ))
 
-            if carrier_status['data']['activeCarriers']['hlag'] and (carriers == 'HLCU' or carriers is None):
+            if carriers == 'HLCU' or carriers is None:
                 task_group.create_task(name='HLAG_task', coro=lambda: hlag.get_hlag_p2p(
                     client=client,
                     background_task=background_tasks,
