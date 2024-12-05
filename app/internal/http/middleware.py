@@ -10,13 +10,13 @@ _correlation_id_ctx_var: ContextVar[str | None] = ContextVar(CORRELATION_ID_CTX_
 
 
 def get_correlation_id() -> str:
-	return _correlation_id_ctx_var.get()
+    return _correlation_id_ctx_var.get()
 
 
 class RequestContextLogMiddleware(BaseHTTPMiddleware):
-	async def dispatch(self, request: Request, call_next: RequestResponseEndpoint):
-		correlation_id = _correlation_id_ctx_var.set(request.headers.get('X-Correlation-ID', str(uuid4())))
-		response = await call_next(request)
-		response.headers['X-Correlation-ID'] = get_correlation_id()
-		_correlation_id_ctx_var.reset(correlation_id)
-		return response
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint):
+        correlation_id = _correlation_id_ctx_var.set(request.headers.get('X-Correlation-ID', str(uuid4())))
+        response = await call_next(request)
+        response.headers['X-Correlation-ID'] = get_correlation_id()
+        _correlation_id_ctx_var.reset(correlation_id)
+        return response
