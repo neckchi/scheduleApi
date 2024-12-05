@@ -2,11 +2,13 @@ import logging
 import time
 from uuid import UUID
 from fastapi import BackgroundTasks, Request, Response, Query
-from app.api.carrier_api import cma, one, hmm, zim, maersk, msc, iqax, hlag
+from app.api.carrier_api import cma, one, zim, maersk, msc, iqax, hlag
 from app.api.schemas.schema_request import StartDateType
 from app.internal.http.http_client_manager import AsyncTaskManager, HTTPClientWrapper
 
-async def route_to_carrier_api(product_id: UUID,client: HTTPClientWrapper,request: Request,query_params: Query,response: Response,settings,port_code_mapping,background_tasks: BackgroundTasks):
+
+async def route_to_carrier_api(product_id: UUID, client: HTTPClientWrapper, request: Request, query_params: Query,
+                               response: Response, settings, port_code_mapping, background_tasks: BackgroundTasks):
     async with AsyncTaskManager() as task_group:
         start_time = time.time()
         for carriers in query_params.scac:
@@ -19,10 +21,14 @@ async def route_to_carrier_api(product_id: UUID,client: HTTPClientWrapper,reques
                         background_task=background_tasks,
                         url=settings.cma_url,
                         scac=cma_scac,
-                        pol=port_code_mapping.get(f"{cma_scac}_pol_code" if not cma_scac else 'CMDU_pol_code') or query_params.point_from,
-                        pod=port_code_mapping.get(f"{cma_scac}_pod_code" if not cma_scac else 'CMDU_pod_code') or query_params.point_to,
-                        departure_date=query_params.start_date.strftime('%Y-%m-%d') if query_params.start_date_type == StartDateType.departure else None,
-                        arrival_date=query_params.start_date.strftime('%Y-%m-%d') if query_params.start_date_type == StartDateType.arrival else None,
+                        pol=port_code_mapping.get(
+                            f"{cma_scac}_pol_code" if not cma_scac else 'CMDU_pol_code') or query_params.point_from,
+                        pod=port_code_mapping.get(
+                            f"{cma_scac}_pod_code" if not cma_scac else 'CMDU_pod_code') or query_params.point_to,
+                        departure_date=query_params.start_date.strftime(
+                            '%Y-%m-%d') if query_params.start_date_type == StartDateType.departure else None,
+                        arrival_date=query_params.start_date.strftime(
+                            '%Y-%m-%d') if query_params.start_date_type == StartDateType.arrival else None,
                         search_range=query_params.search_range.duration,
                         direct_only=query_params.direct_only,
                         vessel_imo=query_params.vessel_imo,
@@ -34,15 +40,17 @@ async def route_to_carrier_api(product_id: UUID,client: HTTPClientWrapper,reques
             if carriers == 'APLU' or carriers is None:
                 task_group.create_task(
                     name=f'APLU_task',
-                    coro=lambda:cma.get_cma_p2p(
+                    coro=lambda: cma.get_cma_p2p(
                         client=client,
                         background_task=background_tasks,
                         url=settings.cma_url,
                         scac="APLU",
                         pol=port_code_mapping.get('APLU_pol_code') or query_params.point_from,
                         pod=port_code_mapping.get('APLU_pod_code') or query_params.point_to,
-                        departure_date=query_params.start_date.strftime('%Y-%m-%d') if query_params.start_date_type == StartDateType.departure else None,
-                        arrival_date=query_params.start_date.strftime('%Y-%m-%d') if query_params.start_date_type == StartDateType.arrival else None,
+                        departure_date=query_params.start_date.strftime(
+                            '%Y-%m-%d') if query_params.start_date_type == StartDateType.departure else None,
+                        arrival_date=query_params.start_date.strftime(
+                            '%Y-%m-%d') if query_params.start_date_type == StartDateType.arrival else None,
                         search_range=query_params.search_range.duration,
                         direct_only=query_params.direct_only,
                         vessel_imo=query_params.vessel_imo,
@@ -198,14 +206,16 @@ async def route_to_carrier_api(product_id: UUID,client: HTTPClientWrapper,reques
             if carriers == 'OOLU' or carriers is None:
                 task_group.create_task(
                     name=f'OOLU_task',
-                    coro=lambda : iqax.get_iqax_p2p(
+                    coro=lambda: iqax.get_iqax_p2p(
                         client=client,
                         background_task=background_tasks,
                         url=settings.iqax_url,
                         pol=port_code_mapping.get('OOLU_pol_code') or query_params.point_from,
                         pod=port_code_mapping.get('OOLU_pol_code') or query_params.point_to,
-                        departure_date=query_params.start_date.strftime('%Y-%m-%d') if query_params.start_date_type == StartDateType.departure else None,
-                        arrival_date=query_params.start_date.strftime('%Y-%m-%d') if query_params.start_date_type == StartDateType.arrival else None,
+                        departure_date=query_params.start_date.strftime(
+                            '%Y-%m-%d') if query_params.start_date_type == StartDateType.departure else None,
+                        arrival_date=query_params.start_date.strftime(
+                            '%Y-%m-%d') if query_params.start_date_type == StartDateType.arrival else None,
                         search_range=query_params.search_range.value,
                         direct_only=query_params.direct_only,
                         tsp=query_params.tsp,
@@ -225,8 +235,10 @@ async def route_to_carrier_api(product_id: UUID,client: HTTPClientWrapper,reques
                         url=settings.iqax_url,
                         pol=port_code_mapping.get('COSU_pol_code') or query_params.point_from,
                         pod=port_code_mapping.get('COSU_pol_code') or query_params.point_to,
-                        departure_date=query_params.start_date.strftime('%Y-%m-%d') if query_params.start_date_type == StartDateType.departure else None,
-                        arrival_date=query_params.start_date.strftime('%Y-%m-%d') if query_params.start_date_type == StartDateType.arrival else None,
+                        departure_date=query_params.start_date.strftime(
+                            '%Y-%m-%d') if query_params.start_date_type == StartDateType.departure else None,
+                        arrival_date=query_params.start_date.strftime(
+                            '%Y-%m-%d') if query_params.start_date_type == StartDateType.arrival else None,
                         search_range=query_params.search_range.value,
                         direct_only=query_params.direct_only,
                         tsp=query_params.tsp,

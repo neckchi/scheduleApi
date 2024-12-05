@@ -4,7 +4,6 @@ from functools import cache
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file='./app/.env', env_file_encoding='utf-8')
     # model_config = SettingsConfigDict(secrets_dir='/run/secrets')
@@ -64,7 +63,3 @@ def load_yaml() -> dict:
     with open(file='./app/configmap.yaml', mode='r') as yml_file:
         config = yaml.load(yml_file, Loader=yaml.FullLoader)
     return config
-
-
-
-
