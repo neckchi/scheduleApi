@@ -1,5 +1,5 @@
-from datetime import datetime, timedelta
-from typing import Generator, Iterator
+from datetime import timedelta
+from typing import Iterator
 
 from fastapi import BackgroundTasks
 
@@ -29,7 +29,7 @@ def process_leg_data(check_transshipment: bool, first_point_from: str, last_poin
             transitTime=round(leg['transitDurationHrsUtc'] / 24),
             cutoffs=Cutoff.model_construct(cyCutoffDate=first_cy_cutoff, docCutoffDate=first_doc_cutoff,
                                            vgmCutOffDate=first_vgm_cutoff) if index == 0 and (
-                    first_cy_cutoff or first_doc_cutoff or first_vgm_cutoff) else None,
+              first_cy_cutoff or first_doc_cutoff or first_vgm_cutoff) else None,
             transportations=Transportation.model_construct(transportType='Vessel', transportName=leg['transportName'],
                                                            referenceType=None if (transport_type := leg.get(
                                                                'transportID')) == 'UNKNOWN' else 'IMO',
@@ -38,10 +38,10 @@ def process_leg_data(check_transshipment: bool, first_point_from: str, last_poin
                                                                                                               service_code :=
                                                                                                               leg[
                                                                                                                   'serviceCode']) or (
-                                                                                                                  leg[
-                                                                                                                      'serviceName'] and
-                                                                                                                  leg[
-                                                                                                                      'serviceName'] != '') else None,
+                                                                                                            leg[
+                                                                                                                'serviceName'] and
+                                                                                                            leg[
+                                                                                                                'serviceName'] != '') else None,
             voyages=Voyage.model_construct(
                 internalVoyage=voyage_num if (voyage_num := leg.get('conveyanceNumber')) else None)) for index, leg in
             enumerate(schedule_task['legs'])]
@@ -101,22 +101,59 @@ async def get_one_access_token(client: HTTPClientWrapper, background_task: Backg
     return response_token['access_token']
 
 
+from typing import Generator, Optional
+from datetime import datetime
+
+
 async def get_one_p2p(client: HTTPClientWrapper, background_task: BackgroundTasks, url: str, token_url: str, pw: str,
                       auth: str, pol: str, pod: str, search_range: int,
-                      direct_only: bool | None, start_date_type: str, start_date: datetime.date,
-                      service: str | None = None, vessel_imo: str | None = None, tsp: str | None = None) -> Generator:
-    params: dict = {'originPort': pol, 'destinationPort': pod, 'searchDate': start_date.strftime('%Y-%m-%d'),
-                    'searchDateType': start_date_type, 'weeksOut': search_range,
-                    'directOnly': 'TRUE' if direct_only is True else 'FALSE'}
-    # weekout:1 ≤ value ≤ 14
-    generate_schedule = lambda data: (schedule_result for schedule_type in data for task in data[schedule_type] for
-                                      schedule_result in
-                                      process_response_data(task=task, vessel_imo=vessel_imo, service=service, tsp=tsp))
-    token: str = await get_one_access_token(client=client, background_task=background_task, token_url=token_url,
-                                            auth=auth, api_key=pw)
-    headers: dict = {'apikey': pw, 'Authorization': f'Bearer {token}', 'Accept': 'application/json'}
+                      direct_only: Optional[bool], start_date_type: str, start_date: datetime.date,
+                      service: Optional[str] = None, vessel_imo: Optional[str] = None,
+                      tsp: Optional[str] = None) -> Generator:
+    # Construct request parameters
+    params: dict = {
+        'originPort': pol,
+        'destinationPort': pod,
+        'searchDate': start_date.strftime('%Y-%m-%d'),
+        'searchDateType': start_date_type,
+        'weeksOut': search_range,
+        'directOnly': 'TRUE' if direct_only is True else 'FALSE'
+    }
+
+    # Define a function to generate schedule results
+    def generate_schedule(data: dict) -> Generator:
+        for schedule_type, tasks in data.items():
+            for task in tasks:
+                yield from process_response_data(task=task, vessel_imo=vessel_imo, service=service, tsp=tsp)
+
+    # Fetch access token
+    token: str = await get_one_access_token(
+        client=client,
+        background_task=background_task,
+        token_url=token_url,
+        auth=auth,
+        api_key=pw
+    )
+
+    # Construct request headers
+    headers: dict = {
+        'apikey': pw,
+        'Authorization': f'Bearer {token}',
+        'Accept': 'application/json'
+    }
+
+    # Fetch data from the API
     response_json: dict = await anext(
-        client.parse(method='GET', background_tasks=background_task, url=url, params=params, headers=headers,
-                     namespace='one original response'))
+        client.parse(
+            method='GET',
+            background_tasks=background_task,
+            url=url,
+            params=params,
+            headers=headers,
+            namespace='one original response'
+        )
+    )
+
+    # Validate response and return the schedule generator if no errors
     if response_json and response_json.get('errorMessages') is None:
         return generate_schedule(data=response_json)

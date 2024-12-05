@@ -33,7 +33,7 @@ app.add_event_handler("shutdown", shutdown_event)
          response_description="Return HTTP Status Code 200 (OK)", status_code=status.HTTP_200_OK,
          response_model=HealthCheck)
 async def get_health() -> HealthCheck:
-    return HealthCheck(status=f"OK")
+    return HealthCheck(status="OK")
 
 
 @app.get("/docs", include_in_schema=False)

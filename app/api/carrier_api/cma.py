@@ -101,15 +101,40 @@ def process_schedule_data(task: dict, direct_only: bool | None, service_filter: 
         yield schedule_body
 
 
+def generate_schedule(data, direct_only, service, vessel_imo):
+    for task in data:
+        for schedule_result in process_schedule_data(task=task,
+                                                     direct_only=direct_only,
+                                                     service_filter=service,
+                                                     vessel_imo_filter=vessel_imo):
+            yield schedule_result
+
+
 async def fetch_schedules(client: HTTPClientWrapper, background_task: BackgroundTasks, cma_code: str, url: str,
                           headers: dict, params: dict, extra_condition: bool) -> dict:
     """Fetch the initial set of schedules from CMA."""
-    updated_params = lambda cma_internal_code: {**params, **(
-        {'shippingCompany': cma_internal_code} if cma_internal_code is not None else {}),
-                                                'specificRoutings': 'USGovernment' if cma_internal_code == '0015' and extra_condition else 'Commercial'}
+
+    def updated_params(cma_internal_code: str) -> dict:
+        """Update request parameters based on CMA internal code and extra condition."""
+        updated = {**params}
+        if cma_internal_code is not None:
+            updated['shippingCompany'] = cma_internal_code
+        updated[
+            'specificRoutings'] = 'USGovernment' if cma_internal_code == '0015' and extra_condition else 'Commercial'
+        return updated
+
+    # Use the updated parameters to fetch the schedules
     response_json: dict = await anext(
-        client.parse(background_tasks=background_task, method='GET', url=url, params=updated_params(cma_code),
-                     headers=headers, namespace=f'{CMA_GROUP.get(cma_code) if cma_code else "CMDU"} original response'))
+        client.parse(
+            background_tasks=background_task,
+            method='GET',
+            url=url,
+            params=updated_params(cma_code),
+            headers=headers,
+            namespace=f'{CMA_GROUP.get(cma_code) if cma_code else "CMDU"} original response'
+        )
+    )
+
     if response_json:
         return response_json
 
@@ -119,12 +144,6 @@ async def get_cma_p2p(client: HTTPClientWrapper, background_task: BackgroundTask
                       vessel_imo: str | None = None,
                       departure_date: datetime.date = None, arrival_date: datetime.date = None, scac: str | None = None,
                       service: str | None = None) -> Generator:
-    generate_schedule = lambda data, direct_only, service, vessel_imo: (schedule_result for task in data for
-                                                                        schedule_result in
-                                                                        process_schedule_data(task=task,
-                                                                                              direct_only=direct_only,
-                                                                                              service_filter=service,
-                                                                                              vessel_imo_filter=vessel_imo))
     api_carrier_code: str = next(k for k, v in CMA_GROUP.items() if v == scac.upper()) if scac else None
     headers: dict = {'keyID': pw}
     carrier_params: dict = {'placeOfLoading': pol, 'placeOfDischarge': pod, 'departureDate': departure_date,

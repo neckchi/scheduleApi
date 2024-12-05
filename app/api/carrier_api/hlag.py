@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import Iterator
+from typing import Iterator, Optional
 
 from fastapi import BackgroundTasks
 
@@ -56,20 +56,51 @@ def process_schedule_data(task: dict, service: str, tsp: str, vessel_imo: str) -
 
 async def get_hlag_p2p(client: HTTPClientWrapper, background_task: BackgroundTasks, url: str, client_id: str,
                        client_secret: str, pol: str, pod: str, search_range: int,
-                       etd: datetime.date = None, eta: datetime.date = None, direct_only: bool | None = None,
-                       service: str | None = None, tsp: str | None = None, vessel_imo: str | None = None):
+                       etd: Optional[datetime] = None, eta: Optional[datetime] = None,
+                       direct_only: Optional[bool] = None,
+                       service: Optional[str] = None, tsp: Optional[str] = None, vessel_imo: Optional[str] = None):
+    # Determine the start and end day based on ETD or ETA
     start_day: str = etd.strftime("%Y-%m-%dT%H:%M:%S.%SZ") if etd else eta.strftime("%Y-%m-%dT%H:%M:%S.%SZ")
-    end_day: str = (etd + timedelta(days=search_range)).strftime("%Y-%m-%dT%H:%M:%S.%SZ") if etd else (
-            eta + timedelta(days=search_range)).strftime("%Y-%m-%dT%H:%M:%S.%SZ")
+    end_day: str = (
+        (etd + timedelta(days=search_range)).strftime("%Y-%m-%dT%H:%M:%S.%SZ") if etd else
+        (eta + timedelta(days=search_range)).strftime("%Y-%m-%dT%H:%M:%S.%SZ")
+    )
+
+    # Construct the request parameters
     params: dict = {'placeOfReceipt': pol, 'placeOfDelivery': pod}
-    params.update({'departureDateTime:gte': start_day, 'departureDateTime:lte': end_day}) if etd else params.update(
-        {'arrivalDateTime:gte': start_day, 'arrivalDateTime:lte': end_day})
-    params.update({'isTranshipment': not (direct_only)}) if direct_only is not None else ...
-    generate_schedule = lambda data: (result for task in data for result in
-                                      process_schedule_data(task=task, service=service, tsp=tsp, vessel_imo=vessel_imo))
-    headers: dict = {'X-IBM-Client-Id': client_id, 'X-IBM-Client-Secret': client_secret, 'Accept': 'application/json'}
+    if etd:
+        params.update({'departureDateTime:gte': start_day, 'departureDateTime:lte': end_day})
+    else:
+        params.update({'arrivalDateTime:gte': start_day, 'arrivalDateTime:lte': end_day})
+
+    if direct_only is not None:
+        params.update({'isTranshipment': not direct_only})
+
+    # Define a function to generate schedules from response data
+    def generate_schedule(data):
+        for task in data:
+            for result in process_schedule_data(task=task, service=service, tsp=tsp, vessel_imo=vessel_imo):
+                yield result
+
+    # Construct the request headers
+    headers: dict = {
+        'X-IBM-Client-Id': client_id,
+        'X-IBM-Client-Secret': client_secret,
+        'Accept': 'application/json'
+    }
+
+    # Fetch data from the API
     response_json = await anext(
-        client.parse(method='GET', background_tasks=background_task, url=url, params=params, headers=headers,
-                     namespace='hlag original response'))
+        client.parse(
+            method='GET',
+            background_tasks=background_task,
+            url=url,
+            params=params,
+            headers=headers,
+            namespace='hlag original response'
+        )
+    )
+
+    # If response data is available, generate the schedule
     if response_json:
         return generate_schedule(data=response_json)

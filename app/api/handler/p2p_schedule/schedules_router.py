@@ -4,7 +4,7 @@ from typing import Annotated, Optional, get_args
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, Query, Request, Response
 
 from app.api.handler.p2p_schedule.external_api_routes import route_to_carrier_api
-from app.api.schemas import schema_response
+from app.api.schemas.schema_response import Product
 from app.api.schemas.schema_request import CarrierCode, QueryParams
 from app.internal.http.http_client_manager import HTTPClientWrapper, get_global_http_client_wrapper
 from app.internal.security import basic_auth
@@ -14,7 +14,7 @@ from app.storage import db
 router = APIRouter(prefix='/schedules', tags=["API Point To Point Schedules"])
 
 
-@router.get("/p2p", summary="Search Point To Point schedules from carriers", response_model=schema_response.Product,
+@router.get("/p2p", summary="Search Point To Point schedules from carriers", response_model=Product,
             response_model_exclude_defaults=True,
             response_description='Return a list of carrier ocean products with multiple schedules')
 async def get_schedules(background_tasks: BackgroundTasks,

@@ -1,5 +1,5 @@
-import datetime
-from typing import Iterator
+from datetime import datetime, timedelta
+from typing import Iterator, Optional, Generator
 
 from fastapi import BackgroundTasks
 
@@ -27,7 +27,7 @@ def process_leg_data(leg_task: list, check_nearest_pol_etd: tuple) -> list:
         pointTo=PointBase.model_construct(locationName=leg['arrivalPortName'], locationCode=leg['arrivalPort']),
         etd=(etd := leg['departureDate']),
         eta=(eta := leg['arrivalDate']),
-        transitTime=int((datetime.datetime.fromisoformat(eta) - datetime.datetime.fromisoformat(etd)).days),
+        transitTime=int((datetime.fromisoformat(eta) - datetime.fromisoformat(etd)).days),
         transportations=Transportation.model_construct(
             transportType=(transport := TRANSPORT_TYPE.get(leg['vesselName'], 'Vessel')),
             transportName=(vessel_name := leg['vesselName']), referenceType='IMO',
@@ -54,7 +54,7 @@ def process_schedule_data(task: dict, direct_only: bool | None, vessel_imo: str,
     transshipment_port: bool = any(
         tsport['departurePort'] == tsp for tsport in task['routeLegs'][1:]) if check_transshipment and tsp else False
     if (transshipment_port or not tsp) and (direct_only is None or direct_only != check_transshipment) and (
-            check_service_code or not service) and check_vessel_imo:
+      check_service_code or not service) and check_vessel_imo:
         transit_time: int = task['transitTime']
         first_point_from: str = task['departurePort']
         check_nearest_pol_etd: tuple = next(
@@ -77,26 +77,60 @@ async def get_zim_access_token(client: HTTPClientWrapper, background_tasks: Back
                     'scope': 'Vessel Schedule'}
     response_token: dict = await anext(
         client.parse(background_tasks=background_tasks, method='POST', url=token_url, headers=headers, data=params,
-                     expire=datetime.timedelta(minutes=55), namespace='zim token'))
+                     expire=timedelta(minutes=55), namespace='zim token'))
     return response_token['access_token']
 
 
 async def get_zim_p2p(client: HTTPClientWrapper, background_task: BackgroundTasks, url: str, token_url: str, pw: str,
                       zim_client: str, zim_secret: str, pol: str, pod: str,
-                      search_range: int, start_date_type: str, start_date: datetime.datetime.date,
-                      direct_only: bool | None, vessel_imo: str | None = None, service: str | None = None,
-                      tsp: str | None = None):
-    params: dict = {'originCode': pol, 'destCode': pod, 'fromDate': start_date.strftime('%Y-%m-%d'),
-                    'toDate': (start_date + datetime.timedelta(days=search_range)).strftime("%Y-%m-%d"),
-                    'sortByDepartureOrArrival': start_date_type}
-    generate_schedule = lambda data: (result for task in data['response']['routes'] for result in
-                                      process_schedule_data(task=task, direct_only=direct_only, vessel_imo=vessel_imo,
-                                                            service=service, tsp=tsp))
-    token: str = await get_zim_access_token(client=client, background_tasks=background_task, token_url=token_url,
-                                            api_key=pw, client_id=zim_client, secret=zim_secret)
-    headers: dict = {'Ocp-Apim-Subscription-Key': pw, 'Authorization': f'Bearer {token}', 'Accept': 'application/json'}
+                      search_range: int, start_date_type: str, start_date: datetime.date,
+                      direct_only: Optional[bool], vessel_imo: Optional[str] = None, service: Optional[str] = None,
+                      tsp: Optional[str] = None) -> Generator:
+    # Construct request parameters
+    params: dict = {
+        'originCode': pol,
+        'destCode': pod,
+        'fromDate': start_date.strftime('%Y-%m-%d'),
+        'toDate': (start_date + timedelta(days=search_range)).strftime('%Y-%m-%d'),
+        'sortByDepartureOrArrival': start_date_type
+    }
+
+    # Define a function to generate schedule results
+    def generate_schedule(data: dict) -> Generator:
+        for task in data.get('response', {}).get('routes', []):
+            for result in process_schedule_data(task=task, direct_only=direct_only, vessel_imo=vessel_imo,
+                                                service=service, tsp=tsp):
+                yield result
+
+    # Fetch access token
+    token: str = await get_zim_access_token(
+        client=client,
+        background_tasks=background_task,
+        token_url=token_url,
+        api_key=pw,
+        client_id=zim_client,
+        secret=zim_secret
+    )
+
+    # Construct request headers
+    headers: dict = {
+        'Ocp-Apim-Subscription-Key': pw,
+        'Authorization': f'Bearer {token}',
+        'Accept': 'application/json'
+    }
+
+    # Fetch data from the API
     response_json: dict = await anext(
-        client.parse(background_tasks=background_task, method='GET', url=url, params=params, headers=headers,
-                     namespace='zim original response'))
+        client.parse(
+            background_tasks=background_task,
+            method='GET',
+            url=url,
+            params=params,
+            headers=headers,
+            namespace='zim original response'
+        )
+    )
+
+    # Validate response and return the schedule generator if data is available
     if response_json:
         return generate_schedule(data=response_json)

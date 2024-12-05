@@ -1,5 +1,5 @@
 import datetime
-from typing import Generator, Iterator
+from typing import Generator, Iterator, Optional
 
 from fastapi import BackgroundTasks
 
@@ -52,7 +52,7 @@ def process_leg_data(schedule_task: dict, last_point_to: str, check_transshipmen
                                      eta=(eta := legs.get('vesselArrivalDate')),
                                      cutoffs=Cutoff.model_construct(cyCutoffDate=first_cy_cutoff,
                                                                     docCutoffDate=first_doc_cutoff) if index == 0 and (
-                                             first_cy_cutoff or first_doc_cutoff) else None,
+                                       first_cy_cutoff or first_doc_cutoff) else None,
                                      transitTime=int((datetime.datetime.fromisoformat(
                                          eta) - datetime.datetime.fromisoformat(etd)).days),
                                      transportations=Transportation.model_construct(transportType='Vessel' if (
@@ -113,18 +113,42 @@ def process_schedule_data(task: dict, vessel_imo: str, service: str, tsp: str) -
 
 
 async def get_hmm_p2p(client: HTTPClientWrapper, background_task: BackgroundTasks, url: str, pw: str, pol: str,
-                      pod: str, search_range: str, direct_only: bool | None,
-                      start_date: datetime, tsp: str | None = None, vessel_imo: str | None = None,
-                      service: str | None = None) -> Generator:
-    params: dict = {'fromLocationCode': pol, 'receiveTermCode': 'CY', 'toLocationCode': pod, 'deliveryTermCode': 'CY',
-                    'periodDate': start_date.strftime("%Y%m%d"), 'weekTerm': search_range, 'webSort': 'D',
-                    'webPriority': 'D' if direct_only is True else 'T' if direct_only is False else 'A'}
-    generate_schedule = lambda data: (schedule_result for task in data.get('resultData') for schedule_result in
-                                      process_schedule_data(task=task, vessel_imo=vessel_imo, service=service, tsp=tsp))
+                      pod: str, search_range: str, direct_only: Optional[bool],
+                      start_date: datetime, tsp: Optional[str] = None, vessel_imo: Optional[str] = None,
+                      service: Optional[str] = None) -> Generator:
+    # Construct request parameters
+    params: dict = {
+        'fromLocationCode': pol,
+        'receiveTermCode': 'CY',
+        'toLocationCode': pod,
+        'deliveryTermCode': 'CY',
+        'periodDate': start_date.strftime("%Y%m%d"),
+        'weekTerm': search_range,
+        'webSort': 'D' if direct_only is True else 'T' if direct_only is False else 'A',
+        'webPriority': 'D' if direct_only is True else 'T' if direct_only is False else 'A'
+    }
+
+    # Define a function to generate schedule results
+    def generate_schedule(data: dict) -> Generator:
+        for task in data.get('resultData', []):
+            for schedule_result in process_schedule_data(task=task, vessel_imo=vessel_imo, service=service, tsp=tsp):
+                yield schedule_result
+
+    # Construct request headers
     headers: dict = {'x-Gateway-APIKey': pw}
+
+    # Fetch data from the API
     response_json: dict = await anext(
-        client.parse(method='POST', background_tasks=background_task, url=url, headers=headers, json=params,
-                     namespace='hmm original response'))
+        client.parse(
+            method='POST',
+            background_tasks=background_task,
+            url=url,
+            headers=headers,
+            json=params,
+            namespace='hmm original response'
+        )
+    )
+
+    # Validate response and return schedule generator if successful
     if response_json and response_json.get('resultMessage') == 'Success':
-        p2p_schedule: Generator = generate_schedule(data=response_json)
-        return p2p_schedule
+        return generate_schedule(data=response_json)

@@ -1,6 +1,6 @@
 from base64 import b64decode, b64encode
-from datetime import datetime, timedelta, timezone
-from typing import AsyncIterator, Generator, Iterator
+from datetime import timezone
+from typing import AsyncIterator, Iterator
 
 import jwt
 from cryptography.hazmat.backends import default_backend
@@ -54,7 +54,7 @@ def process_schedule_data(task: dict, direct_only: bool | None, vessel_imo: str,
     check_vessel_imo: bool = any(
         imo for imo in task['Schedules'] if imo.get('IMONumber') == vessel_imo) if vessel_imo else True
     if (transshipment_port or not tsp) and (
-            direct_only is None or check_transshipment != direct_only) and check_service_code and check_vessel_imo:
+      direct_only is None or check_transshipment != direct_only) and check_service_code and check_vessel_imo:
         first_point_from: str = task['Schedules'][0]['Calls'][0]['Code']
         last_point_to: str = task['Schedules'][-1]['Calls'][-1]['Code']
         first_etd: str = next(
@@ -88,22 +88,58 @@ async def get_msc_token(client: HTTPClientWrapper, background_task: BackgroundTa
     return response_token['access_token']
 
 
+from typing import Generator, Optional
+from datetime import datetime, timedelta
+
+
 async def get_msc_p2p(client: HTTPClientWrapper, background_task: BackgroundTasks, url: str, oauth: str, aud: str,
                       pw: str, msc_client: str, msc_scope: str, msc_thumbprint: str, pol: str, pod: str,
-                      search_range: int, start_date_type: str, start_date: datetime.date, direct_only: bool | None,
-                      vessel_imo: str | None = None, service: str | None = None, tsp: str | None = None) -> Generator:
-    params: dict = {'fromPortUNCode': pol, 'toPortUNCode': pod, 'fromDate': start_date.strftime('%Y-%m-%d'),
-                    'toDate': (start_date + timedelta(days=search_range)).strftime("%Y-%m-%d"),
-                    'datesRelated': start_date_type}
-    generate_schedule = lambda data: (schedule_result for task in data['MSCSchedule']['Transactions'] for
-                                      schedule_result in
-                                      process_schedule_data(task=task, direct_only=direct_only, vessel_imo=vessel_imo,
-                                                            service=service, tsp=tsp))
-    token = await get_msc_token(client=client, background_task=background_task, oauth=oauth, aud=aud, rsa=pw,
-                                msc_client=msc_client, msc_scope=msc_scope, msc_thumbprint=msc_thumbprint)
+                      search_range: int, start_date_type: str, start_date: datetime.date, direct_only: Optional[bool],
+                      vessel_imo: Optional[str] = None, service: Optional[str] = None,
+                      tsp: Optional[str] = None) -> Generator:
+    # Construct request parameters
+    params: dict = {
+        'fromPortUNCode': pol,
+        'toPortUNCode': pod,
+        'fromDate': start_date.strftime('%Y-%m-%d'),
+        'toDate': (start_date + timedelta(days=search_range)).strftime('%Y-%m-%d'),
+        'datesRelated': start_date_type
+    }
+
+    # Define a function to generate schedule results
+    def generate_schedule(data: dict) -> Generator:
+        for task in data.get('MSCSchedule', {}).get('Transactions', []):
+            for schedule_result in process_schedule_data(task=task, direct_only=direct_only, vessel_imo=vessel_imo,
+                                                         service=service, tsp=tsp):
+                yield schedule_result
+
+    # Fetch token
+    token = await get_msc_token(
+        client=client,
+        background_task=background_task,
+        oauth=oauth,
+        aud=aud,
+        rsa=pw,
+        msc_client=msc_client,
+        msc_scope=msc_scope,
+        msc_thumbprint=msc_thumbprint
+    )
+
+    # Construct request headers
     headers: dict = {'Authorization': f'Bearer {token}'}
+
+    # Fetch data from the API
     response_json: dict = await anext(
-        client.parse(method='GET', background_tasks=background_task, url=url, params=params, headers=headers,
-                     namespace='msc original response'))
+        client.parse(
+            method='GET',
+            background_tasks=background_task,
+            url=url,
+            params=params,
+            headers=headers,
+            namespace='msc original response'
+        )
+    )
+
+    # Validate response and return the schedule generator if data is available
     if response_json:
         return generate_schedule(data=response_json)
