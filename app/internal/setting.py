@@ -1,12 +1,8 @@
 import yaml
-import queue
-import logging.config
 from pydantic import SecretStr
 from functools import cache
-from os import path
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from logging.handlers import QueueHandler, QueueListener
-from contextvars import ContextVar
+
 
 
 class Settings(BaseSettings):
@@ -70,28 +66,5 @@ def load_yaml() -> dict:
     return config
 
 
-# Define a function to add extra information to the log records
-def log_queue_listener() -> QueueListener:
-    log_file_path = path.join(path.dirname(path.abspath(__file__)), 'logging.ini')
-    logging.config.fileConfig(log_file_path, disable_existing_loggers=False)
-    log_que = queue.Queue(-1)
-    queue_handler = QueueHandler(log_que)
-    stream_handler = logging.StreamHandler()
-    logger = logging.getLogger(__name__)
-    logger.addHandler(stream_handler)
-    logger.addHandler(queue_handler)
-    listener = QueueListener(log_que, stream_handler, queue_handler, respect_handler_level=True)
-    return listener
 
 
-old_factory = logging.getLogRecordFactory()
-correlation_context = ContextVar('correlation', default=None)
-
-
-def log_correlation():
-    def record_factory(*args, **kwargs):
-        record = old_factory(*args, **kwargs)
-        record.custom_attribute = correlation_context.get()
-        return record
-
-    return record_factory
