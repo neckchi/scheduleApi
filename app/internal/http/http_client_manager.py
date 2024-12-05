@@ -128,7 +128,7 @@ class HTTPClientWrapper:
             logging.info(
                 f'{method} took {response_time:.2f}s to process the request {extra_response.url} {extra_response.status}')
             if extra_response.status in (
-                    status.HTTP_206_PARTIAL_CONTENT, status.HTTP_200_OK) and extra_response is not None:
+              status.HTTP_206_PARTIAL_CONTENT, status.HTTP_200_OK) and extra_response is not None:
                 response_json = await extra_response.json()
                 yield response_json
 
@@ -314,8 +314,8 @@ class AsyncTaskManager:
             try:
                 return await asyncio.wait_for(coro(), timeout=self.default_timeout)
             except (
-                    asyncio.TimeoutError, asyncio.CancelledError, aiohttp.ClientConnectionError,
-                    aiohttp.ServerConnectionError):
+              asyncio.TimeoutError, asyncio.CancelledError, aiohttp.ClientConnectionError,
+              aiohttp.ServerConnectionError):
                 """Due to timeout, the coroutine task is cancelled. Once its cancelled, we retry it"""
                 logging.warning(
                     f"{task_name} timed out after {self.default_timeout} seconds. Retrying {retries + 1}/{self.max_retries}...")

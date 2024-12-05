@@ -84,7 +84,7 @@ class ClientSideCache:
 
     async def get_carrier_port_code(self, data: List[Dict]) -> Dict:
         try:
-            logging.info(f"Getting carrier port code based on the requested scac and port code")
+            logging.info("Getting carrier port code based on the requested scac and port code")
             return {f"{record['scac']}_{record['type']}_code": self.get_carrier_port_code_cache(scac=record['scac'],
                                                                                                 kn_port_code=record[
                                                                                                     'kn_port_code']) for
@@ -248,7 +248,7 @@ class ClientSideCache:
             except Exception as find_error:
                 retries -= 1
                 if retries == 0:
-                    raise ConnectionError(f'Unable to connect to RedisDB and retrieve cache from Redis')
+                    raise ConnectionError('Unable to connect to RedisDB and retrieve cache from Redis')
                 else:
                     logging.critical(f'Unable to retrieve cache from RedisDB due to {find_error}')
                     await self.initialize_database()

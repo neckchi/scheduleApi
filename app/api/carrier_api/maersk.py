@@ -62,7 +62,7 @@ def process_schedule_data(resp: dict, first_cut_off: dict, direct_only: bool | N
         check_vessel_imo: bool = any(imo for imo in task['transportLegs'] if deepget(imo['transport'], 'vessel',
                                                                                      'vesselIMONumber') == vessel_imo) if vessel_imo else True
         if (transshipment_port or not tsp) and (direct_only is None or check_transshipment != direct_only) and (
-                check_service_code or check_service_name) and check_vessel_imo:
+          check_service_code or check_service_name) and check_vessel_imo:
             transit_time: int = round(int(task['transitTime']) / 1400)
             first_point_from: str = task['facilities']['collectionOrigin'].get('cityUNLocationCode') or \
                                     task['facilities']['collectionOrigin'].get('siteUNLocationCode')

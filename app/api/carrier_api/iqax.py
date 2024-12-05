@@ -48,7 +48,7 @@ def process_leg_data(schedule_task: dict, first_etd: str, last_eta: str) -> list
                                                          leg_transport=leg_transport, leg_from=legs['fromPoint'],
                                                          legs_to=legs['toPoint'], last_eta=last_eta)
             leg_transit_time: int = leg_tt if leg_tt else (
-                    datetime.fromisoformat(final_eta[:10]) - datetime.fromisoformat(final_etd[:10])).days
+              datetime.fromisoformat(final_eta[:10]) - datetime.fromisoformat(final_etd[:10])).days
             leg_list.append(Leg.model_construct(
                 pointFrom=PointBase.model_construct(locationName=legs['fromPoint']['location']['name'],
                                                     locationCode=leg_pol,
@@ -93,7 +93,7 @@ def process_schedule_data(task: dict, direct_only: bool | None, vessel_imo: str,
     check_vessel_imo: bool = any(
         str(imo['vessel'].get('IMO')) == vessel_imo for imo in task['leg'] if imo.get('vessel')) if vessel_imo else True
     if (transshipment_port or not tsp) and (
-            direct_only is None or check_transshipment != direct_only) and check_service_code and check_vessel_imo:
+      direct_only is None or check_transshipment != direct_only) and check_service_code and check_vessel_imo:
         first_etd: str = task['por']['etd']
         last_eta: str = task['fnd']['eta']
         schedule_body = Schedule.model_construct(scac=task.get('carrierScac'),

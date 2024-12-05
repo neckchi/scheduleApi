@@ -41,7 +41,7 @@ async def route_to_carrier_api(product_id: UUID, client: HTTPClientWrapper, requ
             # APL carrier task
             if carriers == 'APLU' or carriers is None:
                 task_group.create_task(
-                    name=f'APLU_task',
+                    name='APLU_task',
                     coro=lambda: cma.get_cma_p2p(
                         client=client,
                         background_task=background_tasks,
@@ -130,7 +130,7 @@ async def route_to_carrier_api(product_id: UUID, client: HTTPClientWrapper, requ
             # MAERSK carrier task - MAEU
             if carriers == 'MAEU' or carriers is None:
                 task_group.create_task(
-                    name=f'MAEU_task',
+                    name='MAEU_task',
                     coro=lambda: maersk.get_maersk_p2p(
                         client=client,
                         background_task=background_tasks,
@@ -155,7 +155,7 @@ async def route_to_carrier_api(product_id: UUID, client: HTTPClientWrapper, requ
             # MAERSK carrier task - MAEI
             if carriers == 'MAEI' or carriers is None:
                 task_group.create_task(
-                    name=f'MAEI',
+                    name='MAEI',
                     coro=lambda: maersk.get_maersk_p2p(
                         client=client,
                         background_task=background_tasks,
@@ -207,7 +207,7 @@ async def route_to_carrier_api(product_id: UUID, client: HTTPClientWrapper, requ
             # COSU carrier task
             if carriers == 'OOLU' or carriers is None:
                 task_group.create_task(
-                    name=f'OOLU_task',
+                    name='OOLU_task',
                     coro=lambda: iqax.get_iqax_p2p(
                         client=client,
                         background_task=background_tasks,
@@ -230,7 +230,7 @@ async def route_to_carrier_api(product_id: UUID, client: HTTPClientWrapper, requ
 
             if carriers == 'COSU' or carriers is None:
                 task_group.create_task(
-                    name=f'COSU_task',
+                    name='COSU_task',
                     coro=lambda: iqax.get_iqax_p2p(
                         client=client,
                         background_task=background_tasks,
