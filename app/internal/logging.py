@@ -12,7 +12,8 @@ def setup_logging():
     logger = logging.getLogger()
     syslog = logging.StreamHandler()
     syslog.addFilter(AppFilter())
-    formatter = logging.Formatter('%(asctime)s loglevel=%(levelname)-6s logger=%(name)s %(funcName)s %(correlation_id)s %(message)s')
+    formatter = logging.Formatter(
+        '%(asctime)s loglevel=%(levelname)-6s logger=%(name)s %(funcName)s %(correlation_id)s %(message)s')
     syslog.setFormatter(formatter)
     logger.setLevel(logging.DEBUG if logging.DEBUG else logging.WARN)
     logger.addHandler(syslog)
