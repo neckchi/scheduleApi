@@ -128,7 +128,7 @@ class HTTPClientWrapper:
             logging.info(
                 f'{method} took {response_time:.2f}s to process the request {extra_response.url} {extra_response.status}')
             if extra_response.status in (
-              status.HTTP_206_PARTIAL_CONTENT, status.HTTP_200_OK) and extra_response is not None:
+                    status.HTTP_206_PARTIAL_CONTENT, status.HTTP_200_OK) and extra_response is not None:
                 response_json = await extra_response.json()
                 yield response_json
 
@@ -156,7 +156,7 @@ class HTTPClientWrapper:
                         extra_p2p_task = [asyncio.create_task(anext(
                             self.handle_extra_response(method="GET", url=url, params=params, json=json, data=data,
                                                        headers=dict(headers, **{'range': f'{num}-{49 + num}'})))) for
-                            num in range(page, last_page, page)]
+                                          num in range(page, last_page, page)]
                         extra_p2p_result = await asyncio.gather(*extra_p2p_task)
                         combined_schedule.extend(*extra_p2p_result)
                         if background_tasks:
@@ -185,7 +185,7 @@ class HTTPClientWrapper:
                                         data: Optional[Dict[str, Any]],
                                         background_tasks: Optional[BackgroundTasks],
                                         expire: timedelta, namespace: str | None = None) -> AsyncGenerator[
-        Dict[str, Any], None]:
+            Dict[str, Any], None]:
         try:
             cache_result = await db.get(key=url + str(params), namespace=namespace) if namespace else None
             if cache_result:
@@ -218,7 +218,8 @@ class HTTPClientWrapper:
 
     def gen_all_valid_schedules(self, request: Request, response: Response, product_id: UUID,
                                 matrix: Generator, point_from: str, point_to: str,
-                                background_tasks: BackgroundTasks, task_exception: bool) -> Dict[str, Any]:
+                                background_tasks: BackgroundTasks, task_exception: bool,
+                                failed_scac: Optional[list] = None) -> Dict[str, Any]:
         """Validate the schedule and serialize hte json file excluding the field without any value """
         mapping_time = time.time()
         flat_list: list = list(
@@ -231,7 +232,8 @@ class HTTPClientWrapper:
              "KN-Count-Schedules": str(count_schedules)})
 
         if count_schedules == 0:
-            final_result = JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(
+            resp_headers: dict = {'retry-failed': ", ".join(failed_scac)} if failed_scac else None
+            final_result = JSONResponse(status_code=status.HTTP_200_OK, headers=resp_headers, content=jsonable_encoder(
                 schema_response.Error(productid=product_id, details=f"{point_from}-{point_to} schedule not found")))
         else:
             validation_start_time = time.time()
@@ -247,6 +249,8 @@ class HTTPClientWrapper:
                 f'serialization_time={time.time() - dump_start_time:.2f}s Generate schedule file and exclude all the fields which are equal to None')
             if not task_exception:
                 background_tasks.add_task(db.set, key=request.url, value=final_result, namespace="schedule product")
+            else:
+                response.headers['retry-failed'] = ", ".join(failed_scac)
         """
         HTTP connection pooling status
         IDLE:The connection is not currently being used for any request.It is available for reuse by new requests.
@@ -256,7 +260,7 @@ class HTTPClientWrapper:
         return final_result
 
 
-http_client = HTTPClientWrapper('http://proxy.eu-central-1.aws.int.kn:80')
+http_client = HTTPClientWrapper('http://zscaler.proxy.int.kn:80')
 
 
 async def startup_event():
@@ -299,6 +303,7 @@ class AsyncTaskManager:
         self.error: bool = False
         self.default_timeout: int = default_timeout
         self.max_retries: int = max_retries
+        self.failed_scac: list = []
 
     async def __aenter__(self):
         return self
@@ -314,8 +319,8 @@ class AsyncTaskManager:
             try:
                 return await asyncio.wait_for(coro(), timeout=self.default_timeout)
             except (
-              asyncio.TimeoutError, asyncio.CancelledError, aiohttp.ClientConnectionError,
-              aiohttp.ServerConnectionError):
+                    asyncio.TimeoutError, asyncio.CancelledError, aiohttp.ClientConnectionError,
+                    aiohttp.ServerConnectionError):
                 """Due to timeout, the coroutine task is cancelled. Once its cancelled, we retry it"""
                 logging.warning(
                     f"{task_name} timed out after {self.default_timeout} seconds. Retrying {retries + 1}/{self.max_retries}...")
@@ -324,6 +329,7 @@ class AsyncTaskManager:
                 await asyncio.sleep(1)  # Wait for 1 sec before the next retry
         logging.error(f"{task_name} reached maximum retries. Nothing will be cached")
         self.error = True
+        self.failed_scac.append(task_name.split("_task")[0])
         return None
 
     def create_task(self, name: str, coro: Callable) -> None:

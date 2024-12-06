@@ -61,13 +61,13 @@ async def get_sudu_p2p(client, url: str, pw: str, pol: str, pod: str, direct_onl
                                                   legs['expectedDepartureLT'][:10])).days),
                                               'transportations': {
                                                   'transportType': 'Vessel' if legs[
-                                                                                   'transportMode'] == 'Liner' else str(
+                                                      'transportMode'] == 'Liner' else str(
                                                       legs['transportMode']).title(),
                                                   'transportName': vessel_name if vessel_name != '' else None,
                                                   'referenceType': 'IMO' if vessel_imo else None,
                                                   'reference': vessel_imo if vessel_imo != '' else None
-                                              }
-                                              }
+                            }
+                            }
                             if legs.get('cargoCutOffLT', None):
                                 cut_off_body: dict = {'cyCuttoff': legs['cargoCutOffLT']}
                                 leg_body.update({'cutoffs': cut_off_body})

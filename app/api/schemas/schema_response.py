@@ -56,8 +56,8 @@ class Transportation(BaseModel):
         reference = self.reference
         reference_type = self.referenceType
         if (reference_type is None and reference is not None) or (reference_type is not None and reference is None):
-            logging.error(' Either both of reference type and reference existed or both are not existed ')
-            raise ValueError(f'Either both of reference type and reference existed or both are not existed')
+            logging.error('Either both of reference type and reference existed or both are not existed ')
+            raise ValueError('Either both of reference type and reference existed or both are not existed')
         return self
 
     @model_validator(mode='after')
@@ -114,7 +114,7 @@ class Leg(BaseModel):
 
 
 class Schedule(BaseModel):
-    model_config = ConfigDict(cache_strings=False)
+    model_config = ConfigDict(cache_strings=False, use_enum_values=True)
     scac: CarrierCode
     pointFrom: Annotated[str, Field(max_length=5, title="Port Of Loading", pattern=r"[A-Z]{2}[A-Z0-9]{3}")]
     pointTo: Annotated[str, Field(max_length=5, title="Port Of Discharge", pattern=r"[A-Z]{2}[A-Z0-9]{3}")]

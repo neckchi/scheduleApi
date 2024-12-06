@@ -1,10 +1,12 @@
-from datetime import timedelta
-from typing import Iterator
+from datetime import timedelta, date
+from typing import Iterator, Optional, Generator
 
 from fastapi import BackgroundTasks
 
+from app.api.schemas.schema_request import SearchRange, StartDateType
 from app.api.schemas.schema_response import Cutoff, Leg, PointBase, Schedule, Service, Transportation, Voyage
 from app.internal.http.http_client_manager import HTTPClientWrapper
+from app.internal.setting import Settings
 
 
 def process_leg_data(check_transshipment: bool, first_point_from: str, last_point_to: str, first_etd: str,
@@ -28,20 +30,12 @@ def process_leg_data(check_transshipment: bool, first_point_from: str, last_poin
             eta=leg['arrivalDateEstimated'],
             transitTime=round(leg['transitDurationHrsUtc'] / 24),
             cutoffs=Cutoff.model_construct(cyCutoffDate=first_cy_cutoff, docCutoffDate=first_doc_cutoff,
-                                           vgmCutOffDate=first_vgm_cutoff) if index == 0 and (
-              first_cy_cutoff or first_doc_cutoff or first_vgm_cutoff) else None,
+                                           vgmCutOffDate=first_vgm_cutoff) if index == 0 and (first_cy_cutoff or first_doc_cutoff or first_vgm_cutoff) else None,
             transportations=Transportation.model_construct(transportType='Vessel', transportName=leg['transportName'],
-                                                           referenceType=None if (transport_type := leg.get(
-                                                               'transportID')) == 'UNKNOWN' else 'IMO',
+                                                           referenceType=None if (transport_type := leg.get('transportID')) == 'UNKNOWN' else 'IMO',
                                                            reference=None if transport_type == 'UNKNOWN' else transport_type),
             services=Service.model_construct(serviceCode=service_code, serviceName=leg['serviceName']) if (
-                                                                                                              service_code :=
-                                                                                                              leg[
-                                                                                                                  'serviceCode']) or (
-                                                                                                            leg[
-                                                                                                                'serviceName'] and
-                                                                                                            leg[
-                                                                                                                'serviceName'] != '') else None,
+                service_code := leg['serviceCode']) or (leg['serviceName'] and leg['serviceName'] != '') else None,
             voyages=Voyage.model_construct(
                 internalVoyage=voyage_num if (voyage_num := leg.get('conveyanceNumber')) else None)) for index, leg in
             enumerate(schedule_task['legs'])]
@@ -101,22 +95,21 @@ async def get_one_access_token(client: HTTPClientWrapper, background_task: Backg
     return response_token['access_token']
 
 
-from typing import Generator, Optional
-from datetime import datetime
-
-
-async def get_one_p2p(client: HTTPClientWrapper, background_task: BackgroundTasks, url: str, token_url: str, pw: str,
-                      auth: str, pol: str, pod: str, search_range: int,
-                      direct_only: Optional[bool], start_date_type: str, start_date: datetime.date,
+async def get_one_p2p(client: HTTPClientWrapper, background_task: BackgroundTasks, api_settings: Settings,
+                      pol: str, pod: str, search_range: SearchRange,
+                      direct_only: Optional[bool], start_date_type: StartDateType,
+                      scac: Optional[str] = None,
+                      departure_date: Optional[date] = None,
+                      arrival_date: Optional[date] = None,
                       service: Optional[str] = None, vessel_imo: Optional[str] = None,
                       tsp: Optional[str] = None) -> Generator:
     # Construct request parameters
     params: dict = {
         'originPort': pol,
         'destinationPort': pod,
-        'searchDate': start_date.strftime('%Y-%m-%d'),
-        'searchDateType': start_date_type,
-        'weeksOut': search_range,
+        'searchDate': str(departure_date or arrival_date),
+        'searchDateType': 'BY_DEPARTURE_DATE' if start_date_type == StartDateType.departure else 'BY_ARRIVAL_DATE',
+        'weeksOut': search_range.value,
         'directOnly': 'TRUE' if direct_only is True else 'FALSE'
     }
 
@@ -130,14 +123,14 @@ async def get_one_p2p(client: HTTPClientWrapper, background_task: BackgroundTask
     token: str = await get_one_access_token(
         client=client,
         background_task=background_task,
-        token_url=token_url,
-        auth=auth,
-        api_key=pw
+        token_url=api_settings.oney_turl,
+        auth=api_settings.oney_auth.get_secret_value(),
+        api_key=api_settings.oney_token.get_secret_value()
     )
 
     # Construct request headers
     headers: dict = {
-        'apikey': pw,
+        'apikey': api_settings.oney_token.get_secret_value(),
         'Authorization': f'Bearer {token}',
         'Accept': 'application/json'
     }
@@ -147,7 +140,7 @@ async def get_one_p2p(client: HTTPClientWrapper, background_task: BackgroundTask
         client.parse(
             method='GET',
             background_tasks=background_task,
-            url=url,
+            url=api_settings.oney_url,
             params=params,
             headers=headers,
             namespace='one original response'

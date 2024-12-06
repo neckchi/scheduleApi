@@ -1,11 +1,11 @@
 import logging
-from typing import Annotated, Optional, get_args
+from typing import Annotated, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, Query, Request, Response
 
 from app.api.handler.p2p_schedule.external_api_routes import route_to_carrier_api
+from app.api.schemas.schema_request import QueryParams
 from app.api.schemas.schema_response import Product
-from app.api.schemas.schema_request import CarrierCode, QueryParams
 from app.internal.http.http_client_manager import HTTPClientWrapper, get_global_http_client_wrapper
 from app.internal.security import basic_auth
 from app.internal.setting import Settings, get_settings
@@ -37,15 +37,14 @@ async def get_schedules(background_tasks: BackgroundTasks,
     product_id = db.generate_uuid_from_string(namespace="schedule product", key=request.url)
     cache_result = await db.get(namespace="schedule product", key=request.url)
     if not cache_result:
-        port_code_mapping = await db.get_carrier_port_code(
-            [{'scac': carrier, 'kn_port_code': port_code, 'type': 'pol' if idx == 0 else 'pod'} for carrier in
-             (get_args(CarrierCode) if query_params.scac == [None] else query_params.scac) for idx, port_code in
-             enumerate([query_params.point_from, query_params.point_to])])
+        # port_code_mapping = await db.get_carrier_port_code(
+        #     [{'scac': carrier, 'kn_port_code': port_code, 'type': 'pol' if idx == 0 else 'pod'} for carrier in
+        #      (get_args(CarrierCode) if query_params.scac == [None] else query_params.scac) for idx, port_code in
+        #      enumerate([query_params.point_from, query_params.point_to])])
         # 👇 Having this allows for waiting for all our tasks with strong safety guarantees,logic around cancellation for failures,coroutine-safe and grouping of exceptions.
         final_schedule = await route_to_carrier_api(client=client, product_id=product_id, request=request,
                                                     query_params=query_params, response=response,
-                                                    settings=settings, port_code_mapping=port_code_mapping,
-                                                    background_tasks=background_tasks)
+                                                    settings=settings, background_tasks=background_tasks)
         return final_schedule
     else:
         return cache_result

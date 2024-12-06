@@ -3,8 +3,10 @@ from typing import Iterator, Optional
 
 from fastapi import BackgroundTasks
 
+from app.api.schemas.schema_request import SearchRange, StartDateType
 from app.api.schemas.schema_response import Leg, PointBase, Schedule, Service, Transportation, Voyage
 from app.internal.http.http_client_manager import HTTPClientWrapper
+from app.internal.setting import Settings
 
 
 def process_leg_data(leg_task: list) -> list:
@@ -54,21 +56,30 @@ def process_schedule_data(task: dict, service: str, tsp: str, vessel_imo: str) -
         yield schedule_body
 
 
-async def get_hlag_p2p(client: HTTPClientWrapper, background_task: BackgroundTasks, url: str, client_id: str,
-                       client_secret: str, pol: str, pod: str, search_range: int,
-                       etd: Optional[datetime] = None, eta: Optional[datetime] = None,
+async def get_hlag_p2p(client: HTTPClientWrapper, background_task: BackgroundTasks,
+                       api_settings: Settings,
+                       pol: str, pod: str,
+                       search_range: SearchRange,
+                       start_date_type: Optional[StartDateType] = None,
+                       departure_date: Optional[datetime] = None,
+                       arrival_date: Optional[datetime] = None,
                        direct_only: Optional[bool] = None,
-                       service: Optional[str] = None, tsp: Optional[str] = None, vessel_imo: Optional[str] = None):
+                       scac: Optional[str] = None,
+                       service: Optional[str] = None,
+                       tsp: Optional[str] = None,
+                       vessel_imo: Optional[str] = None):
     # Determine the start and end day based on ETD or ETA
-    start_day: str = etd.strftime("%Y-%m-%dT%H:%M:%S.%SZ") if etd else eta.strftime("%Y-%m-%dT%H:%M:%S.%SZ")
+    start_day: str = departure_date.strftime("%Y-%m-%dT%H:%M:%S.%SZ") if departure_date else arrival_date.strftime(
+        "%Y-%m-%dT%H:%M:%S.%SZ")
     end_day: str = (
-        (etd + timedelta(days=search_range)).strftime("%Y-%m-%dT%H:%M:%S.%SZ") if etd else
-        (eta + timedelta(days=search_range)).strftime("%Y-%m-%dT%H:%M:%S.%SZ")
+        (departure_date + timedelta(days=int(search_range.duration))).strftime(
+            "%Y-%m-%dT%H:%M:%S.%SZ") if departure_date else
+        (arrival_date + timedelta(days=int(search_range.duration))).strftime("%Y-%m-%dT%H:%M:%S.%SZ")
     )
 
     # Construct the request parameters
     params: dict = {'placeOfReceipt': pol, 'placeOfDelivery': pod}
-    if etd:
+    if departure_date:
         params.update({'departureDateTime:gte': start_day, 'departureDateTime:lte': end_day})
     else:
         params.update({'arrivalDateTime:gte': start_day, 'arrivalDateTime:lte': end_day})
@@ -84,8 +95,8 @@ async def get_hlag_p2p(client: HTTPClientWrapper, background_task: BackgroundTas
 
     # Construct the request headers
     headers: dict = {
-        'X-IBM-Client-Id': client_id,
-        'X-IBM-Client-Secret': client_secret,
+        'X-IBM-Client-Id': api_settings.hlcu_client_id.get_secret_value(),
+        'X-IBM-Client-Secret': api_settings.hlcu_client_secret.get_secret_value(),
         'Accept': 'application/json'
     }
 
@@ -94,7 +105,7 @@ async def get_hlag_p2p(client: HTTPClientWrapper, background_task: BackgroundTas
         client.parse(
             method='GET',
             background_tasks=background_task,
-            url=url,
+            url=api_settings.hlcu_url,
             params=params,
             headers=headers,
             namespace='hlag original response'

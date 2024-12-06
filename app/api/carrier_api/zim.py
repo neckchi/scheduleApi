@@ -3,8 +3,10 @@ from typing import Iterator, Optional, Generator
 
 from fastapi import BackgroundTasks
 
+from app.api.schemas.schema_request import SearchRange, StartDateType
 from app.api.schemas.schema_response import Cutoff, Leg, PointBase, Schedule, Service, Transportation, Voyage
 from app.internal.http.http_client_manager import HTTPClientWrapper
+from app.internal.setting import Settings
 
 TRANSPORT_TYPE: dict = {'Land Trans': 'Truck', 'Feeder': 'Feeder', 'TO BE NAMED': 'Vessel', 'BAR': 'Barge'}
 
@@ -54,7 +56,7 @@ def process_schedule_data(task: dict, direct_only: bool | None, vessel_imo: str,
     transshipment_port: bool = any(
         tsport['departurePort'] == tsp for tsport in task['routeLegs'][1:]) if check_transshipment and tsp else False
     if (transshipment_port or not tsp) and (direct_only is None or direct_only != check_transshipment) and (
-      check_service_code or not service) and check_vessel_imo:
+            check_service_code or not service) and check_vessel_imo:
         transit_time: int = task['transitTime']
         first_point_from: str = task['departurePort']
         check_nearest_pol_etd: tuple = next(
@@ -81,17 +83,23 @@ async def get_zim_access_token(client: HTTPClientWrapper, background_tasks: Back
     return response_token['access_token']
 
 
-async def get_zim_p2p(client: HTTPClientWrapper, background_task: BackgroundTasks, url: str, token_url: str, pw: str,
-                      zim_client: str, zim_secret: str, pol: str, pod: str,
-                      search_range: int, start_date_type: str, start_date: datetime.date,
-                      direct_only: Optional[bool], vessel_imo: Optional[str] = None, service: Optional[str] = None,
+async def get_zim_p2p(client: HTTPClientWrapper, background_task: BackgroundTasks, api_settings: Settings,
+                      pol: str,
+                      pod: str,
+                      search_range: SearchRange, start_date_type: StartDateType,
+                      scac: Optional[str] = None,
+                      direct_only: Optional[bool] = None,
+                      departure_date: Optional[datetime.date] = None, arrival_date: Optional[datetime.date] = None,
+                      vessel_imo: Optional[str] = None, service: Optional[str] = None,
                       tsp: Optional[str] = None) -> Generator:
     # Construct request parameters
     params: dict = {
         'originCode': pol,
         'destCode': pod,
-        'fromDate': start_date.strftime('%Y-%m-%d'),
-        'toDate': (start_date + timedelta(days=search_range)).strftime('%Y-%m-%d'),
+        'fromDate': str(departure_date or arrival_date),
+        'toDate': (departure_date + timedelta(days=int(search_range.duration))).strftime(
+            '%Y-%m-%d') if start_date_type == StartDateType.departure else (
+            arrival_date + timedelta(days=int(search_range.duration))).strftime('%Y-%m-%d'),
         'sortByDepartureOrArrival': start_date_type
     }
 
@@ -106,15 +114,14 @@ async def get_zim_p2p(client: HTTPClientWrapper, background_task: BackgroundTask
     token: str = await get_zim_access_token(
         client=client,
         background_tasks=background_task,
-        token_url=token_url,
-        api_key=pw,
-        client_id=zim_client,
-        secret=zim_secret
+        token_url=api_settings.zim_turl,
+        api_key=api_settings.zim_token.get_secret_value(),
+        client_id=api_settings.zim_client.get_secret_value(),
+        secret=api_settings.zim_secret.get_secret_value()
     )
 
-    # Construct request headers
     headers: dict = {
-        'Ocp-Apim-Subscription-Key': pw,
+        'Ocp-Apim-Subscription-Key': api_settings.zim_token.get_secret_value(),
         'Authorization': f'Bearer {token}',
         'Accept': 'application/json'
     }
@@ -124,7 +131,7 @@ async def get_zim_p2p(client: HTTPClientWrapper, background_task: BackgroundTask
         client.parse(
             background_tasks=background_task,
             method='GET',
-            url=url,
+            url=api_settings.zim_url,
             params=params,
             headers=headers,
             namespace='zim original response'

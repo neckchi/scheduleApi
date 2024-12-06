@@ -1,11 +1,13 @@
 from datetime import datetime, timedelta
-from typing import Generator, Iterator
+from typing import Generator, Iterator, Optional
 
 from fastapi import BackgroundTasks
 
 from app.api.carrier_api.helpers import deepget
+from app.api.schemas.schema_request import SearchRange, StartDateType
 from app.api.schemas.schema_response import Cutoff, Leg, PointBase, Schedule, Service, Transportation, Voyage
 from app.internal.http.http_client_manager import HTTPClientWrapper
+from app.internal.setting import Settings
 
 
 def calculate_final_times(index: int, leg_etd: str, leg_tt: int, leg_transport: str, leg_from: dict, legs_to: dict,
@@ -48,7 +50,7 @@ def process_leg_data(schedule_task: dict, first_etd: str, last_eta: str) -> list
                                                          leg_transport=leg_transport, leg_from=legs['fromPoint'],
                                                          legs_to=legs['toPoint'], last_eta=last_eta)
             leg_transit_time: int = leg_tt if leg_tt else (
-              datetime.fromisoformat(final_eta[:10]) - datetime.fromisoformat(final_etd[:10])).days
+                datetime.fromisoformat(final_eta[:10]) - datetime.fromisoformat(final_etd[:10])).days
             leg_list.append(Leg.model_construct(
                 pointFrom=PointBase.model_construct(locationName=legs['fromPoint']['location']['name'],
                                                     locationCode=leg_pol,
@@ -93,7 +95,7 @@ def process_schedule_data(task: dict, direct_only: bool | None, vessel_imo: str,
     check_vessel_imo: bool = any(
         str(imo['vessel'].get('IMO')) == vessel_imo for imo in task['leg'] if imo.get('vessel')) if vessel_imo else True
     if (transshipment_port or not tsp) and (
-      direct_only is None or check_transshipment != direct_only) and check_service_code and check_vessel_imo:
+            direct_only is None or check_transshipment != direct_only) and check_service_code and check_vessel_imo:
         first_etd: str = task['por']['etd']
         last_eta: str = task['fnd']['eta']
         schedule_body = Schedule.model_construct(scac=task.get('carrierScac'),
@@ -106,15 +108,25 @@ def process_schedule_data(task: dict, direct_only: bool | None, vessel_imo: str,
         yield schedule_body
 
 
-async def get_iqax_p2p(client: HTTPClientWrapper, background_task: BackgroundTasks, url: str, pw: str, pol: str,
-                       pod: str, search_range: int, direct_only: bool | None,
-                       tsp: str | None = None, departure_date: datetime.date = None, arrival_date: datetime.date = None,
-                       vessel_imo: str | None = None, scac: str | None = None, service: str | None = None) -> Generator:
-    carrier_params: dict = {'appKey': pw, 'porID': pol, 'fndID': pod, 'departureFrom': departure_date,
-                            'arrivalFrom': arrival_date, 'searchDuration': search_range}
-    params: dict = {k: v for k, v in carrier_params.items() if v is not None}
+async def get_iqax_p2p(client: HTTPClientWrapper, background_task: BackgroundTasks, api_settings: Settings,
+                       pol: str,
+                       pod: str,
+                       search_range: SearchRange,
+                       departure_date: Optional[datetime.date] = None,
+                       arrival_date: Optional[datetime.date] = None,
+                       start_date_type: Optional[StartDateType] = None,
+                       direct_only: Optional[bool] = None,
+                       tsp: Optional[str] = None,
+                       vessel_imo: Optional[str] = None,
+                       scac: Optional[str] = None,
+                       service: Optional[str] = None) -> Generator:
+    carrier_params: dict = {'appKey': api_settings.iqax_token.get_secret_value(),
+                            'porID': pol, 'fndID': pod, 'departureFrom': departure_date,
+                            'arrivalFrom': arrival_date, 'searchDuration': search_range.value}
+    params: dict = {k: str(v) for k, v in carrier_params.items() if v is not None}
     response_json: dict = await anext(
-        client.parse(method='GET', background_tasks=background_task, url=url.format(scac), params=params,
+        client.parse(method='GET', background_tasks=background_task, url=api_settings.iqax_url.format(scac),
+                     params=params,
                      namespace=f'{scac} original response'))
     if schedule_data := response_json.get('routeGroupsList'):
         return (schedule_result for schedule_list in schedule_data for task in schedule_list['route'] for

@@ -36,37 +36,33 @@ def process_leg_data(schedule_task: dict, last_point_to: str, check_transshipmen
     leg_list += [Leg.model_construct(pointFrom=PointBase.model_construct(locationName=legs['loadPort'],
                                                                          locationCode=legs['loadPortCode'],
                                                                          terminalName=first_pol_terminal_name if legs[
-                                                                                                                     'vesselSequence'] == 1 else first_pot_terminal_name,
-                                                                         terminalCode=first_pol_terminal_code if legs[
-                                                                                                                     'vesselSequence'] == 1 else first_pot_terminal_code),
-                                     pointTo=PointBase.model_construct(locationName=legs['dischargePort'],
-                                                                       locationCode=legs.get(
-                                                                           'dischargePortCode') or last_point_to,
-                                                                       terminalName=first_pot_terminal_name if check_transshipment and
-                                                                                                               legs[
-                                                                                                                   'vesselSequence'] == 1 else last_pod_terminal_name,
-                                                                       terminalCode=first_pot_terminal_code if check_transshipment and
-                                                                                                               legs[
-                                                                                                                   'vesselSequence'] == 1 else last_pod_terminal_code),
-                                     etd=etd,
-                                     eta=(eta := legs.get('vesselArrivalDate')),
-                                     cutoffs=Cutoff.model_construct(cyCutoffDate=first_cy_cutoff,
-                                                                    docCutoffDate=first_doc_cutoff) if index == 0 and (
-                                       first_cy_cutoff or first_doc_cutoff) else None,
-                                     transitTime=int((datetime.datetime.fromisoformat(
-                                         eta) - datetime.datetime.fromisoformat(etd)).days),
-                                     transportations=Transportation.model_construct(transportType='Vessel' if (
-                                         vessel_name := legs.get('vesselName')) else 'Feeder',
-                                                                                    transportName=vessel_name,
-                                                                                    referenceType='IMO' if (
-                                                                                        imo_code := legs.get(
-                                                                                            'lloydRegisterNo')) else None,
-                                                                                    reference=imo_code),
-                                     services=Service.model_construct(serviceCode=check_service) if (
-                                         check_service := legs.get('vesselLoop')) else None,
-                                     voyages=Voyage.model_construct(internalVoyage=internal_voy if (
-                                         internal_voy := legs.get('voyageNumber')) else None)) for index, legs in
-                 enumerate(schedule_task['vessel']) if (etd := legs.get('vesselDepartureDate'))]
+        'vesselSequence'] == 1 else first_pot_terminal_name,
+        terminalCode=first_pol_terminal_code if legs[
+        'vesselSequence'] == 1 else first_pot_terminal_code),
+        pointTo=PointBase.model_construct(locationName=legs['dischargePort'],
+                                          locationCode=legs.get(
+            'dischargePortCode') or last_point_to,
+        terminalName=first_pot_terminal_name if check_transshipment and legs['vesselSequence'] == 1 else last_pod_terminal_name,
+        terminalCode=first_pot_terminal_code if check_transshipment and legs['vesselSequence'] == 1 else last_pod_terminal_code),
+        etd=etd,
+        eta=(eta := legs.get('vesselArrivalDate')),
+        cutoffs=Cutoff.model_construct(cyCutoffDate=first_cy_cutoff,
+                                       docCutoffDate=first_doc_cutoff) if index == 0 and (
+        first_cy_cutoff or first_doc_cutoff) else None,
+        transitTime=int((datetime.datetime.fromisoformat(
+            eta) - datetime.datetime.fromisoformat(etd)).days),
+        transportations=Transportation.model_construct(transportType='Vessel' if (
+            vessel_name := legs.get('vesselName')) else 'Feeder',
+        transportName=vessel_name,
+        referenceType='IMO' if (
+            imo_code := legs.get(
+                'lloydRegisterNo')) else None,
+        reference=imo_code),
+        services=Service.model_construct(serviceCode=check_service) if (
+        check_service := legs.get('vesselLoop')) else None,
+        voyages=Voyage.model_construct(internalVoyage=internal_voy if (
+            internal_voy := legs.get('voyageNumber')) else None)) for index, legs in
+        enumerate(schedule_task['vessel']) if (etd := legs.get('vesselDepartureDate'))]
     # inbound
     leg_list += [Leg.model_construct(
         pointFrom=PointBase.model_construct(locationName=schedule_task['inboundInland']['fromLocationName'],

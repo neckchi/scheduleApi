@@ -1,11 +1,27 @@
 from datetime import date
 from enum import Enum, StrEnum
-from typing import Annotated, Any, List, Literal, Optional
+from typing import Annotated, Any, List, Optional
 
 from pydantic import BaseModel, Field, TypeAdapter
 
-CarrierCode = Literal[
-    'MSCU', 'CMDU', 'ANNU', 'APLU', 'CHNL', 'ONEY', 'HDMU', 'ZIMU', 'MAEU', 'MAEI', 'OOLU', 'COSU', 'HLCU']
+
+class CarrierCode(str, Enum):
+    MSCU = 'MSCU'
+    CMDU = 'CMDU'
+    ANNU = 'ANNU'
+    APLU = 'APLU'
+    CHNL = 'CHNL'
+    ONEY = 'ONEY'
+    ZIMU = 'ZIMU'
+    MAEU = 'MAEU'
+    MAEI = 'MAEI'
+    OOLU = 'OOLU'
+    COSU = 'COSU'
+    HLCU = 'HLCU'
+
+    @classmethod
+    def exclude(cls, *scac_to_exclude):
+        return [scac for scac in cls if scac not in scac_to_exclude]
 
 
 class StartDateType(StrEnum):
@@ -14,10 +30,10 @@ class StartDateType(StrEnum):
 
 
 class SearchRange(Enum):
-    One = ('1', 7)
-    Two = ('2', 14)
-    Three = ('3', 21)
-    Four = ('4', 28)
+    One = ('1', '7')
+    Two = ('2', '14')
+    Three = ('3', '21')
+    Four = ('4', '28')
 
     def __new__(cls, value, days):
         member = object.__new__(cls)
@@ -39,7 +55,7 @@ class QueryParams(BaseModel):
         date, Field(validation_alias="startDate", serialization_alias="startDate", description='YYYY-MM-DD')]
     search_range: Annotated[SearchRange, Field(validation_alias='searchRange', serialization_alias='searchRange',
                                                description='Search range based on start date and type,max 4 weeks')]
-    scac: Annotated[List[CarrierCode | None], Field(default=[None])]
+    scac: Annotated[Optional[List[CarrierCode]], Field(default_factory=list, description="List of Carrier Codes")]
     direct_only: Annotated[
         Optional[bool], Field(validation_alias='directOnly', serialization_alias='directOnly', default=None,
                               description='Direct means only show direct schedule Else show both(direct/transshipment)type of schedule')]
