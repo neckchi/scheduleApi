@@ -45,9 +45,9 @@ async def upload_port_code_mapping(upload_file: UploadFile):
 
 @router.get("/read", summary="Read port code mapping information", response_model=List[PortCodeMapping])
 async def read_port_code_mapping(
-  scac: CarrierCode | None = Query(default=None, description='Search for port code by carrier code'),
-  kn_port_code: str | None = Query(alias='knPortCode', default=None, max_length=5, pattern=r"[A-Z]{2}[A-Z0-9]{3}",
-                                   example='HKHKG', description='Search by either port or point of origin')):
+    scac: CarrierCode | None = Query(default=None, description='Search for port code by carrier code'),
+    kn_port_code: str | None = Query(alias='knPortCode', default=None, max_length=5, pattern=r"[A-Z]{2}[A-Z0-9]{3}",
+                                     example='HKHKG', description='Search by either port or point of origin')):
     try:
         read_result = await db.read_port_mapping_code(scac=scac, kn_port_code=kn_port_code)
         validated = PORT_CODE_ADAPTER.validate_python(read_result) if read_result else ...
@@ -75,14 +75,14 @@ async def refresh_port_code_mapping(query_params: Annotated[PortCodeMapping, Que
 
 @router.delete("/delete", summary="Delete port code mapping information")
 async def delete_port_code_mapping(
-  scac: CarrierCode | None = Query(default=None, description='Search for port code by carrier code'),
-  kn_port_code: str | None = Query(alias='knPortCode', default=None, max_length=5, pattern=r"[A-Z]{2}[A-Z0-9]{3}",
-                                   example='HKHKG', description='Search by either port or point of origin')):
+    scac: CarrierCode | None = Query(default=None, description='Search for port code by carrier code'),
+    kn_port_code: str | None = Query(alias='knPortCode', default=None, max_length=5, pattern=r"[A-Z]{2}[A-Z0-9]{3}",
+                                     example='HKHKG', description='Search by either port or point of origin')):
     """
     You can choose to delete either all the port mapping  or specific port mapping based on scac or/and kn port code
     """
     try:
         await db.delete_port_mapping_code(scac=scac, kn_port_code=kn_port_code)
-        return JSONResponse(status_code=status.HTTP_200_OK, content=f'Deleted all entries')
+        return JSONResponse(status_code=status.HTTP_200_OK, content='Deleted all entries')
     except ValidationError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Validation error:{e.errors()}")
