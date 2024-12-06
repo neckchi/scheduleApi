@@ -260,7 +260,7 @@ class HTTPClientWrapper:
         return final_result
 
 
-http_client = HTTPClientWrapper('http://zscaler.proxy.int.kn:80')
+http_client = HTTPClientWrapper('http://proxy.eu-central-1.aws.int.kn:80')
 
 
 async def startup_event():
