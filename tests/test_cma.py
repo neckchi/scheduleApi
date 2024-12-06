@@ -19,7 +19,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(config_path)))
 # Import the actual config module
 
 # Read the actual configmap.yaml file
-configmap_path = os.path.join(os.path.dirname(config_path), 'configmap.yaml')
+# configmap_path = os.path.join(os.path.dirname(config_path), 'configmap.yaml')
+configmap_path = os.path.join(os.path.dirname(config_path), '..', 'configmap.yaml')
 with open(configmap_path, 'r') as f:
     configmap_content = yaml.safe_load(f)
 
