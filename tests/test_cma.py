@@ -1,6 +1,7 @@
-from app.carrierp2p.cma import get_cma_p2p, process_schedule_data, process_leg_data, \
+import app.api.carrier_api.cma
+from app.api.carrier_api.cma import get_cma_p2p, process_schedule_data, process_leg_data, \
     DEFAULT_ETD_ETA
-import app.config as config
+import app.internal.setting as config
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 import sys
@@ -25,7 +26,7 @@ with open(configmap_path, 'r') as f:
 config.load_yaml = lambda: configmap_content
 
 # Mock the redis_mgr module
-sys.modules['app.background_tasks.redis_mgr'] = MagicMock()
+sys.modules['app.storage.redis_mgr'] = MagicMock()
 
 
 # Mock HTTPClientWrapper
@@ -121,8 +122,7 @@ class TestGetCmaP2p:
         direct_only = True
 
         mock_response = [{"transitTime": 10, "some": "data"}]
-
-        with patch('app.carrierp2p.cma.fetch_initial_schedules', new_callable=AsyncMock) as mock_fetch:
+        with patch('app.api.carrier_api.cma.fetch_schedules', new_callable=AsyncMock) as mock_fetch:
             mock_fetch.return_value = mock_response
             result = await get_cma_p2p(mock_client, url, pw, pol, pod, search_range, direct_only)
             assert isinstance(result, GeneratorType)
@@ -146,7 +146,7 @@ class TestGetCmaP2p:
         search_range = 7
         direct_only = True
 
-        with patch('app.carrierp2p.cma.fetch_initial_schedules', new_callable=AsyncMock) as mock_fetch:
+        with patch('app.api.carrier_api.cma.fetch_schedules', new_callable=AsyncMock) as mock_fetch:
             mock_fetch.return_value = []
             result = await get_cma_p2p(mock_client, url, pw, pol, pod, search_range, direct_only)
             assert result is None
@@ -163,7 +163,7 @@ class TestGetCmaP2p:
 
         mock_response = [{"transitTime": 10, "some": "data"}]
 
-        with patch('app.carrierp2p.cma.fetch_initial_schedules', new_callable=AsyncMock) as mock_fetch:
+        with patch('app.api.carrier_api.cma.fetch_schedules', new_callable=AsyncMock) as mock_fetch:
             mock_fetch.return_value = mock_response
             result = await get_cma_p2p(mock_client, url, pw, pol, pod, search_range, direct_only, scac=scac)
             assert isinstance(result, GeneratorType)
@@ -189,7 +189,7 @@ class TestGetCmaP2p:
 
         mock_response = [{"transitTime": 10, "some": "data"}]
 
-        with patch('app.carrierp2p.cma.fetch_initial_schedules', new_callable=AsyncMock) as mock_fetch:
+        with patch('app.api.carrier_api.cma.fetch_schedules', new_callable=AsyncMock) as mock_fetch:
             mock_fetch.return_value = mock_response
             result = await get_cma_p2p(mock_client, url, pw, pol, pod, search_range, direct_only)
             assert isinstance(result, GeneratorType)
