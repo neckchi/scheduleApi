@@ -1,6 +1,7 @@
-from datetime import date
-
-import app.config as config
+import app.api.carrier_api.cma
+from app.api.carrier_api.cma import get_cma_p2p, process_schedule_data, process_leg_data, \
+    DEFAULT_ETD_ETA
+import app.internal.setting as config
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 import sys
@@ -25,7 +26,7 @@ with open(configmap_path, 'r') as f:
 config.load_yaml = lambda: configmap_content
 
 # Mock the redis_mgr module
-sys.modules['app.background_tasks.redis_mgr'] = MagicMock()
+sys.modules['app.storage.redis_mgr'] = MagicMock()
 
 
 # Mock HTTPClientWrapper
@@ -38,28 +39,6 @@ class MockHTTPClientWrapper:
 @pytest.fixture
 def mock_client():
     return MockHTTPClientWrapper()
-
-
-@pytest.fixture(autouse=True)
-def mock_load_yaml():
-    with patch("app.config.load_yaml", return_value={"data": {"backgroundTasks": {"scheduleExpiry": 3600}}}):
-        yield
-
-
-@pytest.fixture
-def mock_settings():
-    return config.Settings()
-
-
-@pytest.fixture(autouse=True)
-def mock_env_vars(monkeypatch):
-    monkeypatch.setenv("REDIS_HOST", "localhost")
-    monkeypatch.setenv("REDIS_PORT", "6379")
-    monkeypatch.setenv("REDIS_DB", "0")
-    monkeypatch.setenv("REDIS_USER", "test_user")
-    monkeypatch.setenv("REDIS_PW", "test_password")
-    monkeypatch.setenv("CMA_URL", "http://example.com")
-    monkeypatch.setenv("CMA_TOKEN", "test_token")
 
 
 @pytest.fixture
@@ -84,9 +63,9 @@ def sample_leg_data():
             },
             "departureDateLocal": "2024-01-01T12:00:00",
             "cutOff": {
-                "shippingInstructionAcceptance": {"gmt": "2024-01-01T10:00:00"},
-                "portCutoff": {"gmt": "2024-01-01T11:00:00"},
-                "vgm": {"gmt": "2024-01-01T09:00:00"}
+                "shippingInstructionAcceptance": {"local": "2024-01-01T10:00:00"},
+                "portCutoff": {"local": "2024-01-01T11:00:00"},
+                "vgm": {"local": "2024-01-01T09:00:00"}
             }
         },
         "pointTo": {
@@ -122,10 +101,6 @@ def sample_schedule_data(sample_leg_data):
     }
 
 
-from app.carrierp2p.cma import get_cma_p2p, process_schedule_data, process_leg_data, \
-    DEFAULT_ETD_ETA
-
-
 def deepget(d, *keys, default=None):
     try:
         for key in keys:
@@ -138,47 +113,28 @@ def deepget(d, *keys, default=None):
 class TestGetCmaP2p:
 
     @pytest.mark.asyncio
-    async def test_get_cma_p2p_with_cache(self, mock_process_schedule_data):
+    async def test_get_cma_p2p_us_to_us(self, mock_process_schedule_data):
         url = "http://example.com/api"
         pw = "password123"
         pol = "USNYC"
         pod = "USLAX"
         search_range = 7
         direct_only = True
-        mock_background_task = AsyncMock()
 
-        cached_response = [{"transitTime": 10, "cached": "data"}]
-
-        with patch('app.background_tasks.db.get', new_callable=AsyncMock) as mock_db_get, \
-                patch('app.carrierp2p.cma.fetch_initial_schedules', new_callable=AsyncMock) as mock_fetch:
-            # Configure mock_db_get to return cached data
-            mock_db_get.return_value = cached_response
-
-            result = await get_cma_p2p(
-                mock_client,
-                mock_background_task,
-                url,
-                pw,
-                pol,
-                pod,
-                search_range,
-                direct_only
-            )
-
+        mock_response = [{"transitTime": 10, "some": "data"}]
+        with patch('app.api.carrier_api.cma.fetch_schedules', new_callable=AsyncMock) as mock_fetch:
+            mock_fetch.return_value = mock_response
+            result = await get_cma_p2p(mock_client, url, pw, pol, pod, search_range, direct_only)
             assert isinstance(result, GeneratorType)
 
-            # Verify fetch_initial_schedules was NOT called (because we got cached data)
-            mock_fetch.assert_not_called()
-
-            # Verify db.get was called with correct parameters
-            mock_db_get.assert_called_once()
-            db_call_args = mock_db_get.call_args[1]
-            assert db_call_args['scac'] == 'cma_group'
+            # Check if fetch_initial_schedules was called with correct parameters
+            mock_fetch.assert_called_once()
+            call_args = mock_fetch.call_args[1]
+            assert call_args['extra_condition']
 
             # Check the content of the generator
             result_list = list(result)
             assert len(result_list) > 0
-            # Assert the processed cached data matches expectations
             assert result_list[0] == {'processed': 'data'}
 
     @pytest.mark.asyncio
@@ -189,15 +145,11 @@ class TestGetCmaP2p:
         pod = "CNSHA"
         search_range = 7
         direct_only = True
-        mock_background_task = AsyncMock()
 
-        with patch('app.background_tasks.db.get', new_callable=AsyncMock) as mock_db_get, \
-                patch('app.carrierp2p.cma.fetch_initial_schedules', new_callable=AsyncMock) as mock_fetch:
-            mock_db_get.return_value = []
-            result = await get_cma_p2p(mock_client, mock_background_task, url, pw, pol, pod, search_range, direct_only)
-            assert isinstance(result, GeneratorType)
-            result_list = list(result)
-            assert len(result_list) == 0
+        with patch('app.api.carrier_api.cma.fetch_schedules', new_callable=AsyncMock) as mock_fetch:
+            mock_fetch.return_value = []
+            result = await get_cma_p2p(mock_client, url, pw, pol, pod, search_range, direct_only)
+            assert result is None
 
     @pytest.mark.asyncio
     async def test_get_cma_p2p_with_scac(self, mock_process_schedule_data):
@@ -211,18 +163,12 @@ class TestGetCmaP2p:
 
         mock_response = [{"transitTime": 10, "some": "data"}]
 
-        mock_background_task = AsyncMock()
-
-        with patch('app.background_tasks.db.get', new_callable=AsyncMock) as mock_db_get, \
-                patch('app.carrierp2p.cma.fetch_initial_schedules', new_callable=AsyncMock) as mock_fetch:
+        with patch('app.api.carrier_api.cma.fetch_schedules', new_callable=AsyncMock) as mock_fetch:
             mock_fetch.return_value = mock_response
-            mock_db_get.return_value = None
-            result = await get_cma_p2p(mock_client, mock_background_task, url, pw, pol, pod, search_range, direct_only,
-                                       scac=scac)
+            result = await get_cma_p2p(mock_client, url, pw, pol, pod, search_range, direct_only, scac=scac)
             assert isinstance(result, GeneratorType)
 
             # Check if fetch_initial_schedules was called with correct parameters
-            mock_db_get.assert_called_once()
             mock_fetch.assert_called_once()
             call_args = mock_fetch.call_args[1]
             assert call_args['cma_list'] == ['0001']  # Assuming '0001' corresponds to 'CMDU' in CMA_GROUP
@@ -233,69 +179,6 @@ class TestGetCmaP2p:
             assert result_list[0] == {'processed': 'data'}
 
     @pytest.mark.asyncio
-    async def test_get_cma_p2p_cache_hit(self, mock_process_schedule_data):
-        url = "http://example.com/api"
-        pw = "password123"
-        pol = "USNYC"
-        pod = "CNSHA"
-        search_range = 7
-        direct_only = True
-        scac = "CMDU"
-        # Mock dependencies
-        mock_client = AsyncMock()
-        mock_background_task = AsyncMock()
-        mock_response = [{"transitTime": 10, "some": "data"}]
-
-        # Mock process_schedule_data to return a simple generator
-        with patch('app.background_tasks.db.get', new_callable=AsyncMock) as mock_db_get, \
-                patch('app.carrierp2p.cma.fetch_initial_schedules', new_callable=AsyncMock) as mock_fetch:
-            mock_db_get.return_value = mock_response
-            mock_fetch.return_value = None
-            # Call the function
-            result = await get_cma_p2p(mock_client, mock_background_task, url, pw, pol, pod, search_range, direct_only,
-                                       scac=scac)
-
-            # Collect results from the generator
-            result_list = list(result)
-
-            # Assertions
-            assert result_list[0] == {'processed': 'data'}
-            mock_db_get.assert_awaited_once()
-            mock_client.parse.assert_not_called()  # fetch_initial_schedules is not called
-
-    @pytest.mark.asyncio
-    async def test_get_cma_p2p_cache_miss(self, mock_process_schedule_data):
-        url = "http://example.com/api"
-        pw = "password123"
-        pol = "USNYC"
-        pod = "CNSHA"
-        search_range = 7
-        direct_only = True
-        scac = "CMDU"
-        # Mock dependencies
-        mock_client = AsyncMock()
-        mock_background_task = AsyncMock()
-        mock_response = [{"transitTime": 10, "some": "data"}]
-
-        # Mock process_schedule_data to return a simple generator
-        with patch('app.background_tasks.db.get', new_callable=AsyncMock) as mock_db_get, \
-                patch('app.carrierp2p.cma.fetch_initial_schedules', new_callable=AsyncMock) as mock_fetch:
-            mock_db_get.return_value = None
-            mock_fetch.return_value = mock_response
-            # Call the function
-            result = await get_cma_p2p(mock_client, mock_background_task, url, pw, pol, pod, search_range, direct_only,
-                                       scac=scac)
-
-            # Collect results from the generator
-            result_list = list(result)
-
-            # Assertions
-            assert result_list[0] == {'processed': 'data'}
-            mock_db_get.assert_awaited_once()
-            mock_fetch.assert_awaited_once()
-            mock_client.parse.assert_not_called()  # fetch_initial_schedules is not called
-
-    @pytest.mark.asyncio
     async def test_get_cma_p2p_basic(self, mock_process_schedule_data):
         url = "http://example.com/api"
         pw = "password123"
@@ -303,15 +186,12 @@ class TestGetCmaP2p:
         pod = "CNSHA"
         search_range = 7
         direct_only = True
-        mock_background_task = AsyncMock()
 
         mock_response = [{"transitTime": 10, "some": "data"}]
 
-        with patch('app.background_tasks.db.get', new_callable=AsyncMock) as mock_db_get, \
-                patch('app.carrierp2p.cma.fetch_initial_schedules', new_callable=AsyncMock) as mock_fetch:
-            mock_db_get.return_value = None
+        with patch('app.api.carrier_api.cma.fetch_schedules', new_callable=AsyncMock) as mock_fetch:
             mock_fetch.return_value = mock_response
-            result = await get_cma_p2p(mock_client, mock_background_task, url, pw, pol, pod, search_range, direct_only)
+            result = await get_cma_p2p(mock_client, url, pw, pol, pod, search_range, direct_only)
             assert isinstance(result, GeneratorType)
 
             # Check if fetch_initial_schedules was called with correct parameters
