@@ -22,6 +22,62 @@ stored in a gitignored file, in OCP they can be provided via Secret.
 **TODO:** If we use redis_mgr.py,please setup redis, put the credential into env file ,uncomment the redis credential in
 config.py and change cacheDB to RedisDB in configmap.yaml
 
+# Project Structure
+      p2papi/
+      ├── app/
+      │   ├── api/
+      │   │   ├── handler/                     # Handles all business-related logic
+      │   │   │   ├── p2p_schedule/            # P2P schedule management
+      │   │   │   │   ├── carrier_api/         # Handles all carrier-related mapping logic
+      │   │   │   │   │   ├── __init__.py
+      │   │   │   │   │   ├── cma.py
+      │   │   │   │   │   ├── hamburgsud.py
+      │   │   │   │   │   ├── helpers.py
+      │   │   │   │   │   ├── hlag.py
+      │   │   │   │   │   ├── hmm.py
+      │   │   │   │   │   ├── iqax.py
+      │   │   │   │   │   ├── maersk.py
+      │   │   │   │   │   ├── msc.py
+      │   │   │   │   │   ├── one.py
+      │   │   │   │   │   ├── zim.py
+      │   │   │   │   ├── schedules_router.py  # P2P schedule router
+      │   │   │   │   ├── __init__.py
+      │   │   │   ├── port_mapping/            # Port mapping logic (Ignore this as we handled separately with other DB interface)
+      │   │   │   │   ├── __init__.py
+      │   │   │   │   ├── port_map.py
+      │   │   ├── schemas/                     # API schema definitions
+      │   │   │   ├── __init__.py
+      │   │   │   ├── schema_request.py
+      │   │   │   ├── schema_response.py
+      │   ├── internal/                        # Internal logic not accessible by other packages
+      │   │   ├── http/                        # HTTP client logic
+      │   │   │   ├── __init__.py
+      │   │   │   ├── http_client_manager.py   # Handles HTTP client pool, lifecycle, and original response caching
+      │   │   │   ├── middleware.py            # Middleware for each HTTP client
+      │   │   ├── logging.py                   # Logging 
+      │   │   ├── security.py                  # Security configurations
+      │   │   ├── setting.py                   # Configuration settings
+      │   │   ├── storage/                     # Database management
+      │   │   │   ├── __init__.py
+      │   │   │   ├── redis_mgr.py             # Redis manager for storage
+      │   ├── .env                             # Environment variables file
+      │   ├── .env.example                     
+      │   ├── __init__.py
+      │   ├── configmap.yaml                   # Configuration map
+      │   ├── main.py                          # Main application entry point
+      ├── cicd/                                # Continuous Integration/Continuous Deployment scripts and configurations
+      ├── tests/                               # Unit and integration tests
+      ├── .flake8                              # Linting configuration
+      ├── .gitignore                           # Git ignored files configuration
+      ├── .gitlab-ci.yml                       # GitLab CI/CD pipeline configuration
+      ├── cicd-workflow.png                    # CI/CD workflow diagram
+      ├── Dockerfile                           # Docker configuration for containerization
+      ├── poetry.lock                          # Poetry dependency lock file
+      ├── pyproject.toml                       # Poetry project configuration
+      ├── README.md                            # Project documentation
+      ├── requirements.txt                     # Python dependencies file
+
+
 # CICD Workflow
 
 This section describes the CICD workflow.
