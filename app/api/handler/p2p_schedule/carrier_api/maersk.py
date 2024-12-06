@@ -4,7 +4,7 @@ from typing import Generator, Iterator, Optional
 
 from fastapi import BackgroundTasks
 
-from app.api.carrier_api.helpers import deepget
+from app.api.handler.p2p_schedule.carrier_api.helpers import deepget
 from app.api.schemas.schema_request import SearchRange, StartDateType
 from app.api.schemas.schema_response import Cutoff, Leg, PointBase, Schedule, Service, Transportation, Voyage
 from app.internal.http.http_client_manager import HTTPClientWrapper
