@@ -98,9 +98,9 @@ This section describes the CICD workflow.
 
 # Environments:
 
-## [DEV](http://internal-p2papicarriers-alb-670514342.eu-central-1.elb.amazonaws.com/)
+## [DEV]
 
-## [UAT](http://internal-p2papicarriers-alb-1729903004.eu-central-1.elb.amazonaws.com/)
+## [UAT]
 
 ## [PROD]()
 
@@ -109,7 +109,7 @@ This section describes the CICD workflow.
 ## Force Redeploy
 
 ´´´
-aws ecs update-service --cluster p2p_schedule_api_of_carriers_cluster --service p2p_schedule_api_of_carriers_service
+...
 --force-new-deployment
 ´´´
 
