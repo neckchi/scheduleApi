@@ -5,8 +5,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.openapi.utils import get_openapi
 
-from app.api.handler.p2p_schedule import schedules_router
-from app.api.handler.port_mapping import port_map
+from app.api.routers import schedules_router, port_map
 from app.api.schemas.schema_response import HealthCheck
 from app.internal.http.http_client_manager import shutdown_event, startup_event
 from app.internal.http.middleware import RequestContextLogMiddleware
