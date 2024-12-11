@@ -9,12 +9,12 @@ from app.api.schemas.schema_response import Cutoff, Leg, PointBase, Schedule, Se
 from app.internal.http.http_client_manager import HTTPClientWrapper
 from app.internal.setting import Settings
 
-DEFAULT_ETD_ETA = datetime.now().astimezone().replace(microsecond=0).isoformat()
+DEFAULT_ETD_ETA: str = datetime.now().astimezone().replace(microsecond=0).isoformat()
 
 CMA_GROUP: dict = {'0001': 'CMDU', '0002': 'ANNU', '0011': 'CHNL', '0015': 'APLU'}
 
 
-def extract_transportation(transportation: dict):
+def extract_transportation(transportation: dict) -> Transportation:
     """Map the transportation Details"""
     mean_of_transport: str = '/'.join(
         part.strip() for part in str(transportation['meanOfTransport']).title().split('/'))
@@ -36,38 +36,22 @@ def extract_transportation(transportation: dict):
 def process_leg_data(leg_task: list) -> list:
     leg_list: list = [
         Leg.model_construct(pointFrom=PointBase.model_construct(locationName=leg['pointFrom']['location']['name'],
-                                                                locationCode=leg['pointFrom']['location'].get(
-                                                                    'internalCode') or leg['pointFrom']['location'][
-            'locationCodifications'][0][
-            'codification'],
-            terminalName=deepget(leg['pointFrom']['location'],
-                                 'facility', 'name'),
-            terminalCode=check_pol_terminal[0].get(
-                                                                    'codification') if (check_pol_terminal := deepget(
-                                                                        leg['pointFrom']['location'], 'facility',
-                                                                        'facilityCodifications')) else None),
-            pointTo=PointBase.model_construct(locationName=leg['pointTo']['location']['name'],
-                                              locationCode=leg['pointTo']['location'].get(
-                'internalCode') or leg['pointTo']['location'][
-                'locationCodifications'][0][
-                'codification'],
-            terminalName=deepget(leg['pointTo']['location'],
-                                 'facility', 'name'),
-            terminalCode=check_pod_terminal[0].get(
-                'codification') if (check_pod_terminal := deepget(
-                    leg['pointTo']['location'], 'facility',
-                    'facilityCodifications')) else None),
-            etd=leg['pointFrom'].get('departureDateGmt', DEFAULT_ETD_ETA),
-            eta=leg['pointTo'].get('arrivalDateGmt', DEFAULT_ETD_ETA),
-            transitTime=leg.get('legTransitTime', 0),
-            transportations=extract_transportation(leg['transportation']),
-            services=Service.model_construct(serviceCode=service_name) if (
+                                                                locationCode=leg['pointFrom']['location'].get('internalCode') or leg['pointFrom']['location']['locationCodifications'][0]['codification'],
+                                                                terminalName=deepget(leg['pointFrom']['location'], 'facility', 'name'),
+                                                                terminalCode=check_pol_terminal[0].get('codification') if (check_pol_terminal := deepget(leg['pointFrom']['location'], 'facility', 'facilityCodifications')) else None),
+                            pointTo=PointBase.model_construct(locationName=leg['pointTo']['location']['name'], locationCode=leg['pointTo']['location'].get('internalCode') or leg['pointTo']['location']['locationCodifications'][0]['codification'],
+                                                              terminalName=deepget(leg['pointTo']['location'], 'facility', 'name'),
+                                                              terminalCode=check_pod_terminal[0].get('codification') if (check_pod_terminal := deepget(leg['pointTo']['location'], 'facility', 'facilityCodifications')) else None),
+                            etd=leg['pointFrom'].get('departureDateGmt', DEFAULT_ETD_ETA),
+                            eta=leg['pointTo'].get('arrivalDateGmt', DEFAULT_ETD_ETA),
+                            transitTime=leg.get('legTransitTime', 0),
+                            transportations=extract_transportation(leg['transportation']),
+                            services=Service.model_construct(serviceCode=service_name) if (
             service_name := deepget(leg['transportation'], 'voyage', 'service', 'code')) else None,
             voyages=Voyage.model_construct(internalVoyage=voyage_num if (
                 voyage_num := deepget(leg['transportation'], 'voyage', 'voyageReference')) else None),
             cutoffs=Cutoff.model_construct(
-            docCutoffDate=deepget(leg['pointFrom']['cutOff'], 'shippingInstructionAcceptance',
-                                  'utc'),
+            docCutoffDate=deepget(leg['pointFrom']['cutOff'], 'shippingInstructionAcceptance', 'utc'),
             cyCutoffDate=deepget(leg['pointFrom']['cutOff'], 'portCutoff', 'utc'),
             vgmCutoffDate=deepget(leg['pointFrom']['cutOff'], 'vgm', 'utc')) if leg[
             'pointFrom'].get('cutOff') else None) for leg in leg_task]

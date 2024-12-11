@@ -21,10 +21,9 @@ from app.storage import db
 
 
 class HTTPClientWrapper:
-    def __init__(self, proxy: Optional[str] = None) -> None:
+    def __init__(self) -> None:
         self.default_limits = load_yaml()['data']['connectionPoolSetting']
         self.limits = self.default_limits.copy()
-        self.proxy = proxy
         self.lock = asyncio.Lock()
         self._client: Optional[aiohttp.ClientSession] = None
 
@@ -49,7 +48,7 @@ class HTTPClientWrapper:
                     total=self.limits['elswhereTimeOut'],
                     connect=self.limits['poolTimeOut']
                 ),
-                trust_env=False,
+                trust_env=True,  # trust_env=True means read environment variables e.g:HTTP_PROXY,HTTPS_PROXY
                 headers={"Connection": "Keep-Alive"},
                 skip_auto_headers=['User-Agent']
             )
@@ -122,8 +121,7 @@ class HTTPClientWrapper:
                                     headers: Optional[Dict[str, Any]], json: Optional[Dict[str, Any]],
                                     data: Optional[Dict[str, Any]], ) -> AsyncGenerator[Dict[str, Any], None]:
         start_time = time.time()
-        async with self._client.request(method=method, url=url, params=params, headers=headers, json=json, data=data,
-                                        proxy=self.proxy) as extra_response:
+        async with self._client.request(method=method, url=url, params=params, headers=headers, json=json, data=data) as extra_response:
             response_time = time.time() - start_time
             logging.info(
                 f'{method} took {response_time:.2f}s to process the request {extra_response.url} {extra_response.status}')
@@ -144,7 +142,7 @@ class HTTPClientWrapper:
             else:
                 start_time = time.time()
                 async with self._client.request(method=method, url=url, params=params, headers=headers, json=json,
-                                                data=data, proxy=self.proxy) as response:
+                                                data=data) as response:
                     response_time = time.time() - start_time
                     logging.info(
                         f'{method} took {response_time:.2f}s to process the request {response.url} {response.status}')
@@ -192,8 +190,7 @@ class HTTPClientWrapper:
                 yield cache_result
             else:
                 start_time = time.time()
-                async with self._client.request(method, url=url, params=params, headers=headers, data=data,
-                                                proxy=self.proxy) as stream_request:
+                async with self._client.request(method, url=url, params=params, headers=headers, data=data) as stream_request:
                     # logging.info(self.client._connector._conns)
                     response_time = time.time() - start_time
                     logging.info(
@@ -260,7 +257,7 @@ class HTTPClientWrapper:
         return final_result
 
 
-http_client = HTTPClientWrapper('http://proxy.eu-central-1.aws.int.kn:80')
+http_client = HTTPClientWrapper()
 
 
 async def startup_event():
