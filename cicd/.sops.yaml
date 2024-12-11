@@ -1,9 +1,0 @@
-creation_rules:
-  - path_regex: .*/dev/.*
-    kms: 'arn:aws:kms:eu-central-1:934536729814:key/5713c297-51a8-4cea-aced-4b318f6fbd49'
-  - path_regex: .*/uat/.*
-    kms: 'arn:aws:kms:eu-central-1:279379121702:key/1eb3c3e8-059b-4d2b-9e12-a592398ce105'
-  - path_regex: .*/production/.*
-    kms: 'arn:aws:kms:eu-central-1:451265915793:key/3d903466-8aab-4e58-9430-c994bfe1705c'
-  - path_regex: .*/sandbox/.*
-    kms: 'arn:aws:kms:eu-central-1:544980404659:key/82ea8097-1139-4d40-974c-5ec971083c1e'
