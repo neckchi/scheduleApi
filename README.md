@@ -40,8 +40,6 @@ config.py and change cacheDB to RedisDB in configmap.yaml
       │   │   │   │   │   ├── msc.py
       │   │   │   │   │   ├── one.py
       │   │   │   │   │   ├── zim.py
-      │   │   │   │   ├── schedules_router.py  # P2P schedule router
-      │   │   │   │   ├── __init__.py
       │   │   ├── schemas/                     # API schema definitions
       │   │   │   ├── __init__.py
       │   │   │   ├── schema_request.py
